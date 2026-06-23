@@ -1,11 +1,12 @@
 import { Activity, BarChart3, Bot, ClipboardList, Lightbulb, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getLatestSnapshot, importSnapshot } from "./client/api";
+import { analyzeLatestSnapshot, getLatestSnapshot, importSnapshot } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
 import { CoachReport } from "./client/components/CoachReport";
 import { ManualImportPanel } from "./client/components/ManualImportPanel";
 import { NextPostQueue } from "./client/components/NextPostQueue";
 import { PostBreakdown } from "./client/components/PostBreakdown";
+import type { AnalysisOutput } from "./shared/analysis-schema";
 import type { CapturedAccountSnapshot } from "./shared/types";
 
 const navItems = [
@@ -20,6 +21,9 @@ export function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisOutput | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
 
@@ -41,7 +45,21 @@ export function App() {
 
   async function handleImport(rawJson: string) {
     await importSnapshot(JSON.parse(rawJson));
+    setAnalysis(null);
+    setAnalysisError(null);
     await refresh();
+  }
+
+  async function handleAnalyze() {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      setAnalysis(await analyzeLatestSnapshot());
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   return (
@@ -88,17 +106,21 @@ export function App() {
         <CaptureBar
           snapshot={snapshot}
           loading={loading}
+          analyzing={analyzing}
           error={loadError}
+          onAnalyze={() => void handleAnalyze()}
           onOpenImport={() => setImportOpen(true)}
           onRefresh={() => void refresh()}
         />
 
+        {analysisError && <section className="panel error-panel">{analysisError}</section>}
+
         <div className="dashboard-grid">
-          <CoachReport />
-          <NextPostQueue />
+          <CoachReport analysis={analysis} />
+          <NextPostQueue analysis={analysis} />
         </div>
 
-        <PostBreakdown snapshot={snapshot} />
+        <PostBreakdown snapshot={snapshot} analysis={analysis} />
       </main>
 
       <ManualImportPanel open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />

@@ -384,6 +384,61 @@ h1 {
   color: var(--text);
 }
 
+.idea-list small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.executive-summary {
+  max-width: 72ch;
+  color: var(--text);
+}
+
+.coach-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.coach-columns h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.coach-columns ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.coach-columns li + li {
+  margin-top: 7px;
+}
+
+.pillar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.pillar-row span {
+  border: 1px solid rgba(47, 140, 230, 0.34);
+  border-radius: 6px;
+  background: rgba(12, 92, 171, 0.14);
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .post-breakdown {
   margin-top: 16px;
   border-color: transparent;
@@ -442,6 +497,31 @@ h1 {
 .post-card dd {
   margin: 3px 0 0;
   font-weight: 800;
+}
+
+.post-analysis {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.post-analysis strong {
+  display: block;
+  line-height: 1.35;
+}
+
+.post-analysis blockquote {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--primary-strong);
+  padding-left: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.error-panel {
+  margin-top: 16px;
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #ffb0b0;
 }
 
 .modal-backdrop {
@@ -531,6 +611,10 @@ a:focus-visible {
 
   .capture-actions {
     justify-content: flex-start;
+  }
+
+  .coach-columns {
+    grid-template-columns: 1fr;
   }
 
   .side-nav {

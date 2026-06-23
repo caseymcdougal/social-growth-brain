@@ -1,8 +1,10 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { analysisOutputSchema } from "../../src/shared/analysis-schema";
 import { createServerApp } from "../../src/server/routes";
+import analysisFixture from "../fixtures/analysis-valid.json";
 
 const servers: { close: () => void }[] = [];
 
@@ -64,5 +66,27 @@ describe("server routes", () => {
     expect(response.status).toBe(400);
     expect(body.ok).toBe(false);
     expect(body.errorStage).toBe("manual_import_validation");
+  });
+
+  it("analyzes the latest snapshot with an injected AI runner", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const aiRunner = { analyze: vi.fn(async () => output) };
+    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+
+    const response = await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(aiRunner.analyze).toHaveBeenCalledOnce();
+    expect(body.output.executive_summary).toContain("specific and opinionated");
+    expect(body.analysisRunId).toBeGreaterThan(0);
   });
 });

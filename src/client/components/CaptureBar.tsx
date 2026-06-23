@@ -4,7 +4,9 @@ import type { CapturedAccountSnapshot } from "../../shared/types";
 export function CaptureBar(props: {
   snapshot: CapturedAccountSnapshot | null;
   loading: boolean;
+  analyzing: boolean;
   error: string | null;
+  onAnalyze: () => void;
   onOpenImport: () => void;
   onRefresh: () => void;
 }) {
@@ -32,8 +34,8 @@ export function CaptureBar(props: {
         <button className="secondary-button" type="button" onClick={props.onRefresh} disabled={props.loading}>
           <RefreshCcw size={16} aria-hidden="true" /> Refresh
         </button>
-        <button className="primary-button" type="button" disabled={!props.snapshot}>
-          <Wand2 size={16} aria-hidden="true" /> Analyze Recent Posts
+        <button className="primary-button" type="button" disabled={!props.snapshot || props.analyzing} onClick={props.onAnalyze}>
+          <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing" : "Analyze Recent Posts"}
         </button>
       </div>
     </section>

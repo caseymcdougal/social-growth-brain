@@ -1,3 +1,4 @@
+import type { AnalysisOutput } from "../shared/analysis-schema";
 import type { CapturedAccountSnapshot } from "../shared/types";
 
 export async function getLatestSnapshot(): Promise<CapturedAccountSnapshot | null> {
@@ -17,4 +18,13 @@ export async function importSnapshot(snapshot: unknown): Promise<void> {
     const data = await response.json().catch(() => null);
     throw new Error(data?.errorMessage ?? "Import failed");
   }
+}
+
+export async function analyzeLatestSnapshot(): Promise<AnalysisOutput> {
+  const response = await fetch("/api/analyze", { method: "POST" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Analysis failed");
+  }
+  return data.output;
 }
