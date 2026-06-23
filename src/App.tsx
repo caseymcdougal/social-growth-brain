@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, ClipboardList, Lightbulb, ShieldCheck } from "lucide-react";
+import { BarChart3, Bot, ClipboardList, Radio, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { analyzeLatestSnapshot, captureSnapshot, getLatestSnapshot, importSnapshot } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
@@ -9,11 +9,10 @@ import { PostBreakdown } from "./client/components/PostBreakdown";
 import type { AnalysisOutput } from "./shared/analysis-schema";
 import type { CapturedAccountSnapshot } from "./shared/types";
 
-const navItems = [
-  { icon: Activity, label: "Capture", active: true },
-  { icon: Bot, label: "Coach" },
-  { icon: ClipboardList, label: "Posts" },
-  { icon: Lightbulb, label: "Ideas" }
+const auditSteps = [
+  { icon: Radio, label: "Capture", detail: "X or JSON" },
+  { icon: Bot, label: "Diagnose", detail: "Codex CLI" },
+  { icon: ClipboardList, label: "Draft", detail: "Hooks + rewrites" }
 ];
 
 export function App() {
@@ -88,34 +87,42 @@ export function App() {
           </div>
           <div>
             <strong>Social Audit</strong>
-            <span>Local dashboard</span>
+            <span>Private X review</span>
           </div>
         </div>
-        <nav className="side-nav">
-          {navItems.map((item) => {
+        <div className="step-rail" aria-label="Audit sequence">
+          {auditSteps.map((item, index) => {
             const Icon = item.icon;
             return (
-              <a href={`#${item.label.toLowerCase()}`} aria-current={item.active ? "page" : undefined} key={item.label}>
-                <Icon size={17} aria-hidden="true" />
-                {item.label}
-              </a>
+              <div className="step-row" key={item.label}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <Icon size={16} aria-hidden="true" />
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </div>
+              </div>
             );
           })}
-        </nav>
+        </div>
         <div className="privacy-note">
           <ShieldCheck size={17} aria-hidden="true" />
-          <span>Browser session and Codex CLI stay local.</span>
+          <div>
+            <strong>Local-only</strong>
+            <span>No X API key or analytics-panel scraping.</span>
+          </div>
         </div>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">X Strategy Room</p>
-            <h1>Analyze recent posts</h1>
+            <p className="eyebrow">Casey / X audit</p>
+            <h1>Audit workspace</h1>
+            <p className="topbar-copy">Capture visible post signals, run a hidden Codex diagnosis, and keep the recommendations in this local app.</p>
           </div>
           <div className="run-status" aria-live="polite">
-            <span className={loading ? "status-dot is-loading" : "status-dot"} />
+            <span className={loading ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
             {loading ? "Loading" : snapshot ? `${postCount} ${postLabel} ready` : "No capture"}
           </div>
         </header>

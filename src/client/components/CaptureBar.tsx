@@ -14,14 +14,14 @@ export function CaptureBar(props: {
   const capturedAt = props.snapshot?.profile.capturedAt
     ? new Date(props.snapshot.profile.capturedAt).toLocaleString()
     : "No capture yet";
-  const handle = props.snapshot ? `@${props.snapshot.profile.handle}` : "X account snapshot";
+  const handle = props.snapshot ? `@${props.snapshot.profile.handle}` : "No local snapshot";
   const postCount = props.snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
 
   return (
     <section className="capture-bar" aria-label="Capture status">
       <div className="capture-summary">
-        <p className="eyebrow">Capture</p>
+        <p className="eyebrow">Source</p>
         <h2>{handle}</h2>
         <p>
           {capturedAt} · {postCount} {postLabel} loaded
@@ -30,13 +30,13 @@ export function CaptureBar(props: {
       </div>
       <div className="capture-actions">
         <button className="secondary-button" type="button" onClick={props.onOpenImport}>
-          <Upload size={16} aria-hidden="true" /> Import manually
+          <Upload size={16} aria-hidden="true" /> Paste JSON
         </button>
         <button className="secondary-button" type="button" onClick={props.onCapture} disabled={props.loading || props.capturing}>
-          <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Capturing" : "Capture X"}
+          <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Capturing" : "Capture from X"}
         </button>
         <button className="primary-button" type="button" disabled={!props.snapshot || props.analyzing} onClick={props.onAnalyze}>
-          <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing" : "Analyze Recent Posts"}
+          <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Running audit" : "Run audit"}
         </button>
       </div>
     </section>

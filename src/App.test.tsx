@@ -15,7 +15,7 @@ test("renders the dashboard shell", async () => {
 
   render(<App />);
 
-  expect(screen.getByText("X Strategy Room")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Analyze recent posts" })).toBeInTheDocument();
-  expect(await screen.findByRole("button", { name: /Import manually/i })).toBeInTheDocument();
+  expect(screen.getByText("Casey / X audit")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Audit workspace" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /Paste JSON/i })).toBeInTheDocument();
 });

@@ -30,8 +30,8 @@ export function ManualImportPanel(props: {
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="manual-import-title">
         <div className="modal-title-row">
           <div>
-            <p className="eyebrow">Manual Import</p>
-            <h2 id="manual-import-title">Paste snapshot JSON</h2>
+            <p className="eyebrow">Fallback Input</p>
+            <h2 id="manual-import-title">Paste captured snapshot</h2>
           </div>
           <button className="icon-button" type="button" onClick={props.onClose} aria-label="Close manual import">
             <X size={18} aria-hidden="true" />
@@ -43,6 +43,7 @@ export function ManualImportPanel(props: {
           onChange={(event) => setRawJson(event.target.value)}
           rows={12}
           spellCheck={false}
+          placeholder='{"profile": {"handle": "caseymcdougal"}, "posts": [...]}'
         />
         {error && <p className="error-text">{error}</p>}
         <div className="modal-actions">

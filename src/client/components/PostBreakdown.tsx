@@ -27,7 +27,7 @@ export function PostBreakdown({
     <section className="panel post-breakdown" aria-labelledby="post-breakdown-title">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Post Breakdown</p>
+          <p className="eyebrow">Captured Posts</p>
           <h2 id="post-breakdown-title">{posts.length ? `${posts.length} recent ${postLabel}` : "No posts loaded"}</h2>
         </div>
         <span className="status-chip">{posts.length ? "Captured" : "Empty"}</span>
@@ -35,7 +35,7 @@ export function PostBreakdown({
       <div className="post-list">
         {posts.length === 0 && (
           <article className="empty-post-card">
-            <p>Import a snapshot to populate the 25-post review lane.</p>
+            <p>No captured posts in the local database yet.</p>
           </article>
         )}
         {posts.map((post) => {
@@ -43,7 +43,7 @@ export function PostBreakdown({
           return (
             <article className="post-card" key={post.xPostId}>
               <div className="post-card-top">
-                <span>Score {engagementScore(post)}</span>
+                <span>{engagementScore(post)} visible interactions</span>
                 {post.postedAt && <time dateTime={post.postedAt}>{new Date(post.postedAt).toLocaleDateString()}</time>}
               </div>
               <p>{post.text}</p>

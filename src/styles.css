@@ -31,9 +31,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(12, 92, 171, 0.1), transparent 240px),
-    var(--surface);
+  background: var(--surface);
 }
 
 button,
@@ -113,31 +111,45 @@ a {
   font-size: 12px;
 }
 
-.side-nav {
+.step-rail {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
-.side-nav a {
-  min-height: 40px;
+.step-row {
+  min-height: 54px;
   border-radius: 6px;
-  padding: 0 10px;
-  display: flex;
+  border: 1px solid var(--line);
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: 24px 20px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  background: rgba(250, 250, 250, 0.025);
 }
 
-.side-nav a[aria-current="page"] {
-  background: rgba(12, 92, 171, 0.22);
-  color: var(--text);
-  box-shadow: inset 3px 0 0 var(--primary-strong);
+.step-row span {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 800;
 }
 
-.side-nav a:hover {
-  background: rgba(250, 250, 250, 0.06);
+.step-row strong,
+.step-row small {
+  display: block;
+}
+
+.step-row strong {
   color: var(--text);
+  font-size: 13px;
+}
+
+.step-row small {
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: 12px;
 }
 
 .privacy-note {
@@ -149,10 +161,20 @@ a {
   line-height: 1.4;
 }
 
+.privacy-note strong,
+.privacy-note span {
+  display: block;
+}
+
+.privacy-note strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
 .workspace {
   min-width: 0;
   width: min(1280px, 100%);
-  padding: 28px;
+  padding: 24px;
 }
 
 .topbar {
@@ -180,13 +202,19 @@ p {
 
 h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.08;
   letter-spacing: 0;
 }
 
 .topbar p {
   margin: 0;
+}
+
+.topbar-copy {
+  max-width: 640px;
+  margin-top: 8px;
+  line-height: 1.45;
 }
 
 .run-status,
@@ -226,13 +254,17 @@ h1 {
   background: var(--warning);
 }
 
+.status-dot.is-empty {
+  background: var(--faint);
+}
+
 .capture-bar,
 .panel,
 .modal {
   border: 1px solid var(--line);
   background: rgba(17, 18, 23, 0.92);
   border-radius: 8px;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 1px 0 rgba(250, 250, 250, 0.03);
 }
 
 .capture-bar {
@@ -252,7 +284,7 @@ h1 {
 .panel h2,
 .modal h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.18;
   letter-spacing: 0;
 }
@@ -320,7 +352,13 @@ h1 {
 .primary-button:disabled,
 .secondary-button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.56;
+}
+
+.primary-button:disabled {
+  border-color: var(--line);
+  background: rgba(250, 250, 250, 0.055);
+  color: var(--faint);
 }
 
 .icon-button {
@@ -338,7 +376,7 @@ h1 {
 }
 
 .panel {
-  padding: 20px;
+  padding: 18px;
 }
 
 .section-head {
@@ -357,7 +395,7 @@ h1 {
 
 .report-stack article,
 .idea-list article {
-  min-height: 52px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -456,7 +494,7 @@ h1 {
 
 .post-card,
 .empty-post-card {
-  min-height: 190px;
+  min-height: 176px;
   border: 1px solid var(--line);
   background: rgba(17, 18, 23, 0.92);
   border-radius: 8px;
@@ -582,8 +620,8 @@ a:focus-visible {
     border-bottom: 1px solid var(--line);
   }
 
-  .side-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .step-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .privacy-note {
@@ -617,8 +655,8 @@ a:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .side-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .step-rail {
+    grid-template-columns: 1fr;
   }
 
   h1 {
