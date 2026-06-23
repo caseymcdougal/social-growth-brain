@@ -300,6 +300,10 @@ h1 {
   color: #ffb0b0;
 }
 
+.inline-status {
+  color: var(--primary-strong);
+}
+
 .capture-actions,
 .modal-actions {
   display: flex;

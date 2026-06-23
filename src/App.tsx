@@ -22,6 +22,7 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [captureStatus, setCaptureStatus] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisOutput | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -55,10 +56,12 @@ export function App() {
   async function handleCapture() {
     setCapturing(true);
     setCaptureError(null);
+    setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
     setAnalysis(null);
     setAnalysisError(null);
     try {
       setSnapshot(await captureSnapshot());
+      setCaptureStatus(null);
     } catch (error) {
       setCaptureError(error instanceof Error ? error.message : "Capture failed");
     } finally {
@@ -133,6 +136,7 @@ export function App() {
           capturing={capturing}
           analyzing={analyzing}
           error={loadError ?? captureError}
+          status={capturing ? captureStatus : null}
           onAnalyze={() => void handleAnalyze()}
           onCapture={() => void handleCapture()}
           onOpenImport={() => setImportOpen(true)}

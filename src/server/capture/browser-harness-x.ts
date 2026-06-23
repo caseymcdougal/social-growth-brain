@@ -3,7 +3,7 @@ import { normalizeCapturedSnapshot } from "../../shared/normalize";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 import { CaptureError, type CaptureRunner } from "./capture-runner";
 
-const CAPTURE_TIMEOUT_MS = 120_000;
+const CAPTURE_TIMEOUT_MS = 45_000;
 
 function sanitizeHandle(handle: string) {
   return handle.replace(/^@/, "").replace(/[^A-Za-z0-9_]/g, "").slice(0, 15) || "caseymcdougal";
@@ -16,7 +16,14 @@ function extractionScript(handle: string) {
 
   return `
 new_tab(${JSON.stringify(profileUrl)})
-wait_for_load()
+wait_for_element("main", timeout=10.0, visible=True)
+wait(2.0)
+for _ in range(8):
+  count = js("document.querySelectorAll('article[data-testid=\\\\\\"tweet\\\\\\"]').length")
+  if count >= 25:
+    break
+  js("window.scrollBy(0, Math.round(window.innerHeight * 1.4))")
+  wait(1.0)
 data = js("""
 (() => {
   const handle = ${safeHandleJson};
@@ -38,7 +45,7 @@ data = js("""
   };
   const profile = {
     handle,
-    displayName: document.querySelector('[data-testid="UserName"]')?.innerText?.split("\\n")[0] || handle,
+    displayName: document.querySelector('[data-testid="UserName"]')?.innerText?.split("\\\\n")[0] || handle,
     bio: document.querySelector('[data-testid="UserDescription"]')?.innerText || "",
     profileUrl: location.href.split("?")[0],
     followersCount: null,
@@ -95,7 +102,7 @@ export class BrowserHarnessXCaptureRunner implements CaptureRunner {
         if (settled) return;
         settled = true;
         child.kill("SIGTERM");
-        reject(new CaptureError("browser_not_reachable", "browser-harness capture timed out"));
+        reject(new CaptureError("browser_not_reachable", "X capture timed out after 45 seconds"));
       }, CAPTURE_TIMEOUT_MS);
 
       child.stdout.on("data", (chunk) => {
@@ -148,9 +155,6 @@ export class BrowserHarnessXCaptureRunner implements CaptureRunner {
     const normalized = normalizeCapturedSnapshot(parsed as CapturedAccountSnapshot);
     if (normalized.posts.length === 0) {
       throw new CaptureError("profile_not_found", "No original posts found on the profile page");
-    }
-    if (normalized.posts.length < 5) {
-      throw new CaptureError("not_enough_posts", "Fewer than 5 posts were captured");
     }
     return normalized;
   }

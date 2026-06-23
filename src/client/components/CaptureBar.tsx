@@ -7,6 +7,7 @@ export function CaptureBar(props: {
   capturing: boolean;
   analyzing: boolean;
   error: string | null;
+  status: string | null;
   onAnalyze: () => void;
   onCapture: () => void;
   onOpenImport: () => void;
@@ -26,6 +27,7 @@ export function CaptureBar(props: {
         <p>
           {capturedAt} · {postCount} {postLabel} loaded
         </p>
+        {props.status && <p className="inline-status">{props.status}</p>}
         {props.error && <p className="inline-error">{props.error}</p>}
       </div>
       <div className="capture-actions">
