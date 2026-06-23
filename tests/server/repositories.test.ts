@@ -37,6 +37,13 @@ function snapshot(): CapturedAccountSnapshot {
 }
 
 describe("repositories", () => {
+  it("enforces SQLite foreign keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-"));
+    const db = openDatabase(join(dir, "test.sqlite"));
+
+    expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
+  });
+
   it("saves and reads the latest captured snapshot", () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-"));
     const db = openDatabase(join(dir, "test.sqlite"));

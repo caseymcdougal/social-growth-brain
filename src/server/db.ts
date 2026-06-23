@@ -7,6 +7,7 @@ export type AppDatabase = Database.Database;
 export function openDatabase(path: string): AppDatabase {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
+  db.pragma("foreign_keys = ON");
   db.pragma("journal_mode = WAL");
   migrate(db);
   return db;
