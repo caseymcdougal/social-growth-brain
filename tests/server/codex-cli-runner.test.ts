@@ -28,7 +28,10 @@ describe("Codex CLI runner", () => {
     });
 
     expect(readFileSync(files.inputPath, "utf8")).toContain("\"posts\"");
-    expect(readFileSync(files.promptPath, "utf8")).toContain("Return JSON only");
+    const prompt = readFileSync(files.promptPath, "utf8");
+    expect(prompt).toContain("Return JSON only");
+    expect(prompt).toContain("public visible metrics");
+    expect(prompt).toContain("rank the strongest and weakest posts");
     expect(readFileSync(files.schemaPath, "utf8")).toContain("executive_summary");
   });
 });

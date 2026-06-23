@@ -1,28 +1,28 @@
 import type { AnalysisOutput } from "../../shared/analysis-schema";
 
-export function CoachReport({ analysis }: { analysis: AnalysisOutput | null }) {
+export function CoachReport({ analysis, postCount }: { analysis: AnalysisOutput | null; postCount: number }) {
   if (!analysis) {
     return (
       <section className="panel coach-report" aria-labelledby="coach-report-title">
         <div className="section-head">
           <div>
-            <p className="eyebrow">Diagnosis</p>
-            <h2 id="coach-report-title">No audit run yet</h2>
+            <p className="eyebrow">Coach read</p>
+            <h2 id="coach-report-title">Awaiting strategy audit</h2>
           </div>
-          <span className="status-chip">Idle</span>
+          <span className="status-chip">{postCount ? "Ready" : "No scan"}</span>
         </div>
         <div className="report-stack">
           <article>
-            <span>Input</span>
-            <p>Visible metrics and post text only</p>
+            <span>Rank</span>
+            <p>Sort the public posts by visible signal.</p>
           </article>
           <article>
-            <span>Output</span>
-            <p>Pattern read, weak spots, rewrites</p>
+            <span>Diagnose</span>
+            <p>Explain the hook, clarity, and audience fit.</p>
           </article>
           <article>
-            <span>Storage</span>
-            <p>Run artifacts saved under local data/jobs</p>
+            <span>Write</span>
+            <p>Generate stronger next posts from the read.</p>
           </article>
         </div>
       </section>
@@ -33,12 +33,18 @@ export function CoachReport({ analysis }: { analysis: AnalysisOutput | null }) {
     <section className="panel coach-report" aria-labelledby="coach-report-title">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Diagnosis</p>
-          <h2 id="coach-report-title">{analysis.account_positioning_read}</h2>
+          <p className="eyebrow">Coach read</p>
+          <h2 id="coach-report-title">Positioning read</h2>
         </div>
-        <span className="status-chip">Analyzed</span>
+        <span className="status-chip">Latest audit</span>
       </div>
+      <p className="positioning-read">{analysis.account_positioning_read}</p>
       <p className="executive-summary">{analysis.executive_summary}</p>
+      <div className="pattern-strip">
+        {analysis.top_patterns.map((pattern) => (
+          <span key={pattern}>{pattern}</span>
+        ))}
+      </div>
       <div className="coach-columns">
         <div>
           <h3>Working</h3>

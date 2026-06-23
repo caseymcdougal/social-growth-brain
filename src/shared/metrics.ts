@@ -14,6 +14,20 @@ export function parseMetricCount(raw: string | null | undefined): number | null 
   return Math.round(base * multiplier);
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function parseMetricFromLabelText(raw: string | null | undefined, labels: string[]): number | null {
+  if (!raw) return null;
+  const labelPattern = labels.map(escapeRegExp).join("|");
+  const numberPattern = "\\d[\\d,]*(?:\\.\\d+)?\\s*(?:[KMB])?";
+  const countBeforeLabel = new RegExp(`(${numberPattern})\\s+(?:${labelPattern})\\b`, "i");
+  const labelBeforeCount = new RegExp(`(?:${labelPattern})\\b[^\\d]{0,32}(${numberPattern})`, "i");
+
+  return parseMetricCount(raw.match(countBeforeLabel)?.[1] ?? raw.match(labelBeforeCount)?.[1]);
+}
+
 export function parseVisibleMetrics(raw: {
   views?: string | null;
   likes?: string | null;

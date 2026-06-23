@@ -89,4 +89,27 @@ describe("server routes", () => {
     expect(body.output.executive_summary).toContain("specific and opinionated");
     expect(body.analysisRunId).toBeGreaterThan(0);
   });
+
+  it("returns the latest successful analysis for the latest snapshot", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const aiRunner = { analyze: vi.fn(async () => output) };
+    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+    await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+
+    const response = await fetch(`${baseUrl}/api/analysis/latest`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.analysis.executive_summary).toContain("specific and opinionated");
+    expect(body.analysis.next_post_ideas).toHaveLength(output.next_post_ideas.length);
+    expect(body.analysis.post_analyses[0].post_id).toBe(output.post_analyses[0].post_id);
+  });
 });

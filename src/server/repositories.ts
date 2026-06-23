@@ -1,5 +1,5 @@
 import type { AppDatabase } from "./db";
-import type { AnalysisOutput } from "../shared/analysis-schema";
+import { analysisOutputSchema, type AnalysisOutput } from "../shared/analysis-schema";
 import type { CapturedAccountSnapshot } from "../shared/types";
 
 interface StoredProfile {
@@ -28,6 +28,32 @@ interface StoredPost {
   bookmarks_count: number | null;
   captured_at: string;
   source: "browser" | "manual";
+}
+
+interface StoredAnalysisRun {
+  id: number;
+}
+
+interface StoredStrategyReport {
+  executive_summary: string;
+  account_positioning_read: string;
+  top_patterns_json: string;
+  what_is_working_json: string;
+  what_is_holding_back_json: string;
+  content_pillars_json: string;
+  next_post_recommendations_json: string;
+}
+
+interface StoredPostAnalysis {
+  x_post_id: string;
+  performance_read: string;
+  likely_reason: string;
+  hook_diagnosis: string;
+  clarity_diagnosis: string;
+  audience_fit: string;
+  recommended_change: string;
+  rewrite: string;
+  variant_hooks_json: string;
 }
 
 export function createRepositories(db: AppDatabase) {
@@ -144,6 +170,50 @@ export function createRepositories(db: AppDatabase) {
       });
 
       return tx();
+    },
+
+    getLatestAnalysisForLatestSnapshot(): AnalysisOutput | null {
+      const profile = db
+        .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!profile) return null;
+
+      const run = db
+        .prepare(
+          "SELECT id FROM analysis_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
+        )
+        .get(profile.id) as StoredAnalysisRun | undefined;
+      if (!run) return null;
+
+      const report = db
+        .prepare("SELECT * FROM strategy_reports WHERE analysis_run_id = ? LIMIT 1")
+        .get(run.id) as StoredStrategyReport | undefined;
+      if (!report) return null;
+
+      const postAnalyses = db
+        .prepare("SELECT * FROM post_analyses WHERE analysis_run_id = ? ORDER BY id ASC")
+        .all(run.id) as StoredPostAnalysis[];
+
+      return analysisOutputSchema.parse({
+        executive_summary: report.executive_summary,
+        account_positioning_read: report.account_positioning_read,
+        top_patterns: JSON.parse(report.top_patterns_json),
+        what_is_working: JSON.parse(report.what_is_working_json),
+        what_is_holding_back: JSON.parse(report.what_is_holding_back_json),
+        recommended_content_pillars: JSON.parse(report.content_pillars_json),
+        next_post_ideas: JSON.parse(report.next_post_recommendations_json),
+        post_analyses: postAnalyses.map((post) => ({
+          post_id: post.x_post_id,
+          performance_read: post.performance_read,
+          likely_reason: post.likely_reason,
+          hook_diagnosis: post.hook_diagnosis,
+          clarity_diagnosis: post.clarity_diagnosis,
+          audience_fit: post.audience_fit,
+          recommended_change: post.recommended_change,
+          rewrite: post.rewrite,
+          variant_hooks: JSON.parse(post.variant_hooks_json)
+        }))
+      });
     }
   };
 }

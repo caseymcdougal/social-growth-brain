@@ -40,6 +40,10 @@ export function createServerApp(options: { dataDir: string; aiRunner?: AiRunner;
     response.json({ snapshot: repos.getLatestSnapshot() });
   });
 
+  app.get("/api/analysis/latest", (_request, response) => {
+    response.json({ analysis: repos.getLatestAnalysisForLatestSnapshot() });
+  });
+
   app.post("/api/capture", async (request, response) => {
     try {
       const handle = typeof request.body?.handle === "string" ? request.body.handle : "caseymcdougal";

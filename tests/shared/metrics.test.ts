@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMetricCount, parseVisibleMetrics } from "../../src/shared/metrics";
+import { parseMetricCount, parseMetricFromLabelText, parseVisibleMetrics } from "../../src/shared/metrics";
 
 describe("parseMetricCount", () => {
   it("parses plain counts", () => {
@@ -9,11 +9,28 @@ describe("parseMetricCount", () => {
   it("parses abbreviated counts", () => {
     expect(parseMetricCount("1.2K")).toBe(1200);
     expect(parseMetricCount("3.4M")).toBe(3400000);
+    expect(parseMetricCount("2,345")).toBe(2345);
   });
 
   it("returns null for missing counts", () => {
     expect(parseMetricCount("")).toBeNull();
     expect(parseMetricCount("Views")).toBeNull();
+  });
+});
+
+describe("parseMetricFromLabelText", () => {
+  it("extracts counts from combined X action labels", () => {
+    const label = "12 replies, 4 reposts, 99 likes, 7 bookmarks, 1.8K views";
+
+    expect(parseMetricFromLabelText(label, ["reply", "replies"])).toBe(12);
+    expect(parseMetricFromLabelText(label, ["repost", "reposts"])).toBe(4);
+    expect(parseMetricFromLabelText(label, ["like", "likes"])).toBe(99);
+    expect(parseMetricFromLabelText(label, ["bookmark", "bookmarks"])).toBe(7);
+    expect(parseMetricFromLabelText(label, ["view", "views"])).toBe(1800);
+  });
+
+  it("extracts counts when X places the label before the number", () => {
+    expect(parseMetricFromLabelText("View post analytics 2,345 views", ["view", "views"])).toBe(2345);
   });
 });
 

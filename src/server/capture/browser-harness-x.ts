@@ -18,15 +18,16 @@ function extractionScript(handle: string) {
 new_tab(${JSON.stringify(profileUrl)})
 wait_for_element("main", timeout=10.0, visible=True)
 wait(2.0)
-for _ in range(8):
+for _ in range(14):
   count = js("document.querySelectorAll('article[data-testid=\\\\\\"tweet\\\\\\"]').length")
-  if count >= 25:
+  if count >= 40:
     break
   js("window.scrollBy(0, Math.round(window.innerHeight * 1.4))")
-  wait(1.0)
-data = js("""
+  wait(0.8)
+data = js(r"""
 (() => {
   const handle = ${safeHandleJson};
+  const handleLower = handle.toLowerCase();
   const capturedAt = new Date().toISOString();
   const text = (node) => (node?.innerText || node?.textContent || "").trim();
   if (/\\/i\\/flow\\/login/.test(location.pathname) || /Log in to X|Sign in to X/i.test(document.body.innerText || "")) {
@@ -43,6 +44,30 @@ data = js("""
     const multiplier = suffix === "K" ? 1000 : suffix === "M" ? 1000000 : suffix === "B" ? 1000000000 : 1;
     return Math.round(base * multiplier);
   };
+  const escapeRegExp = (value) => value.replace(/[|\\\\{}()[\\]^$+*?.]/g, "\\\\$&");
+  const parseMetricFromLabelText = (raw, labels) => {
+    if (!raw) return null;
+    const labelPattern = labels.map(escapeRegExp).join("|");
+    const numberPattern = "\\\\d[\\\\d,]*(?:\\\\.\\\\d+)?\\\\s*(?:[KMB])?";
+    const countBeforeLabel = new RegExp("(" + numberPattern + ")\\\\s+(?:" + labelPattern + ")\\\\b", "i");
+    const labelBeforeCount = new RegExp("(?:" + labelPattern + ")\\\\b[^\\\\d]{0,32}(" + numberPattern + ")", "i");
+    return parseCount(raw.match(countBeforeLabel)?.[1] || raw.match(labelBeforeCount)?.[1]);
+  };
+  const metricCandidates = (article, selectors) => {
+    const values = [
+      article.getAttribute("aria-label"),
+      article.innerText,
+      ...Array.from(article.querySelectorAll("[aria-label]")).map((node) => node.getAttribute("aria-label")),
+      ...Array.from(article.querySelectorAll('[role="group"][aria-label]')).map((node) => node.getAttribute("aria-label"))
+    ];
+    for (const selector of selectors) {
+      const node = article.querySelector(selector);
+      const clickable = node?.closest('[role="button"], a');
+      values.push(node?.getAttribute("aria-label"), clickable?.getAttribute("aria-label"), text(node), text(clickable));
+    }
+    return values.filter(Boolean).join(" · ");
+  };
+  const metric = (article, labels, selectors = []) => parseMetricFromLabelText(metricCandidates(article, selectors), labels);
   const profile = {
     handle,
     displayName: document.querySelector('[data-testid="UserName"]')?.innerText?.split("\\\\n")[0] || handle,
@@ -56,17 +81,22 @@ data = js("""
   const articles = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
   const posts = [];
   for (const article of articles) {
+    const socialContext = text(article.querySelector('[data-testid="socialContext"]'));
+    if (/reposted|retweeted/i.test(socialContext)) continue;
     const tweetText = text(article.querySelector('[data-testid="tweetText"]'));
     const link = Array.from(article.querySelectorAll('a'))
       .map((anchor) => anchor.href)
-      .find((href) => /\\/status\\/\\d+/.test(href));
+      .find((href) => {
+        try {
+          const url = new URL(href);
+          const parts = url.pathname.split("/").filter(Boolean);
+          return parts[0]?.toLowerCase() === handleLower && parts[1] === "status" && /^\\d+$/.test(parts[2] || "");
+        } catch {
+          return false;
+        }
+      });
     if (!tweetText || !link) continue;
     const statusMatch = link.match(/status\\/(\\d+)/);
-    const aria = article.getAttribute("aria-label") || article.innerText || "";
-    const metric = (label) => {
-      const match = aria.match(new RegExp("(\\\\d+(?:\\\\.\\\\d+)?[KMB]?)\\\\s+" + label, "i"));
-      return match ? parseCount(match[1]) : null;
-    };
     posts.push({
       xPostId: statusMatch?.[1] || link,
       url: link,
@@ -74,11 +104,11 @@ data = js("""
       postedAt: article.querySelector("time")?.getAttribute("datetime") || null,
       capturedAt,
       source: "browser",
-      viewsCount: metric("views?"),
-      likesCount: metric("likes?"),
-      repostsCount: metric("reposts?"),
-      repliesCount: metric("repl(?:y|ies)"),
-      bookmarksCount: metric("bookmarks?")
+      viewsCount: metric(article, ["view", "views"], ['a[href$="/analytics"]', 'a[aria-label*="view" i]', 'a[aria-label*="analytics" i]']),
+      likesCount: metric(article, ["like", "likes"], ['[data-testid="like"]', '[aria-label*="like" i]']),
+      repostsCount: metric(article, ["repost", "reposts"], ['[data-testid="retweet"]', '[aria-label*="repost" i]']),
+      repliesCount: metric(article, ["reply", "replies"], ['[data-testid="reply"]', '[aria-label*="reply" i]']),
+      bookmarksCount: metric(article, ["bookmark", "bookmarks"], ['[data-testid="bookmark"]', '[aria-label*="bookmark" i]'])
     });
     if (posts.length >= 25) break;
   }

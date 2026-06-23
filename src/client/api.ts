@@ -8,6 +8,13 @@ export async function getLatestSnapshot(): Promise<CapturedAccountSnapshot | nul
   return data.snapshot ?? null;
 }
 
+export async function getLatestAnalysis(): Promise<AnalysisOutput | null> {
+  const response = await fetch("/api/analysis/latest");
+  if (!response.ok) throw new Error("Failed to load latest analysis");
+  const data = await response.json();
+  return data.analysis ?? null;
+}
+
 export async function importSnapshot(snapshot: unknown): Promise<void> {
   const response = await fetch("/api/import", {
     method: "POST",

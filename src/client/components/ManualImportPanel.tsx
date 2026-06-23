@@ -31,7 +31,7 @@ export function ManualImportPanel(props: {
         <div className="modal-title-row">
           <div>
             <p className="eyebrow">Fallback Input</p>
-            <h2 id="manual-import-title">Paste captured snapshot</h2>
+            <h2 id="manual-import-title">Paste public snapshot</h2>
           </div>
           <button className="icon-button" type="button" onClick={props.onClose} aria-label="Close manual import">
             <X size={18} aria-hidden="true" />
@@ -51,7 +51,7 @@ export function ManualImportPanel(props: {
             Cancel
           </button>
           <button className="primary-button" type="button" onClick={submit} disabled={importing || !rawJson.trim()}>
-            {importing ? "Importing" : "Import snapshot"}
+            {importing ? "Importing" : "Import public snapshot"}
           </button>
         </div>
       </section>

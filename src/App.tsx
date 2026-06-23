@@ -1,18 +1,20 @@
-import { BarChart3, Bot, ClipboardList, Radio, ShieldCheck } from "lucide-react";
+import { Crosshair, FileText, LockKeyhole, Radar, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { analyzeLatestSnapshot, captureSnapshot, getLatestSnapshot, importSnapshot } from "./client/api";
+import { analyzeLatestSnapshot, captureSnapshot, getLatestAnalysis, getLatestSnapshot, importSnapshot } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
 import { CoachReport } from "./client/components/CoachReport";
 import { ManualImportPanel } from "./client/components/ManualImportPanel";
 import { NextPostQueue } from "./client/components/NextPostQueue";
 import { PostBreakdown } from "./client/components/PostBreakdown";
 import type { AnalysisOutput } from "./shared/analysis-schema";
+import { rankPostsByVisibleSignal, summarizeMetricCompleteness } from "./shared/performance";
 import type { CapturedAccountSnapshot } from "./shared/types";
 
 const auditSteps = [
-  { icon: Radio, label: "Capture", detail: "X or JSON" },
-  { icon: Bot, label: "Diagnose", detail: "Codex CLI" },
-  { icon: ClipboardList, label: "Draft", detail: "Hooks + rewrites" }
+  { icon: Radar, label: "Scan", detail: "Public X metrics" },
+  { icon: TrendingUp, label: "Rank", detail: "Visible signal" },
+  { icon: Crosshair, label: "Diagnose", detail: "Why it moved" },
+  { icon: Sparkles, label: "Write", detail: "Next posts" }
 ];
 
 export function App() {
@@ -28,12 +30,18 @@ export function App() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
+  const posts = snapshot?.posts ?? [];
+  const metricSummary = summarizeMetricCompleteness(posts);
+  const rankedPosts = rankPostsByVisibleSignal(posts);
+  const topPost = rankedPosts[0]?.post;
 
   async function refresh() {
     setLoading(true);
     setLoadError(null);
     try {
-      setSnapshot(await getLatestSnapshot());
+      const latestSnapshot = await getLatestSnapshot();
+      setSnapshot(latestSnapshot);
+      setAnalysis(latestSnapshot ? await getLatestAnalysis() : null);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Failed to load latest snapshot");
     } finally {
@@ -83,14 +91,14 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="Primary">
+      <aside className="sidebar" aria-label="Audit workflow">
         <div className="brand-lockup">
           <div className="brand-mark">
-            <BarChart3 size={19} aria-hidden="true" />
+            <FileText size={18} aria-hidden="true" />
           </div>
           <div>
-            <strong>Social Audit</strong>
-            <span>Private X review</span>
+            <strong>Audit Room</strong>
+            <span>Casey / X</span>
           </div>
         </div>
         <div className="step-rail" aria-label="Audit sequence">
@@ -109,10 +117,10 @@ export function App() {
           })}
         </div>
         <div className="privacy-note">
-          <ShieldCheck size={17} aria-hidden="true" />
+          <LockKeyhole size={16} aria-hidden="true" />
           <div>
-            <strong>Local-only</strong>
-            <span>No X API key or analytics-panel scraping.</span>
+            <strong>Local run</strong>
+            <span>Public profile metrics. No scheduler.</span>
           </div>
         </div>
       </aside>
@@ -120,9 +128,11 @@ export function App() {
       <main className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Casey / X audit</p>
-            <h1>Audit workspace</h1>
-            <p className="topbar-copy">Capture visible post signals, run a hidden Codex diagnosis, and keep the recommendations in this local app.</p>
+            <p className="eyebrow">Private X strategy room</p>
+            <h1>X Audit Cockpit</h1>
+            <p className="topbar-copy">
+              Rank the last public posts, separate strong signals from weak hooks, and turn the read into copy-ready ideas.
+            </p>
           </div>
           <div className="run-status" aria-live="polite">
             <span className={loading ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
@@ -130,26 +140,55 @@ export function App() {
           </div>
         </header>
 
-        <CaptureBar
-          snapshot={snapshot}
-          loading={loading}
-          capturing={capturing}
-          analyzing={analyzing}
-          error={loadError ?? captureError}
-          status={capturing ? captureStatus : null}
-          onAnalyze={() => void handleAnalyze()}
-          onCapture={() => void handleCapture()}
-          onOpenImport={() => setImportOpen(true)}
-        />
+        <div className="mission-grid">
+          <CaptureBar
+            snapshot={snapshot}
+            metricSummary={metricSummary}
+            loading={loading}
+            capturing={capturing}
+            analyzing={analyzing}
+            error={loadError ?? captureError}
+            status={capturing ? captureStatus : null}
+            onAnalyze={() => void handleAnalyze()}
+            onCapture={() => void handleCapture()}
+            onOpenImport={() => setImportOpen(true)}
+          />
+
+          <section className="panel signal-panel" aria-label="Public metric signal">
+            <p className="eyebrow">Signal</p>
+            <h2>{Math.round(metricSummary.completenessRatio * 100)}% metric coverage</h2>
+            <div className="signal-meter" aria-hidden="true">
+              <span style={{ width: `${Math.round(metricSummary.completenessRatio * 100)}%` }} />
+            </div>
+            <dl className="signal-list">
+              <div>
+                <dt>Fields read</dt>
+                <dd>
+                  {metricSummary.capturedFields}/{metricSummary.totalFields || 0}
+                </dd>
+              </div>
+              <div>
+                <dt>Posts with stats</dt>
+                <dd>
+                  {metricSummary.postsWithAnyMetrics}/{postCount}
+                </dd>
+              </div>
+              <div>
+                <dt>Top public signal</dt>
+                <dd>{topPost ? topPost.text.slice(0, 42) : "Awaiting scan"}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
 
         {analysisError && <section className="panel error-panel">{analysisError}</section>}
 
         <div className="dashboard-grid">
-          <CoachReport analysis={analysis} />
+          <CoachReport analysis={analysis} postCount={postCount} />
           <NextPostQueue analysis={analysis} />
         </div>
 
-        <PostBreakdown snapshot={snapshot} analysis={analysis} />
+        <PostBreakdown rankedPosts={rankedPosts} analysis={analysis} />
       </main>
 
       <ManualImportPanel open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
