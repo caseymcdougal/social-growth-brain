@@ -84,5 +84,29 @@ function migrate(db: AppDatabase) {
       rewrite TEXT NOT NULL,
       variant_hooks_json TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS generation_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_snapshot_id INTEGER NOT NULL REFERENCES profile_snapshots(id) ON DELETE CASCADE,
+      analysis_run_id INTEGER NOT NULL REFERENCES analysis_runs(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      error_stage TEXT,
+      error_message TEXT,
+      job_dir TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS generated_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      generation_run_id INTEGER NOT NULL REFERENCES generation_runs(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      angle TEXT NOT NULL,
+      why_this TEXT NOT NULL,
+      hook TEXT NOT NULL,
+      draft TEXT NOT NULL,
+      source_signal TEXT NOT NULL
+    );
   `);
 }

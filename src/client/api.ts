@@ -1,4 +1,5 @@
 import type { AnalysisOutput } from "../shared/analysis-schema";
+import type { GenerationOutput } from "../shared/generation-schema";
 import type { CapturedAccountSnapshot } from "../shared/types";
 
 export async function getLatestSnapshot(): Promise<CapturedAccountSnapshot | null> {
@@ -13,6 +14,13 @@ export async function getLatestAnalysis(): Promise<AnalysisOutput | null> {
   if (!response.ok) throw new Error("Failed to load latest analysis");
   const data = await response.json();
   return data.analysis ?? null;
+}
+
+export async function getLatestGeneration(): Promise<GenerationOutput | null> {
+  const response = await fetch("/api/generation/latest");
+  if (!response.ok) throw new Error("Failed to load latest generated posts");
+  const data = await response.json();
+  return data.generation ?? null;
 }
 
 export async function importSnapshot(snapshot: unknown): Promise<void> {
@@ -47,4 +55,13 @@ export async function analyzeLatestSnapshot(): Promise<AnalysisOutput> {
     throw new Error(data?.errorMessage ?? "Analysis failed");
   }
   return data.output;
+}
+
+export async function generateTodaysIdeas(): Promise<GenerationOutput> {
+  const response = await fetch("/api/generate/today", { method: "POST" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Generation failed");
+  }
+  return data.generation;
 }

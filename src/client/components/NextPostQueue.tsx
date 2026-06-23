@@ -1,14 +1,32 @@
-import { Check, Copy, Lightbulb, PenLine, Target } from "lucide-react";
+import { Check, Copy, Lightbulb, PenLine, RefreshCcw, Sparkles, Target, Zap } from "lucide-react";
 import { useState } from "react";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
+import type { GenerationOutput } from "../../shared/generation-schema";
 
 const queue = [
-  { icon: Lightbulb, label: "Hook", value: "Run an audit to generate hooks" },
-  { icon: Target, label: "Why", value: "Each idea includes the rationale" },
-  { icon: PenLine, label: "Draft", value: "Draft copy appears after analysis" }
+  { icon: Target, label: "Audit", value: "Run strategy audit" },
+  { icon: Sparkles, label: "Generate", value: "Today's ideas" },
+  { icon: Copy, label: "Export", value: "Copy drafts into X" }
 ];
 
-export function NextPostQueue({ analysis }: { analysis: AnalysisOutput | null }) {
+const labModes = [
+  { icon: Sparkles, label: "Generate today's ideas", enabled: true },
+  { icon: Zap, label: "Posts like top performer", enabled: false },
+  { icon: RefreshCcw, label: "Rewrite selected post", enabled: false },
+  { icon: Target, label: "Contrarian angles", enabled: false }
+];
+
+export function NextPostQueue({
+  analysis,
+  generation,
+  generating,
+  onGenerateToday
+}: {
+  analysis: AnalysisOutput | null;
+  generation: GenerationOutput | null;
+  generating: boolean;
+  onGenerateToday: () => void;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
 
   async function copyDraft(id: string, text: string) {
@@ -17,11 +35,36 @@ export function NextPostQueue({ analysis }: { analysis: AnalysisOutput | null })
     window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1400);
   }
 
-  if (!analysis) {
-    return (
-      <section className="panel next-posts" aria-labelledby="next-posts-title">
-        <p className="eyebrow">Idea studio</p>
-        <h2 id="next-posts-title">No drafts yet</h2>
+  return (
+    <section className="panel next-posts" aria-labelledby="next-posts-title">
+      <div className="section-head post-lab-head">
+        <div>
+          <p className="eyebrow">Post Lab</p>
+          <h2 id="next-posts-title">{generation ? "Today's generated posts" : analysis ? "Ready to generate" : "Waiting on audit"}</h2>
+        </div>
+        <span className="status-chip">{generation ? `${generation.posts.length} drafts` : analysis ? "Audit ready" : "Locked"}</span>
+      </div>
+
+      <div className="post-lab-actions" aria-label="Post generation modes">
+        {labModes.map((mode) => {
+          const Icon = mode.icon;
+          return (
+            <button
+              className={mode.enabled ? "lab-action is-primary" : "lab-action"}
+              disabled={!analysis || generating || !mode.enabled}
+              key={mode.label}
+              onClick={mode.enabled ? onGenerateToday : undefined}
+              type="button"
+            >
+              <Icon size={16} aria-hidden="true" />
+              <span>{mode.label}</span>
+              {!mode.enabled && <small>Next</small>}
+            </button>
+          );
+        })}
+      </div>
+
+      {!analysis && (
         <div className="idea-list">
           {queue.map((item) => {
             const Icon = item.icon;
@@ -36,31 +79,46 @@ export function NextPostQueue({ analysis }: { analysis: AnalysisOutput | null })
             );
           })}
         </div>
-      </section>
-    );
-  }
+      )}
 
-  return (
-    <section className="panel next-posts" aria-labelledby="next-posts-title">
-      <p className="eyebrow">Idea studio</p>
-      <h2 id="next-posts-title">Recommended posts</h2>
-      <div className="idea-list">
-        {analysis.next_post_ideas.map((idea, index) => (
-          <article className="idea-card" key={idea.title}>
-            <Lightbulb size={17} aria-hidden="true" />
-            <div>
-              <span>{idea.title}</span>
-              <p className="idea-hook">{idea.hook}</p>
-              <p className="idea-draft">{idea.draft}</p>
-              <small>{idea.reason}</small>
-              <button className="copy-button" type="button" onClick={() => void copyDraft(`${idea.title}-${index}`, idea.draft)}>
-                {copied === `${idea.title}-${index}` ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                {copied === `${idea.title}-${index}` ? "Copied" : "Copy draft"}
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {analysis && !generation && (
+        <div className="idea-list starter-list">
+          {analysis.next_post_ideas.map((idea) => (
+            <article className="idea-card" key={idea.title}>
+              <Lightbulb size={17} aria-hidden="true" />
+              <div>
+                <span>{idea.title}</span>
+                <p className="idea-hook">{idea.hook}</p>
+                <small>{idea.reason}</small>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {generation && (
+        <div className="idea-list generated-list">
+          {generation.posts.map((post, index) => {
+            const copyId = `${post.title}-${index}`;
+            return (
+              <article className="idea-card generated-post-card" key={copyId}>
+                <PenLine size={17} aria-hidden="true" />
+                <div>
+                  <span>{post.title}</span>
+                  <p className="idea-hook">{post.hook}</p>
+                  <p className="source-signal">{post.source_signal}</p>
+                  <p className="idea-draft">{post.draft}</p>
+                  <small>{post.why_this}</small>
+                  <button className="copy-button" type="button" onClick={() => void copyDraft(copyId, post.draft)}>
+                    {copied === copyId ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                    {copied === copyId ? "Copied" : "Copy draft"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

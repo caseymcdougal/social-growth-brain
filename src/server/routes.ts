@@ -6,10 +6,17 @@ import type { AiRunner } from "./ai/ai-runner";
 import { BrowserHarnessXCaptureRunner } from "./capture/browser-harness-x";
 import { CaptureError, type CaptureRunner } from "./capture/capture-runner";
 import { openDatabase } from "./db";
+import { CodexGenerationRunner } from "./generation/codex-generation-runner";
+import type { GenerationRunner } from "./generation/generation-runner";
 import { createJobDir } from "./jobs";
 import { createRepositories } from "./repositories";
 
-export function createServerApp(options: { dataDir: string; aiRunner?: AiRunner; captureRunner?: CaptureRunner }) {
+export function createServerApp(options: {
+  dataDir: string;
+  aiRunner?: AiRunner;
+  captureRunner?: CaptureRunner;
+  generationRunner?: GenerationRunner;
+}) {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
 
@@ -17,6 +24,7 @@ export function createServerApp(options: { dataDir: string; aiRunner?: AiRunner;
   const repos = createRepositories(db);
   const captureRunner = options.captureRunner ?? new BrowserHarnessXCaptureRunner();
   const aiRunner = options.aiRunner ?? new CodexCliRunner();
+  const generationRunner = options.generationRunner ?? new CodexGenerationRunner();
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true, service: "social-audit" });
@@ -42,6 +50,10 @@ export function createServerApp(options: { dataDir: string; aiRunner?: AiRunner;
 
   app.get("/api/analysis/latest", (_request, response) => {
     response.json({ analysis: repos.getLatestAnalysisForLatestSnapshot() });
+  });
+
+  app.get("/api/generation/latest", (_request, response) => {
+    response.json({ generation: repos.getLatestGenerationForLatestSnapshot() });
   });
 
   app.post("/api/capture", async (request, response) => {
@@ -95,6 +107,52 @@ export function createServerApp(options: { dataDir: string; aiRunner?: AiRunner;
         ok: false,
         errorStage: "ai_runner_failed",
         errorMessage: error instanceof Error ? error.message : "Analysis failed",
+        jobDir
+      });
+    }
+  });
+
+  app.post("/api/generate/today", async (_request, response) => {
+    const snapshot = repos.getLatestSnapshot();
+    if (!snapshot) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_snapshot",
+        errorMessage: "Import or capture posts before generation"
+      });
+      return;
+    }
+
+    const latestAnalysis = repos.getLatestAnalysisRecordForLatestSnapshot();
+    if (!latestAnalysis) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_analysis",
+        errorMessage: "Run a strategy audit before generating posts"
+      });
+      return;
+    }
+
+    const jobDir = createJobDir(options.dataDir, "generation");
+    try {
+      const generation = await generationRunner.generateToday({
+        snapshot,
+        analysis: latestAnalysis.analysis,
+        jobDir
+      });
+      const generationRunId = repos.saveGeneration({
+        profileSnapshotId: latestAnalysis.profileSnapshotId,
+        analysisRunId: latestAnalysis.analysisRunId,
+        jobDir,
+        mode: "today",
+        output: generation
+      });
+      response.json({ ok: true, generationRunId, generation });
+    } catch (error) {
+      response.status(500).json({
+        ok: false,
+        errorStage: "generation_runner_failed",
+        errorMessage: error instanceof Error ? error.message : "Generation failed",
         jobDir
       });
     }

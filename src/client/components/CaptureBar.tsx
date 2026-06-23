@@ -1,4 +1,4 @@
-import { RefreshCcw, Upload, Wand2 } from "lucide-react";
+import { RefreshCcw, Sparkles, Upload, Wand2 } from "lucide-react";
 import type { MetricCompletenessSummary } from "../../shared/performance";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 
@@ -8,10 +8,13 @@ export function CaptureBar(props: {
   loading: boolean;
   capturing: boolean;
   analyzing: boolean;
+  generating: boolean;
+  hasAnalysis: boolean;
   error: string | null;
   status: string | null;
   onAnalyze: () => void;
   onCapture: () => void;
+  onGenerateToday: () => void;
   onOpenImport: () => void;
 }) {
   const capturedAt = props.snapshot?.profile.capturedAt
@@ -37,12 +40,43 @@ export function CaptureBar(props: {
         <button className="secondary-button" type="button" onClick={props.onOpenImport}>
           <Upload size={16} aria-hidden="true" /> Paste snapshot
         </button>
-        <button className="secondary-button" type="button" onClick={props.onCapture} disabled={props.loading || props.capturing || props.analyzing}>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={props.onCapture}
+          disabled={props.loading || props.capturing || props.analyzing || props.generating}
+        >
           <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning X" : "Scan public metrics"}
         </button>
-        <button className="primary-button" type="button" disabled={!props.snapshot || props.analyzing || props.capturing || props.loading} onClick={props.onAnalyze}>
-          <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Run strategy audit"}
-        </button>
+        {props.hasAnalysis ? (
+          <>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!props.snapshot || props.analyzing || props.capturing || props.loading || props.generating}
+              onClick={props.onAnalyze}
+            >
+              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Re-run audit"}
+            </button>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={props.generating || props.analyzing || props.capturing || props.loading}
+              onClick={props.onGenerateToday}
+            >
+              <Sparkles size={16} aria-hidden="true" /> {props.generating ? "Generating" : "Generate today's ideas"}
+            </button>
+          </>
+        ) : (
+          <button
+            className="primary-button"
+            type="button"
+            disabled={!props.snapshot || props.analyzing || props.capturing || props.loading || props.generating}
+            onClick={props.onAnalyze}
+          >
+            <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Run strategy audit"}
+          </button>
+        )}
       </div>
     </section>
   );

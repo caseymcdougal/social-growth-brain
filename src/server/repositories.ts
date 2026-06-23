@@ -1,5 +1,6 @@
 import type { AppDatabase } from "./db";
 import { analysisOutputSchema, type AnalysisOutput } from "../shared/analysis-schema";
+import { generationOutputSchema, type GenerationOutput } from "../shared/generation-schema";
 import type { CapturedAccountSnapshot } from "../shared/types";
 
 interface StoredProfile {
@@ -32,6 +33,7 @@ interface StoredPost {
 
 interface StoredAnalysisRun {
   id: number;
+  profile_snapshot_id: number;
 }
 
 interface StoredStrategyReport {
@@ -54,6 +56,38 @@ interface StoredPostAnalysis {
   recommended_change: string;
   rewrite: string;
   variant_hooks_json: string;
+}
+
+interface StoredGeneratedPost {
+  title: string;
+  angle: string;
+  why_this: string;
+  hook: string;
+  draft: string;
+  source_signal: string;
+}
+
+function buildAnalysisOutput(report: StoredStrategyReport, postAnalyses: StoredPostAnalysis[]): AnalysisOutput {
+  return analysisOutputSchema.parse({
+    executive_summary: report.executive_summary,
+    account_positioning_read: report.account_positioning_read,
+    top_patterns: JSON.parse(report.top_patterns_json),
+    what_is_working: JSON.parse(report.what_is_working_json),
+    what_is_holding_back: JSON.parse(report.what_is_holding_back_json),
+    recommended_content_pillars: JSON.parse(report.content_pillars_json),
+    next_post_ideas: JSON.parse(report.next_post_recommendations_json),
+    post_analyses: postAnalyses.map((post) => ({
+      post_id: post.x_post_id,
+      performance_read: post.performance_read,
+      likely_reason: post.likely_reason,
+      hook_diagnosis: post.hook_diagnosis,
+      clarity_diagnosis: post.clarity_diagnosis,
+      audience_fit: post.audience_fit,
+      recommended_change: post.recommended_change,
+      rewrite: post.rewrite,
+      variant_hooks: JSON.parse(post.variant_hooks_json)
+    }))
+  });
 }
 
 export function createRepositories(db: AppDatabase) {
@@ -172,7 +206,7 @@ export function createRepositories(db: AppDatabase) {
       return tx();
     },
 
-    getLatestAnalysisForLatestSnapshot(): AnalysisOutput | null {
+    getLatestAnalysisRecordForLatestSnapshot(): { profileSnapshotId: number; analysisRunId: number; analysis: AnalysisOutput } | null {
       const profile = db
         .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
         .get() as { id: number } | undefined;
@@ -180,7 +214,7 @@ export function createRepositories(db: AppDatabase) {
 
       const run = db
         .prepare(
-          "SELECT id FROM analysis_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
+          "SELECT id, profile_snapshot_id FROM analysis_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
         )
         .get(profile.id) as StoredAnalysisRun | undefined;
       if (!run) return null;
@@ -194,26 +228,76 @@ export function createRepositories(db: AppDatabase) {
         .prepare("SELECT * FROM post_analyses WHERE analysis_run_id = ? ORDER BY id ASC")
         .all(run.id) as StoredPostAnalysis[];
 
-      return analysisOutputSchema.parse({
-        executive_summary: report.executive_summary,
-        account_positioning_read: report.account_positioning_read,
-        top_patterns: JSON.parse(report.top_patterns_json),
-        what_is_working: JSON.parse(report.what_is_working_json),
-        what_is_holding_back: JSON.parse(report.what_is_holding_back_json),
-        recommended_content_pillars: JSON.parse(report.content_pillars_json),
-        next_post_ideas: JSON.parse(report.next_post_recommendations_json),
-        post_analyses: postAnalyses.map((post) => ({
-          post_id: post.x_post_id,
-          performance_read: post.performance_read,
-          likely_reason: post.likely_reason,
-          hook_diagnosis: post.hook_diagnosis,
-          clarity_diagnosis: post.clarity_diagnosis,
-          audience_fit: post.audience_fit,
-          recommended_change: post.recommended_change,
-          rewrite: post.rewrite,
-          variant_hooks: JSON.parse(post.variant_hooks_json)
-        }))
+      return {
+        profileSnapshotId: run.profile_snapshot_id,
+        analysisRunId: run.id,
+        analysis: buildAnalysisOutput(report, postAnalyses)
+      };
+    },
+
+    getLatestAnalysisForLatestSnapshot(): AnalysisOutput | null {
+      return this.getLatestAnalysisRecordForLatestSnapshot()?.analysis ?? null;
+    },
+
+    saveGeneration(input: {
+      profileSnapshotId: number;
+      analysisRunId: number;
+      jobDir: string;
+      mode: "today";
+      output: GenerationOutput;
+    }): number {
+      const startedAt = new Date().toISOString();
+      const tx = db.transaction(() => {
+        const run = db
+          .prepare(`
+            INSERT INTO generation_runs
+            (profile_snapshot_id, analysis_run_id, status, mode, started_at, finished_at, job_dir)
+            VALUES (?, ?, 'succeeded', ?, ?, ?, ?)
+          `)
+          .run(input.profileSnapshotId, input.analysisRunId, input.mode, startedAt, startedAt, input.jobDir);
+        const generationRunId = Number(run.lastInsertRowid);
+
+        const insertPost = db.prepare(`
+          INSERT INTO generated_posts
+          (generation_run_id, title, angle, why_this, hook, draft, source_signal)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const post of input.output.posts) {
+          insertPost.run(
+            generationRunId,
+            post.title,
+            post.angle,
+            post.why_this,
+            post.hook,
+            post.draft,
+            post.source_signal
+          );
+        }
+
+        return generationRunId;
       });
+
+      return tx();
+    },
+
+    getLatestGenerationForLatestSnapshot(): GenerationOutput | null {
+      const profile = db
+        .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!profile) return null;
+
+      const run = db
+        .prepare(
+          "SELECT id FROM generation_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
+        )
+        .get(profile.id) as { id: number } | undefined;
+      if (!run) return null;
+
+      const posts = db
+        .prepare("SELECT title, angle, why_this, hook, draft, source_signal FROM generated_posts WHERE generation_run_id = ? ORDER BY id ASC")
+        .all(run.id) as StoredGeneratedPost[];
+
+      return generationOutputSchema.parse({ posts });
     }
   };
 }

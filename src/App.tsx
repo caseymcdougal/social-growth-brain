@@ -1,12 +1,21 @@
 import { Crosshair, FileText, LockKeyhole, Radar, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import { analyzeLatestSnapshot, captureSnapshot, getLatestAnalysis, getLatestSnapshot, importSnapshot } from "./client/api";
+import {
+  analyzeLatestSnapshot,
+  captureSnapshot,
+  generateTodaysIdeas,
+  getLatestAnalysis,
+  getLatestGeneration,
+  getLatestSnapshot,
+  importSnapshot
+} from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
 import { CoachReport } from "./client/components/CoachReport";
 import { ManualImportPanel } from "./client/components/ManualImportPanel";
 import { NextPostQueue } from "./client/components/NextPostQueue";
 import { PostBreakdown } from "./client/components/PostBreakdown";
 import type { AnalysisOutput } from "./shared/analysis-schema";
+import type { GenerationOutput } from "./shared/generation-schema";
 import { rankPostsByVisibleSignal, summarizeMetricCompleteness } from "./shared/performance";
 import type { CapturedAccountSnapshot } from "./shared/types";
 
@@ -28,6 +37,9 @@ export function App() {
   const [analysis, setAnalysis] = useState<AnalysisOutput | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [generation, setGeneration] = useState<GenerationOutput | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
   const posts = snapshot?.posts ?? [];
@@ -41,7 +53,9 @@ export function App() {
     try {
       const latestSnapshot = await getLatestSnapshot();
       setSnapshot(latestSnapshot);
-      setAnalysis(latestSnapshot ? await getLatestAnalysis() : null);
+      const latestAnalysis = latestSnapshot ? await getLatestAnalysis() : null;
+      setAnalysis(latestAnalysis);
+      setGeneration(latestAnalysis ? await getLatestGeneration() : null);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Failed to load latest snapshot");
     } finally {
@@ -57,6 +71,8 @@ export function App() {
     await importSnapshot(JSON.parse(rawJson));
     setAnalysis(null);
     setAnalysisError(null);
+    setGeneration(null);
+    setGenerationError(null);
     setCaptureError(null);
     await refresh();
   }
@@ -67,6 +83,8 @@ export function App() {
     setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
     setAnalysis(null);
     setAnalysisError(null);
+    setGeneration(null);
+    setGenerationError(null);
     try {
       setSnapshot(await captureSnapshot());
       setCaptureStatus(null);
@@ -80,12 +98,26 @@ export function App() {
   async function handleAnalyze() {
     setAnalyzing(true);
     setAnalysisError(null);
+    setGeneration(null);
+    setGenerationError(null);
     try {
       setAnalysis(await analyzeLatestSnapshot());
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "Analysis failed");
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function handleGenerateToday() {
+    setGenerating(true);
+    setGenerationError(null);
+    try {
+      setGeneration(await generateTodaysIdeas());
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "Generation failed");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -147,10 +179,13 @@ export function App() {
             loading={loading}
             capturing={capturing}
             analyzing={analyzing}
+            generating={generating}
+            hasAnalysis={Boolean(analysis)}
             error={loadError ?? captureError}
             status={capturing ? captureStatus : null}
             onAnalyze={() => void handleAnalyze()}
             onCapture={() => void handleCapture()}
+            onGenerateToday={() => void handleGenerateToday()}
             onOpenImport={() => setImportOpen(true)}
           />
 
@@ -182,10 +217,16 @@ export function App() {
         </div>
 
         {analysisError && <section className="panel error-panel">{analysisError}</section>}
+        {generationError && <section className="panel error-panel">{generationError}</section>}
 
         <div className="dashboard-grid">
           <CoachReport analysis={analysis} postCount={postCount} />
-          <NextPostQueue analysis={analysis} />
+          <NextPostQueue
+            analysis={analysis}
+            generation={generation}
+            generating={generating}
+            onGenerateToday={() => void handleGenerateToday()}
+          />
         </div>
 
         <PostBreakdown rankedPosts={rankedPosts} analysis={analysis} />
