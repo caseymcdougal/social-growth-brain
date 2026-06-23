@@ -1,0 +1,29 @@
+{
+  "executive_summary": "Your strongest posts are specific and opinionated. The weaker posts are abstract and do not give readers a clear stake.",
+  "account_positioning_read": "Builder/operator sharing practical AI product experiments.",
+  "top_patterns": ["Specific product takes outperform broad motivation.", "Posts with a clear enemy have stronger hooks."],
+  "what_is_working": ["Direct product opinions", "Builder-in-public specificity"],
+  "what_is_holding_back": ["Too many abstract claims", "Not enough concrete screenshots or examples"],
+  "recommended_content_pillars": ["AI tools I am building", "Lessons from shipping", "Taste critiques of software"],
+  "next_post_ideas": [
+    {
+      "title": "Why most social analytics tools fail creators",
+      "reason": "Matches your dashboard build and gives you a clear contrarian angle.",
+      "hook": "Most social analytics tools stop at the exact moment they become useful.",
+      "draft": "Most social analytics tools stop at the exact moment they become useful. They tell you a post underperformed. They rarely tell you what to write next, what angle was weak, or how to sharpen the idea."
+    }
+  ],
+  "post_analyses": [
+    {
+      "post_id": "1",
+      "performance_read": "Likely above baseline because the problem is clear and the audience can self-identify.",
+      "likely_reason": "The post contrasts useless analytics with actionable strategy.",
+      "hook_diagnosis": "Strong contrast, but could be more concrete.",
+      "clarity_diagnosis": "Clear enough for builders and creators.",
+      "audience_fit": "Good fit for founders building content systems.",
+      "recommended_change": "Name the exact failure mode in the first sentence.",
+      "rewrite": "Most creator dashboards are autopsies. I want one that works like a strategist.",
+      "variant_hooks": ["Your analytics should tell you what to post next.", "A dashboard that only explains the past is half a product."]
+    }
+  ]
+}
