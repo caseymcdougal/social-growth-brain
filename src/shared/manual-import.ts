@@ -2,13 +2,15 @@ import { z } from "zod";
 import { normalizeCapturedSnapshot } from "./normalize";
 
 const nullableNumber = z.number().int().nonnegative().nullable();
+const requiredTrimmedString = z.string().trim().min(1);
+const isoDateTime = z.iso.datetime();
 
 const postSchema = z.object({
-  xPostId: z.string().min(1),
-  url: z.string().url(),
-  text: z.string().min(1),
-  postedAt: z.string().nullable(),
-  capturedAt: z.string(),
+  xPostId: requiredTrimmedString,
+  url: requiredTrimmedString.pipe(z.string().url()),
+  text: requiredTrimmedString,
+  postedAt: isoDateTime.nullable(),
+  capturedAt: isoDateTime,
   source: z.literal("manual"),
   viewsCount: nullableNumber,
   likesCount: nullableNumber,
@@ -19,13 +21,13 @@ const postSchema = z.object({
 
 const snapshotSchema = z.object({
   profile: z.object({
-    handle: z.string().min(1),
-    displayName: z.string().min(1),
+    handle: requiredTrimmedString,
+    displayName: requiredTrimmedString,
     bio: z.string(),
-    profileUrl: z.string().url(),
+    profileUrl: requiredTrimmedString.pipe(z.string().url()),
     followersCount: nullableNumber,
     followingCount: nullableNumber,
-    capturedAt: z.string(),
+    capturedAt: isoDateTime,
     source: z.literal("manual")
   }),
   posts: z.array(postSchema).min(1)
