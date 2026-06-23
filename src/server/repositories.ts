@@ -1,6 +1,14 @@
 import type { AppDatabase } from "./db";
 import { analysisOutputSchema, type AnalysisOutput } from "../shared/analysis-schema";
 import { generationOutputSchema, type GenerationOutput } from "../shared/generation-schema";
+import {
+  strategyMemoryProposalOutputSchema,
+  strategyMemorySchema,
+  topicExplorationOutputSchema,
+  type StrategyMemory,
+  type StrategyMemoryProposalOutput,
+  type TopicExplorationOutput
+} from "../shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "../shared/types";
 
 interface StoredProfile {
@@ -65,6 +73,23 @@ interface StoredGeneratedPost {
   hook: string;
   draft: string;
   source_signal: string;
+}
+
+interface StoredStrategyMemory {
+  id: number;
+  memory_json: string;
+  created_at: string;
+}
+
+interface StoredStrategyMemoryProposal {
+  id: number;
+  proposed_memory_json: string;
+  updates_json: string;
+  created_at: string;
+}
+
+interface StoredTopicExplorationRun {
+  output_json: string;
 }
 
 function buildAnalysisOutput(report: StoredStrategyReport, postAnalyses: StoredPostAnalysis[]): AnalysisOutput {
@@ -298,6 +323,138 @@ export function createRepositories(db: AppDatabase) {
         .all(run.id) as StoredGeneratedPost[];
 
       return generationOutputSchema.parse({ posts });
+    },
+
+    getLatestStrategyMemory(): { id: number; memory: StrategyMemory; createdAt: string } | null {
+      const row = db
+        .prepare("SELECT id, memory_json, created_at FROM strategy_memories ORDER BY created_at DESC, id DESC LIMIT 1")
+        .get() as StoredStrategyMemory | undefined;
+      if (!row) return null;
+
+      return {
+        id: row.id,
+        memory: strategyMemorySchema.parse(JSON.parse(row.memory_json)),
+        createdAt: row.created_at
+      };
+    },
+
+    getLatestPendingStrategyMemoryProposal():
+      | ({ id: number; createdAt: string } & StrategyMemoryProposalOutput)
+      | null {
+      const profile = db
+        .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!profile) return null;
+
+      const row = db
+        .prepare(
+          "SELECT id, proposed_memory_json, updates_json, created_at FROM strategy_memory_proposals WHERE profile_snapshot_id = ? AND status = 'pending' ORDER BY created_at DESC, id DESC LIMIT 1"
+        )
+        .get(profile.id) as StoredStrategyMemoryProposal | undefined;
+      if (!row) return null;
+
+      const output = strategyMemoryProposalOutputSchema.parse({
+        memory: JSON.parse(row.proposed_memory_json),
+        updates: JSON.parse(row.updates_json)
+      });
+
+      return {
+        id: row.id,
+        createdAt: row.created_at,
+        ...output
+      };
+    },
+
+    saveStrategyMemoryProposal(input: {
+      profileSnapshotId: number;
+      analysisRunId: number;
+      jobDir: string;
+      output: StrategyMemoryProposalOutput;
+    }): number {
+      const createdAt = new Date().toISOString();
+      const result = db
+        .prepare(`
+          INSERT INTO strategy_memory_proposals
+          (profile_snapshot_id, analysis_run_id, status, proposed_memory_json, updates_json, created_at, job_dir)
+          VALUES (?, ?, 'pending', ?, ?, ?, ?)
+        `)
+        .run(
+          input.profileSnapshotId,
+          input.analysisRunId,
+          JSON.stringify(input.output.memory),
+          JSON.stringify(input.output.updates),
+          createdAt,
+          input.jobDir
+        );
+
+      return Number(result.lastInsertRowid);
+    },
+
+    applyStrategyMemoryProposal(proposalId: number): { id: number; memory: StrategyMemory; createdAt: string } | null {
+      const proposal = db
+        .prepare("SELECT id, proposed_memory_json FROM strategy_memory_proposals WHERE id = ? AND status = 'pending' LIMIT 1")
+        .get(proposalId) as { id: number; proposed_memory_json: string } | undefined;
+      if (!proposal) return null;
+
+      const memory = strategyMemorySchema.parse(JSON.parse(proposal.proposed_memory_json));
+      const createdAt = new Date().toISOString();
+      const tx = db.transaction(() => {
+        const result = db
+          .prepare("INSERT INTO strategy_memories (source_proposal_id, memory_json, created_at) VALUES (?, ?, ?)")
+          .run(proposal.id, JSON.stringify(memory), createdAt);
+        db.prepare("UPDATE strategy_memory_proposals SET status = 'applied', applied_at = ? WHERE id = ?").run(createdAt, proposal.id);
+
+        return Number(result.lastInsertRowid);
+      });
+
+      return {
+        id: tx(),
+        memory,
+        createdAt
+      };
+    },
+
+    saveTopicExploration(input: {
+      profileSnapshotId: number;
+      analysisRunId: number;
+      strategyMemoryId: number | null;
+      jobDir: string;
+      output: TopicExplorationOutput;
+    }): number {
+      const startedAt = new Date().toISOString();
+      const result = db
+        .prepare(`
+          INSERT INTO topic_exploration_runs
+          (profile_snapshot_id, analysis_run_id, strategy_memory_id, status, output_json, started_at, finished_at, job_dir)
+          VALUES (?, ?, ?, 'succeeded', ?, ?, ?, ?)
+        `)
+        .run(
+          input.profileSnapshotId,
+          input.analysisRunId,
+          input.strategyMemoryId,
+          JSON.stringify(input.output),
+          startedAt,
+          startedAt,
+          input.jobDir
+        );
+
+      return Number(result.lastInsertRowid);
+    },
+
+    getLatestTopicExplorationForLatestSnapshot(): TopicExplorationOutput | null {
+      const profile = db
+        .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!profile) return null;
+
+      const row = db
+        .prepare(
+          "SELECT output_json FROM topic_exploration_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
+        )
+        .get(profile.id) as StoredTopicExplorationRun | undefined;
+      if (!row) return null;
+
+      return topicExplorationOutputSchema.parse(JSON.parse(row.output_json));
     }
   };
 }

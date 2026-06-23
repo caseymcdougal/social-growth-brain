@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analysisOutputSchema } from "../../src/shared/analysis-schema";
 import { generationOutputSchema } from "../../src/shared/generation-schema";
+import {
+  strategyMemoryProposalOutputSchema,
+  topicExplorationOutputSchema
+} from "../../src/shared/strategy-intelligence-schema";
 import { createServerApp } from "../../src/server/routes";
+import type { StrategyIntelligenceRunner } from "../../src/server/strategy/strategy-intelligence-runner";
 import analysisFixture from "../fixtures/analysis-valid.json";
 
 const servers: { close: () => void }[] = [];
@@ -206,5 +211,182 @@ describe("server routes", () => {
 
     expect(response.status).toBe(200);
     expect(body.generation.posts[0].draft).toContain("content tool earns");
+  });
+
+  it("requires a successful audit before refreshing strategy memory", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+
+    const response = await fetch(`${baseUrl}/api/strategy-memory/refresh`, { method: "POST" });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.errorStage).toBe("no_analysis");
+  });
+
+  it("creates and applies a strategy memory proposal with an injected runner", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const proposal = strategyMemoryProposalOutputSchema.parse({
+      memory: {
+        positioning: "Casey writes as a local-first AI tooling operator.",
+        audience_segments: ["builders shipping with AI"],
+        strongest_lanes: ["local AI dashboards", "workflow critique"],
+        weak_lanes: ["generic AI commentary"],
+        voice_rules: ["make the product opinion first"],
+        proof_points: ["Audit found specific product opinions outperform generic takes."],
+        active_experiments: [
+          {
+            hypothesis: "Named workflow enemies increase replies.",
+            status: "active",
+            evidence: "The audit flagged clear enemy framing as a strong pattern."
+          }
+        ]
+      },
+      updates: [
+        {
+          area: "positioning",
+          proposed: "Frame Casey as a local-first AI tooling operator.",
+          reason: "This is supported by the current dashboard build and post audit.",
+          evidence: "Top patterns favor specific product opinions."
+        }
+      ]
+    });
+    const strategyRunner = {
+      generateMemoryProposal: vi.fn(async () => proposal),
+      exploreTopics: vi.fn()
+    };
+    const baseUrl = await listen(
+      createServerApp({
+        dataDir: dir,
+        aiRunner: { analyze: vi.fn(async () => output) },
+        strategyRunner
+      })
+    );
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+    await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+
+    const refreshResponse = await fetch(`${baseUrl}/api/strategy-memory/refresh`, { method: "POST" });
+    const refreshBody = await refreshResponse.json();
+
+    expect(refreshResponse.status).toBe(200);
+    expect(strategyRunner.generateMemoryProposal).toHaveBeenCalledOnce();
+    expect(refreshBody.proposal.updates[0].area).toBe("positioning");
+
+    const latestBeforeApply = await (await fetch(`${baseUrl}/api/strategy-memory/latest`)).json();
+    expect(latestBeforeApply.memory).toBeNull();
+    expect(latestBeforeApply.proposal.id).toBe(refreshBody.proposal.id);
+
+    const applyResponse = await fetch(`${baseUrl}/api/strategy-memory/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ proposalId: refreshBody.proposal.id })
+    });
+    const applyBody = await applyResponse.json();
+
+    expect(applyResponse.status).toBe(200);
+    expect(applyBody.memory.positioning).toContain("local-first");
+
+    const latestAfterApply = await (await fetch(`${baseUrl}/api/strategy-memory/latest`)).json();
+    expect(latestAfterApply.memory.positioning).toContain("local-first");
+    expect(latestAfterApply.proposal).toBeNull();
+  });
+
+  it("explores nearby topics with accepted memory when available", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const proposal = strategyMemoryProposalOutputSchema.parse({
+      memory: {
+        positioning: "Casey writes as a local-first AI tooling operator.",
+        audience_segments: ["builders shipping with AI"],
+        strongest_lanes: ["local AI dashboards"],
+        weak_lanes: ["generic AI commentary"],
+        voice_rules: ["make the product opinion first"],
+        proof_points: ["Specific product opinions outperform generic takes."],
+        active_experiments: [
+          {
+            hypothesis: "Local workflow posts can become a repeatable lane.",
+            status: "active",
+            evidence: "The audit recommended product-specific content pillars."
+          }
+        ]
+      },
+      updates: [
+        {
+          area: "strongest_lanes",
+          proposed: "Add local AI dashboards.",
+          reason: "It is supported by current build context.",
+          evidence: "Recommended content pillars include AI tools Casey is building."
+        }
+      ]
+    });
+    const topics = topicExplorationOutputSchema.parse({
+      topics: [
+        {
+          title: "Dashboards that remember taste",
+          lane: "local AI dashboards",
+          why_near: "It extends the dashboard work into a broader creator-tooling thesis.",
+          evidence: ["Accepted memory says local AI dashboards are a strong lane."],
+          risk: "low",
+          hooks: ["Your dashboard should remember your taste.", "A content tool without memory is just a scoreboard."],
+          draft:
+            "A content tool without memory is just a scoreboard. The useful version remembers your taste, your strongest lanes, and the kinds of takes you should stop repeating.",
+          follow_up_prompt: "Explore memory-first creator tools."
+        }
+      ]
+    });
+    const exploreTopics = vi.fn(async (_input: Parameters<StrategyIntelligenceRunner["exploreTopics"]>[0]) => topics);
+    const strategyRunner = {
+      generateMemoryProposal: vi.fn(async () => proposal),
+      exploreTopics
+    };
+    const baseUrl = await listen(
+      createServerApp({
+        dataDir: dir,
+        aiRunner: { analyze: vi.fn(async () => output) },
+        strategyRunner
+      })
+    );
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+    await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+    const proposalBody = await (await fetch(`${baseUrl}/api/strategy-memory/refresh`, { method: "POST" })).json();
+    await fetch(`${baseUrl}/api/strategy-memory/apply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ proposalId: proposalBody.proposal.id })
+    });
+
+    const exploreResponse = await fetch(`${baseUrl}/api/topics/explore`, { method: "POST" });
+    const exploreBody = await exploreResponse.json();
+
+    expect(exploreResponse.status).toBe(200);
+    expect(exploreTopics).toHaveBeenCalledOnce();
+    expect(exploreTopics.mock.calls[0]).toBeDefined();
+    const topicCall = exploreTopics.mock.calls[0]?.[0];
+    if (!topicCall?.currentMemory) throw new Error("Expected topic exploration to receive accepted memory");
+    expect(topicCall.currentMemory.positioning).toContain("local-first");
+    expect(exploreBody.exploration.topics[0].title).toBe("Dashboards that remember taste");
+
+    const latestTopics = await (await fetch(`${baseUrl}/api/topics/latest`)).json();
+    expect(latestTopics.exploration.topics[0].draft).toContain("scoreboard");
   });
 });

@@ -10,12 +10,15 @@ import { CodexGenerationRunner } from "./generation/codex-generation-runner";
 import type { GenerationRunner } from "./generation/generation-runner";
 import { createJobDir } from "./jobs";
 import { createRepositories } from "./repositories";
+import { CodexStrategyIntelligenceRunner } from "./strategy/codex-strategy-intelligence-runner";
+import type { StrategyIntelligenceRunner } from "./strategy/strategy-intelligence-runner";
 
 export function createServerApp(options: {
   dataDir: string;
   aiRunner?: AiRunner;
   captureRunner?: CaptureRunner;
   generationRunner?: GenerationRunner;
+  strategyRunner?: StrategyIntelligenceRunner;
 }) {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
@@ -25,6 +28,7 @@ export function createServerApp(options: {
   const captureRunner = options.captureRunner ?? new BrowserHarnessXCaptureRunner();
   const aiRunner = options.aiRunner ?? new CodexCliRunner();
   const generationRunner = options.generationRunner ?? new CodexGenerationRunner();
+  const strategyRunner = options.strategyRunner ?? new CodexStrategyIntelligenceRunner();
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true, service: "social-audit" });
@@ -54,6 +58,17 @@ export function createServerApp(options: {
 
   app.get("/api/generation/latest", (_request, response) => {
     response.json({ generation: repos.getLatestGenerationForLatestSnapshot() });
+  });
+
+  app.get("/api/strategy-memory/latest", (_request, response) => {
+    response.json({
+      memory: repos.getLatestStrategyMemory()?.memory ?? null,
+      proposal: repos.getLatestPendingStrategyMemoryProposal()
+    });
+  });
+
+  app.get("/api/topics/latest", (_request, response) => {
+    response.json({ exploration: repos.getLatestTopicExplorationForLatestSnapshot() });
   });
 
   app.post("/api/capture", async (request, response) => {
@@ -153,6 +168,131 @@ export function createServerApp(options: {
         ok: false,
         errorStage: "generation_runner_failed",
         errorMessage: error instanceof Error ? error.message : "Generation failed",
+        jobDir
+      });
+    }
+  });
+
+  app.post("/api/strategy-memory/refresh", async (_request, response) => {
+    const snapshot = repos.getLatestSnapshot();
+    if (!snapshot) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_snapshot",
+        errorMessage: "Import or capture posts before updating strategy memory"
+      });
+      return;
+    }
+
+    const latestAnalysis = repos.getLatestAnalysisRecordForLatestSnapshot();
+    if (!latestAnalysis) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_analysis",
+        errorMessage: "Run a strategy audit before updating strategy memory"
+      });
+      return;
+    }
+
+    const jobDir = createJobDir(options.dataDir, "strategy-memory");
+    try {
+      const currentMemory = repos.getLatestStrategyMemory();
+      const output = await strategyRunner.generateMemoryProposal({
+        snapshot,
+        analysis: latestAnalysis.analysis,
+        currentMemory: currentMemory?.memory ?? null,
+        jobDir
+      });
+      const proposalId = repos.saveStrategyMemoryProposal({
+        profileSnapshotId: latestAnalysis.profileSnapshotId,
+        analysisRunId: latestAnalysis.analysisRunId,
+        jobDir,
+        output
+      });
+      response.json({
+        ok: true,
+        proposal: {
+          id: proposalId,
+          ...output
+        }
+      });
+    } catch (error) {
+      response.status(500).json({
+        ok: false,
+        errorStage: "strategy_memory_runner_failed",
+        errorMessage: error instanceof Error ? error.message : "Strategy memory update failed",
+        jobDir
+      });
+    }
+  });
+
+  app.post("/api/strategy-memory/apply", (request, response) => {
+    const proposalId = Number(request.body?.proposalId);
+    if (!Number.isInteger(proposalId) || proposalId < 1) {
+      response.status(400).json({
+        ok: false,
+        errorStage: "invalid_proposal",
+        errorMessage: "Provide a valid proposalId"
+      });
+      return;
+    }
+
+    const applied = repos.applyStrategyMemoryProposal(proposalId);
+    if (!applied) {
+      response.status(404).json({
+        ok: false,
+        errorStage: "proposal_not_found",
+        errorMessage: "No pending strategy memory proposal was found"
+      });
+      return;
+    }
+
+    response.json({ ok: true, memoryId: applied.id, memory: applied.memory });
+  });
+
+  app.post("/api/topics/explore", async (_request, response) => {
+    const snapshot = repos.getLatestSnapshot();
+    if (!snapshot) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_snapshot",
+        errorMessage: "Import or capture posts before exploring topics"
+      });
+      return;
+    }
+
+    const latestAnalysis = repos.getLatestAnalysisRecordForLatestSnapshot();
+    if (!latestAnalysis) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_analysis",
+        errorMessage: "Run a strategy audit before exploring topics"
+      });
+      return;
+    }
+
+    const currentMemory = repos.getLatestStrategyMemory();
+    const jobDir = createJobDir(options.dataDir, "topic-explorer");
+    try {
+      const exploration = await strategyRunner.exploreTopics({
+        snapshot,
+        analysis: latestAnalysis.analysis,
+        currentMemory: currentMemory?.memory ?? null,
+        jobDir
+      });
+      const topicRunId = repos.saveTopicExploration({
+        profileSnapshotId: latestAnalysis.profileSnapshotId,
+        analysisRunId: latestAnalysis.analysisRunId,
+        strategyMemoryId: currentMemory?.id ?? null,
+        jobDir,
+        output: exploration
+      });
+      response.json({ ok: true, topicRunId, exploration });
+    } catch (error) {
+      response.status(500).json({
+        ok: false,
+        errorStage: "topic_explorer_runner_failed",
+        errorMessage: error instanceof Error ? error.message : "Topic exploration failed",
         jobDir
       });
     }

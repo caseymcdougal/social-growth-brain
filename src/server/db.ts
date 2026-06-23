@@ -108,5 +108,36 @@ function migrate(db: AppDatabase) {
       draft TEXT NOT NULL,
       source_signal TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS strategy_memories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_proposal_id INTEGER,
+      memory_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS strategy_memory_proposals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_snapshot_id INTEGER NOT NULL REFERENCES profile_snapshots(id) ON DELETE CASCADE,
+      analysis_run_id INTEGER NOT NULL REFERENCES analysis_runs(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      proposed_memory_json TEXT NOT NULL,
+      updates_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      applied_at TEXT,
+      job_dir TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS topic_exploration_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_snapshot_id INTEGER NOT NULL REFERENCES profile_snapshots(id) ON DELETE CASCADE,
+      analysis_run_id INTEGER NOT NULL REFERENCES analysis_runs(id) ON DELETE CASCADE,
+      strategy_memory_id INTEGER REFERENCES strategy_memories(id) ON DELETE SET NULL,
+      status TEXT NOT NULL,
+      output_json TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      finished_at TEXT,
+      job_dir TEXT NOT NULL
+    );
   `);
 }

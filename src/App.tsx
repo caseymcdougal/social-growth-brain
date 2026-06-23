@@ -1,22 +1,31 @@
 import { Crosshair, FileText, LockKeyhole, Radar, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
+  applyStrategyMemoryProposal,
   analyzeLatestSnapshot,
   captureSnapshot,
+  exploreNearbyTopics,
   generateTodaysIdeas,
   getLatestAnalysis,
   getLatestGeneration,
   getLatestSnapshot,
-  importSnapshot
+  getLatestStrategyMemory,
+  getLatestTopicExploration,
+  importSnapshot,
+  refreshStrategyMemory,
+  type StrategyMemoryProposal
 } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
 import { CoachReport } from "./client/components/CoachReport";
 import { ManualImportPanel } from "./client/components/ManualImportPanel";
 import { NextPostQueue } from "./client/components/NextPostQueue";
 import { PostBreakdown } from "./client/components/PostBreakdown";
+import { StrategyMemoryPanel } from "./client/components/StrategyMemoryPanel";
+import { TopicExplorer } from "./client/components/TopicExplorer";
 import type { AnalysisOutput } from "./shared/analysis-schema";
 import type { GenerationOutput } from "./shared/generation-schema";
 import { rankPostsByVisibleSignal, summarizeMetricCompleteness } from "./shared/performance";
+import type { StrategyMemory, TopicExplorationOutput } from "./shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "./shared/types";
 
 const auditSteps = [
@@ -40,6 +49,14 @@ export function App() {
   const [generation, setGeneration] = useState<GenerationOutput | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [strategyMemory, setStrategyMemory] = useState<StrategyMemory | null>(null);
+  const [memoryProposal, setMemoryProposal] = useState<StrategyMemoryProposal | null>(null);
+  const [updatingMemory, setUpdatingMemory] = useState(false);
+  const [applyingMemory, setApplyingMemory] = useState(false);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const [topicExploration, setTopicExploration] = useState<TopicExplorationOutput | null>(null);
+  const [exploringTopics, setExploringTopics] = useState(false);
+  const [topicError, setTopicError] = useState<string | null>(null);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
   const posts = snapshot?.posts ?? [];
@@ -55,7 +72,22 @@ export function App() {
       setSnapshot(latestSnapshot);
       const latestAnalysis = latestSnapshot ? await getLatestAnalysis() : null;
       setAnalysis(latestAnalysis);
-      setGeneration(latestAnalysis ? await getLatestGeneration() : null);
+      if (latestAnalysis) {
+        const [latestGeneration, latestMemory, latestTopics] = await Promise.all([
+          getLatestGeneration(),
+          getLatestStrategyMemory(),
+          getLatestTopicExploration()
+        ]);
+        setGeneration(latestGeneration);
+        setStrategyMemory(latestMemory.memory);
+        setMemoryProposal(latestMemory.proposal);
+        setTopicExploration(latestTopics);
+      } else {
+        setGeneration(null);
+        setStrategyMemory(null);
+        setMemoryProposal(null);
+        setTopicExploration(null);
+      }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Failed to load latest snapshot");
     } finally {
@@ -73,6 +105,10 @@ export function App() {
     setAnalysisError(null);
     setGeneration(null);
     setGenerationError(null);
+    setMemoryProposal(null);
+    setMemoryError(null);
+    setTopicExploration(null);
+    setTopicError(null);
     setCaptureError(null);
     await refresh();
   }
@@ -85,6 +121,10 @@ export function App() {
     setAnalysisError(null);
     setGeneration(null);
     setGenerationError(null);
+    setMemoryProposal(null);
+    setMemoryError(null);
+    setTopicExploration(null);
+    setTopicError(null);
     try {
       setSnapshot(await captureSnapshot());
       setCaptureStatus(null);
@@ -100,6 +140,10 @@ export function App() {
     setAnalysisError(null);
     setGeneration(null);
     setGenerationError(null);
+    setMemoryProposal(null);
+    setMemoryError(null);
+    setTopicExploration(null);
+    setTopicError(null);
     try {
       setAnalysis(await analyzeLatestSnapshot());
     } catch (error) {
@@ -118,6 +162,43 @@ export function App() {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleRefreshMemory() {
+    setUpdatingMemory(true);
+    setMemoryError(null);
+    try {
+      setMemoryProposal(await refreshStrategyMemory());
+    } catch (error) {
+      setMemoryError(error instanceof Error ? error.message : "Strategy memory update failed");
+    } finally {
+      setUpdatingMemory(false);
+    }
+  }
+
+  async function handleApplyMemory(proposalId: number) {
+    setApplyingMemory(true);
+    setMemoryError(null);
+    try {
+      setStrategyMemory(await applyStrategyMemoryProposal(proposalId));
+      setMemoryProposal(null);
+    } catch (error) {
+      setMemoryError(error instanceof Error ? error.message : "Apply memory update failed");
+    } finally {
+      setApplyingMemory(false);
+    }
+  }
+
+  async function handleExploreTopics() {
+    setExploringTopics(true);
+    setTopicError(null);
+    try {
+      setTopicExploration(await exploreNearbyTopics());
+    } catch (error) {
+      setTopicError(error instanceof Error ? error.message : "Topic exploration failed");
+    } finally {
+      setExploringTopics(false);
     }
   }
 
@@ -218,6 +299,8 @@ export function App() {
 
         {analysisError && <section className="panel error-panel">{analysisError}</section>}
         {generationError && <section className="panel error-panel">{generationError}</section>}
+        {memoryError && <section className="panel error-panel">{memoryError}</section>}
+        {topicError && <section className="panel error-panel">{topicError}</section>}
 
         <div className="dashboard-grid">
           <CoachReport analysis={analysis} postCount={postCount} />
@@ -226,6 +309,24 @@ export function App() {
             generation={generation}
             generating={generating}
             onGenerateToday={() => void handleGenerateToday()}
+          />
+        </div>
+
+        <div className="intelligence-grid">
+          <StrategyMemoryPanel
+            analysis={analysis}
+            memory={strategyMemory}
+            proposal={memoryProposal}
+            updating={updatingMemory}
+            applying={applyingMemory}
+            onRefresh={() => void handleRefreshMemory()}
+            onApply={(proposalId) => void handleApplyMemory(proposalId)}
+          />
+          <TopicExplorer
+            analysis={analysis}
+            exploration={topicExploration}
+            exploring={exploringTopics}
+            onExplore={() => void handleExploreTopics()}
           />
         </div>
 
