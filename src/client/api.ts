@@ -20,6 +20,19 @@ export async function importSnapshot(snapshot: unknown): Promise<void> {
   }
 }
 
+export async function captureSnapshot(handle = "caseymcdougal"): Promise<CapturedAccountSnapshot> {
+  const response = await fetch("/api/capture", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handle })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Capture failed");
+  }
+  return data.snapshot;
+}
+
 export async function analyzeLatestSnapshot(): Promise<AnalysisOutput> {
   const response = await fetch("/api/analyze", { method: "POST" });
   const data = await response.json().catch(() => null);

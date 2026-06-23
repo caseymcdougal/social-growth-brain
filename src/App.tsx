@@ -1,6 +1,6 @@
 import { Activity, BarChart3, Bot, ClipboardList, Lightbulb, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
-import { analyzeLatestSnapshot, getLatestSnapshot, importSnapshot } from "./client/api";
+import { analyzeLatestSnapshot, captureSnapshot, getLatestSnapshot, importSnapshot } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
 import { CoachReport } from "./client/components/CoachReport";
 import { ManualImportPanel } from "./client/components/ManualImportPanel";
@@ -21,6 +21,8 @@ export function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisOutput | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -47,7 +49,22 @@ export function App() {
     await importSnapshot(JSON.parse(rawJson));
     setAnalysis(null);
     setAnalysisError(null);
+    setCaptureError(null);
     await refresh();
+  }
+
+  async function handleCapture() {
+    setCapturing(true);
+    setCaptureError(null);
+    setAnalysis(null);
+    setAnalysisError(null);
+    try {
+      setSnapshot(await captureSnapshot());
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "Capture failed");
+    } finally {
+      setCapturing(false);
+    }
   }
 
   async function handleAnalyze() {
@@ -106,11 +123,12 @@ export function App() {
         <CaptureBar
           snapshot={snapshot}
           loading={loading}
+          capturing={capturing}
           analyzing={analyzing}
-          error={loadError}
+          error={loadError ?? captureError}
           onAnalyze={() => void handleAnalyze()}
+          onCapture={() => void handleCapture()}
           onOpenImport={() => setImportOpen(true)}
-          onRefresh={() => void refresh()}
         />
 
         {analysisError && <section className="panel error-panel">{analysisError}</section>}

@@ -4,11 +4,12 @@ import type { CapturedAccountSnapshot } from "../../shared/types";
 export function CaptureBar(props: {
   snapshot: CapturedAccountSnapshot | null;
   loading: boolean;
+  capturing: boolean;
   analyzing: boolean;
   error: string | null;
   onAnalyze: () => void;
+  onCapture: () => void;
   onOpenImport: () => void;
-  onRefresh: () => void;
 }) {
   const capturedAt = props.snapshot?.profile.capturedAt
     ? new Date(props.snapshot.profile.capturedAt).toLocaleString()
@@ -31,8 +32,8 @@ export function CaptureBar(props: {
         <button className="secondary-button" type="button" onClick={props.onOpenImport}>
           <Upload size={16} aria-hidden="true" /> Import manually
         </button>
-        <button className="secondary-button" type="button" onClick={props.onRefresh} disabled={props.loading}>
-          <RefreshCcw size={16} aria-hidden="true" /> Refresh
+        <button className="secondary-button" type="button" onClick={props.onCapture} disabled={props.loading || props.capturing}>
+          <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Capturing" : "Capture X"}
         </button>
         <button className="primary-button" type="button" disabled={!props.snapshot || props.analyzing} onClick={props.onAnalyze}>
           <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing" : "Analyze Recent Posts"}
