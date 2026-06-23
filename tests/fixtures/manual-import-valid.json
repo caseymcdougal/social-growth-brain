@@ -1,0 +1,27 @@
+{
+  "profile": {
+    "handle": "caseymcdougal",
+    "displayName": "Casey McDougal",
+    "bio": "Building AI tools and internet products.",
+    "profileUrl": "https://x.com/caseymcdougal",
+    "followersCount": 1200,
+    "followingCount": 450,
+    "capturedAt": "2026-06-22T18:00:00.000Z",
+    "source": "manual"
+  },
+  "posts": [
+    {
+      "xPostId": "1",
+      "url": "https://x.com/caseymcdougal/status/1",
+      "text": "Most social dashboards tell you what happened. I want one that tells me what to do next.",
+      "postedAt": "2026-06-21T16:00:00.000Z",
+      "capturedAt": "2026-06-22T18:00:00.000Z",
+      "source": "manual",
+      "viewsCount": 1400,
+      "likesCount": 22,
+      "repostsCount": 5,
+      "repliesCount": 3,
+      "bookmarksCount": 1
+    }
+  ]
+}
