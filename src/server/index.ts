@@ -1,13 +1,11 @@
-import express from "express";
+import { createServerApp } from "./routes";
 
 const host = "127.0.0.1";
 const port = Number(process.env.PORT ?? 4174);
-const app = express();
+const dataDir = process.env.SOCIAL_AUDIT_DATA_DIR ?? "data";
 
-app.get("/api/health", (_request, response) => {
-  response.json({ ok: true, service: "social-audit" });
-});
+const app = createServerApp({ dataDir });
 
 app.listen(port, host, () => {
-  console.log(`Social audit API listening on http://${host}:${port}`);
+  console.log(`social-audit api listening on http://${host}:${port}`);
 });
