@@ -379,10 +379,11 @@ function AuditCommandCenter({
       ) : (
         <div className="command-center-grid">
           <article className="command-center-card is-primary">
-            <span>Overall status</span>
-            <strong>
-              {scorecard.statusLabel} · {scorecard.overallScore}
-            </strong>
+            <span>Creator score</span>
+            <div className="score-hero">
+              <strong className="score-value">{scorecard.overallScore}</strong>
+              <span className="score-status">{scorecard.statusLabel}</span>
+            </div>
             <p>{scorecard.primaryConstraint.detail}</p>
           </article>
           <article className="command-center-card">
