@@ -52,6 +52,20 @@ export function createServerApp(options: {
     response.json({ snapshot: repos.getLatestSnapshot() });
   });
 
+  app.get("/api/dashboard", (_request, response) => {
+    const snapshot = repos.getLatestSnapshot();
+    const analysis = snapshot ? repos.getLatestAnalysisSummaryForLatestSnapshot() : null;
+    const generation = analysis ? repos.getLatestGenerationForLatestSnapshot() : null;
+    response.json({
+      snapshot,
+      history: repos.getRecentSnapshots(6),
+      analysis,
+      generation: generation ? { posts: generation.posts.slice(0, 1) } : null,
+      strategyMemory: { memory: null, proposal: null },
+      topicExploration: null
+    });
+  });
+
   app.get("/api/analysis/latest", (_request, response) => {
     response.json({ analysis: repos.getLatestAnalysisForLatestSnapshot() });
   });

@@ -90,4 +90,45 @@ describe("repositories", () => {
       bookmarksCount: null
     });
   });
+
+  it("returns recent captured snapshots newest first", () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-"));
+    const db = openDatabase(join(dir, "test.sqlite"));
+    const repos = createRepositories(db);
+
+    repos.saveCapturedSnapshot({
+      ...snapshot(),
+      profile: { ...snapshot().profile, capturedAt: "2026-06-20T18:00:00.000Z", followersCount: 1200 },
+      posts: [
+        {
+          ...snapshot().posts[0],
+          xPostId: "older",
+          text: "Older scan post.",
+          capturedAt: "2026-06-20T18:00:00.000Z",
+          viewsCount: 500
+        }
+      ]
+    });
+    repos.saveCapturedSnapshot({
+      ...snapshot(),
+      profile: { ...snapshot().profile, capturedAt: "2026-06-26T18:00:00.000Z", followersCount: 1250 },
+      posts: [
+        {
+          ...snapshot().posts[0],
+          xPostId: "newer",
+          text: "Newer scan post.",
+          capturedAt: "2026-06-26T18:00:00.000Z",
+          viewsCount: 1500
+        }
+      ]
+    });
+
+    const history = repos.getRecentSnapshots(2);
+
+    expect(history).toHaveLength(2);
+    expect(history[0].profile.capturedAt).toBe("2026-06-26T18:00:00.000Z");
+    expect(history[0].profile.followersCount).toBe(1250);
+    expect(history[0].posts[0].xPostId).toBe("newer");
+    expect(history[1].profile.capturedAt).toBe("2026-06-20T18:00:00.000Z");
+  });
 });

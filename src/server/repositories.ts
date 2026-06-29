@@ -1,5 +1,5 @@
 import type { AppDatabase } from "./db";
-import { analysisOutputSchema, type AnalysisOutput } from "../shared/analysis-schema";
+import { analysisOutputSchema, type AnalysisOutput, type AnalysisSummary } from "../shared/analysis-schema";
 import { generationOutputSchema, type GenerationOutput } from "../shared/generation-schema";
 import {
   strategyMemoryProposalOutputSchema,
@@ -94,13 +94,7 @@ interface StoredTopicExplorationRun {
 
 function buildAnalysisOutput(report: StoredStrategyReport, postAnalyses: StoredPostAnalysis[]): AnalysisOutput {
   return analysisOutputSchema.parse({
-    executive_summary: report.executive_summary,
-    account_positioning_read: report.account_positioning_read,
-    top_patterns: JSON.parse(report.top_patterns_json),
-    what_is_working: JSON.parse(report.what_is_working_json),
-    what_is_holding_back: JSON.parse(report.what_is_holding_back_json),
-    recommended_content_pillars: JSON.parse(report.content_pillars_json),
-    next_post_ideas: JSON.parse(report.next_post_recommendations_json),
+    ...buildAnalysisSummary(report),
     post_analyses: postAnalyses.map((post) => ({
       post_id: post.x_post_id,
       performance_read: post.performance_read,
@@ -113,6 +107,46 @@ function buildAnalysisOutput(report: StoredStrategyReport, postAnalyses: StoredP
       variant_hooks: JSON.parse(post.variant_hooks_json)
     }))
   });
+}
+
+function buildAnalysisSummary(report: StoredStrategyReport): AnalysisSummary {
+  return {
+    executive_summary: report.executive_summary,
+    account_positioning_read: report.account_positioning_read,
+    top_patterns: JSON.parse(report.top_patterns_json),
+    what_is_working: JSON.parse(report.what_is_working_json),
+    what_is_holding_back: JSON.parse(report.what_is_holding_back_json),
+    recommended_content_pillars: JSON.parse(report.content_pillars_json),
+    next_post_ideas: JSON.parse(report.next_post_recommendations_json)
+  };
+}
+
+function buildCapturedSnapshot(profile: StoredProfile, posts: StoredPost[]): CapturedAccountSnapshot {
+  return {
+    profile: {
+      handle: profile.handle,
+      displayName: profile.display_name,
+      bio: profile.bio,
+      profileUrl: profile.profile_url,
+      followersCount: profile.followers_count,
+      followingCount: profile.following_count,
+      capturedAt: profile.captured_at,
+      source: profile.source
+    },
+    posts: posts.map((post) => ({
+      xPostId: post.x_post_id,
+      url: post.url,
+      text: post.text,
+      postedAt: post.posted_at,
+      viewsCount: post.views_count,
+      likesCount: post.likes_count,
+      repostsCount: post.reposts_count,
+      repliesCount: post.replies_count,
+      bookmarksCount: post.bookmarks_count,
+      capturedAt: post.captured_at,
+      source: post.source
+    }))
+  };
 }
 
 export function createRepositories(db: AppDatabase) {
@@ -151,31 +185,17 @@ export function createRepositories(db: AppDatabase) {
         .prepare("SELECT * FROM post_snapshots WHERE profile_snapshot_id = ? ORDER BY id ASC")
         .all(profile.id) as StoredPost[];
 
-      return {
-        profile: {
-          handle: profile.handle,
-          displayName: profile.display_name,
-          bio: profile.bio,
-          profileUrl: profile.profile_url,
-          followersCount: profile.followers_count,
-          followingCount: profile.following_count,
-          capturedAt: profile.captured_at,
-          source: profile.source
-        },
-        posts: posts.map((post) => ({
-          xPostId: post.x_post_id,
-          url: post.url,
-          text: post.text,
-          postedAt: post.posted_at,
-          viewsCount: post.views_count,
-          likesCount: post.likes_count,
-          repostsCount: post.reposts_count,
-          repliesCount: post.replies_count,
-          bookmarksCount: post.bookmarks_count,
-          capturedAt: post.captured_at,
-          source: post.source
-        }))
-      };
+      return buildCapturedSnapshot(profile, posts);
+    },
+
+    getRecentSnapshots(limit = 6): CapturedAccountSnapshot[] {
+      const boundedLimit = Math.max(1, Math.min(24, Math.floor(limit)));
+      const profiles = db
+        .prepare("SELECT * FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT ?")
+        .all(boundedLimit) as StoredProfile[];
+
+      const selectPosts = db.prepare("SELECT * FROM post_snapshots WHERE profile_snapshot_id = ? ORDER BY id ASC");
+      return profiles.map((profile) => buildCapturedSnapshot(profile, selectPosts.all(profile.id) as StoredPost[]));
     },
 
     saveAnalysis(profileSnapshotId: number, jobDir: string, output: AnalysisOutput): number {
@@ -262,6 +282,25 @@ export function createRepositories(db: AppDatabase) {
 
     getLatestAnalysisForLatestSnapshot(): AnalysisOutput | null {
       return this.getLatestAnalysisRecordForLatestSnapshot()?.analysis ?? null;
+    },
+
+    getLatestAnalysisSummaryForLatestSnapshot(): AnalysisSummary | null {
+      const profile = db
+        .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!profile) return null;
+
+      const run = db
+        .prepare(
+          "SELECT id FROM analysis_runs WHERE profile_snapshot_id = ? AND status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1"
+        )
+        .get(profile.id) as { id: number } | undefined;
+      if (!run) return null;
+
+      const report = db
+        .prepare("SELECT * FROM strategy_reports WHERE analysis_run_id = ? LIMIT 1")
+        .get(run.id) as StoredStrategyReport | undefined;
+      return report ? buildAnalysisSummary(report) : null;
     },
 
     saveGeneration(input: {

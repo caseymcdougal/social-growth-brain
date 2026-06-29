@@ -1,6 +1,6 @@
 import { Check, Compass, Copy, Sparkles } from "lucide-react";
 import { useState } from "react";
-import type { AnalysisOutput } from "../../shared/analysis-schema";
+import type { AnalysisSummary } from "../../shared/analysis-schema";
 import type { TopicExplorationOutput } from "../../shared/strategy-intelligence-schema";
 
 export function TopicExplorer({
@@ -9,7 +9,7 @@ export function TopicExplorer({
   exploring,
   onExplore
 }: {
-  analysis: AnalysisOutput | null;
+  analysis: AnalysisSummary | null;
   exploration: TopicExplorationOutput | null;
   exploring: boolean;
   onExplore: () => void;
@@ -33,7 +33,13 @@ export function TopicExplorer({
       </div>
 
       <div className="topic-actions">
-        <button className="primary-button" type="button" disabled={!analysis || exploring} onClick={onExplore}>
+        <button
+          className="primary-button"
+          type="button"
+          disabled={!analysis || exploring}
+          onClick={onExplore}
+          aria-busy={exploring || undefined}
+        >
           <Compass size={16} aria-hidden="true" /> {exploring ? "Exploring" : "Explore nearby topics"}
         </button>
       </div>

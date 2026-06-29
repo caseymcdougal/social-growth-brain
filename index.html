@@ -7,6 +7,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var key = "social-audit-dashboard-state-v1";
+        try {
+          var cached = window.localStorage.getItem(key);
+          if (cached) {
+            window.__socialAuditDashboardState = JSON.parse(cached);
+            window.__socialAuditDashboardStateSource = "storage";
+            return;
+          }
+        } catch (error) {}
+
+        window.__socialAuditDashboardStatePromise = fetch("/api/dashboard").then(function (response) {
+          if (!response.ok) throw new Error("Failed to load latest snapshot");
+          return response.json().then(function (data) {
+            window.__socialAuditDashboardState = data;
+            window.__socialAuditDashboardStateSource = "network";
+            return data;
+          });
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

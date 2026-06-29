@@ -27,7 +27,7 @@ export function ManualImportPanel(props: {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="manual-import-title">
+      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="manual-import-title" aria-busy={importing || undefined}>
         <div className="modal-title-row">
           <div>
             <p className="eyebrow">Fallback Input</p>
@@ -45,12 +45,22 @@ export function ManualImportPanel(props: {
           spellCheck={false}
           placeholder='{"profile": {"handle": "caseymcdougal"}, "posts": [...]}'
         />
-        {error && <p className="error-text">{error}</p>}
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
         <div className="modal-actions">
           <button className="secondary-button" type="button" onClick={props.onClose}>
             Cancel
           </button>
-          <button className="primary-button" type="button" onClick={submit} disabled={importing || !rawJson.trim()}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={submit}
+            disabled={importing || !rawJson.trim()}
+            aria-busy={importing || undefined}
+          >
             {importing ? "Importing" : "Import public snapshot"}
           </button>
         </div>

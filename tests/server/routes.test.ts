@@ -119,6 +119,85 @@ describe("server routes", () => {
     expect(body.analysis.post_analyses[0].post_id).toBe(output.post_analyses[0].post_id);
   });
 
+  it("returns consolidated dashboard startup state", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const aiRunner = { analyze: vi.fn(async () => output) };
+    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+    await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+
+    const response = await fetch(`${baseUrl}/api/dashboard`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.snapshot.profile.handle).toBe("caseymcdougal");
+    expect(body.analysis.executive_summary).toContain("specific and opinionated");
+    expect(body.generation).toBeNull();
+    expect(body.strategyMemory).toEqual({ memory: null, proposal: null });
+    expect(body.topicExploration).toBeNull();
+  });
+
+  it("returns recent scan history in dashboard startup state", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+    const olderFixture = {
+      ...fixture,
+      profile: { ...fixture.profile, capturedAt: "2026-06-20T18:00:00.000Z", followersCount: 1200 },
+      posts: [
+        {
+          ...fixture.posts[0],
+          xPostId: "older-post",
+          url: "https://x.com/caseymcdougal/status/older-post",
+          text: "Older scan post.",
+          capturedAt: "2026-06-20T18:00:00.000Z",
+          viewsCount: 500
+        }
+      ]
+    };
+    const newerFixture = {
+      ...fixture,
+      profile: { ...fixture.profile, capturedAt: "2026-06-26T18:00:00.000Z", followersCount: 1250 },
+      posts: [
+        {
+          ...fixture.posts[0],
+          xPostId: "newer-post",
+          url: "https://x.com/caseymcdougal/status/newer-post",
+          text: "Newer scan post.",
+          capturedAt: "2026-06-26T18:00:00.000Z",
+          viewsCount: 1500
+        }
+      ]
+    };
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(olderFixture)
+    });
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(newerFixture)
+    });
+
+    const response = await fetch(`${baseUrl}/api/dashboard`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.history).toHaveLength(2);
+    expect(body.history[0].profile.capturedAt).toBe("2026-06-26T18:00:00.000Z");
+    expect(body.history[0].posts[0].xPostId).toBe("newer-post");
+    expect(body.history[1].profile.capturedAt).toBe("2026-06-20T18:00:00.000Z");
+  });
+
   it("requires a successful audit before generating today's ideas", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
     const baseUrl = await listen(createServerApp({ dataDir: dir }));

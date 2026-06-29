@@ -32,6 +32,11 @@ describe("parseMetricFromLabelText", () => {
   it("extracts counts when X places the label before the number", () => {
     expect(parseMetricFromLabelText("View post analytics 2,345 views", ["view", "views"])).toBe(2345);
   });
+
+  it("extracts profile stat counts from X follower labels", () => {
+    expect(parseMetricFromLabelText("1,234 Followers", ["follower", "followers"])).toBe(1234);
+    expect(parseMetricFromLabelText("Following 287", ["following"])).toBe(287);
+  });
 });
 
 describe("parseVisibleMetrics", () => {

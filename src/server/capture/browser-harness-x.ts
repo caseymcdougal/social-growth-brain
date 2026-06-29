@@ -68,13 +68,31 @@ data = js(r"""
     return values.filter(Boolean).join(" · ");
   };
   const metric = (article, labels, selectors = []) => parseMetricFromLabelText(metricCandidates(article, selectors), labels);
+  const profileStat = (pathSuffixes, labels) => {
+    const suffixes = Array.isArray(pathSuffixes) ? pathSuffixes : [pathSuffixes];
+    const anchors = Array.from(document.querySelectorAll("main a[href]"));
+    for (const anchor of anchors) {
+      try {
+        const url = new URL(anchor.href, location.href);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (parts[0]?.toLowerCase() !== handleLower || !suffixes.includes(parts[1])) continue;
+
+        const raw = [anchor.getAttribute("aria-label"), text(anchor)].filter(Boolean).join(" · ");
+        const count = parseMetricFromLabelText(raw, labels) ?? parseCount(raw);
+        if (count !== null) return count;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  };
   const profile = {
     handle,
     displayName: document.querySelector('[data-testid="UserName"]')?.innerText?.split("\\\\n")[0] || handle,
     bio: document.querySelector('[data-testid="UserDescription"]')?.innerText || "",
     profileUrl: location.href.split("?")[0],
-    followersCount: null,
-    followingCount: null,
+    followersCount: profileStat(["followers", "verified_followers"], ["follower", "followers"]),
+    followingCount: profileStat("following", ["following"]),
     capturedAt,
     source: "browser"
   };
@@ -124,7 +142,8 @@ export class BrowserHarnessXCaptureRunner implements CaptureRunner {
   async captureRecentPosts(handle: string): Promise<CapturedAccountSnapshot> {
     const script = extractionScript(handle);
     const raw = await new Promise<string>((resolve, reject) => {
-      const child = spawn("browser-harness", ["-c", script], { stdio: ["ignore", "pipe", "pipe"] });
+      const browserHarnessBin = process.env.BROWSER_HARNESS_BIN || "browser-harness";
+      const child = spawn(browserHarnessBin, ["-c", script], { stdio: ["ignore", "pipe", "pipe"] });
       let stdout = "";
       let stderr = "";
       let settled = false;

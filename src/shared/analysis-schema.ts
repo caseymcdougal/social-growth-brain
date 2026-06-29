@@ -33,3 +33,4 @@ export const analysisOutputSchema = z.object({
 });
 
 export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
+export type AnalysisSummary = Omit<AnalysisOutput, "post_analyses">;

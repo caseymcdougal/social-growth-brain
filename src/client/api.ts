@@ -1,4 +1,4 @@
-import type { AnalysisOutput } from "../shared/analysis-schema";
+import type { AnalysisOutput, AnalysisSummary } from "../shared/analysis-schema";
 import type { GenerationOutput } from "../shared/generation-schema";
 import type {
   StrategyMemory,
@@ -11,6 +11,105 @@ export type StrategyMemoryProposal = StrategyMemoryProposalOutput & {
   id: number;
   createdAt?: string;
 };
+
+export type DashboardState = {
+  snapshot: CapturedAccountSnapshot | null;
+  history: CapturedAccountSnapshot[];
+  analysis: AnalysisSummary | null;
+  generation: GenerationOutput | null;
+  strategyMemory: {
+    memory: StrategyMemory | null;
+    proposal: StrategyMemoryProposal | null;
+  };
+  topicExploration: TopicExplorationOutput | null;
+};
+
+declare global {
+  interface Window {
+    __socialAuditDashboardState?: unknown;
+    __socialAuditDashboardStatePromise?: Promise<unknown>;
+    __socialAuditDashboardStateSource?: "network" | "storage";
+  }
+}
+
+let dashboardStatePromise: Promise<DashboardState> | null = null;
+let bootstrappedDashboardStateSource: "network" | "storage" | null = null;
+const dashboardStateStorageKey = "social-audit-dashboard-state-v1";
+
+function storeDashboardState(data: DashboardState) {
+  try {
+    window.localStorage.setItem(dashboardStateStorageKey, JSON.stringify(data));
+  } catch {
+    // Local cache is a speed path only.
+  }
+}
+
+function normalizeDashboardState(data: any): DashboardState {
+  const dashboardState = {
+    snapshot: data.snapshot ?? null,
+    history: data.history ?? (data.snapshot ? [data.snapshot] : []),
+    analysis: data.analysis ?? null,
+    generation: data.generation ?? null,
+    strategyMemory: {
+      memory: data.strategyMemory?.memory ?? null,
+      proposal: data.strategyMemory?.proposal ?? null
+    },
+    topicExploration: data.topicExploration ?? null
+  };
+  if (typeof window !== "undefined") storeDashboardState(dashboardState);
+  return dashboardState;
+}
+
+async function fetchDashboardState(): Promise<DashboardState> {
+  const response = await fetch("/api/dashboard");
+  if (!response.ok) throw new Error("Failed to load latest snapshot");
+  const data = await response.json();
+  return normalizeDashboardState(data);
+}
+
+export function getDashboardState(options: { force?: boolean } = {}): Promise<DashboardState> {
+  if (options.force) dashboardStatePromise = null;
+  if (!dashboardStatePromise) {
+    const bootstrapPromise = typeof window === "undefined" ? undefined : window.__socialAuditDashboardStatePromise;
+    dashboardStatePromise = bootstrapPromise ? bootstrapPromise.then(normalizeDashboardState) : fetchDashboardState();
+    if (typeof window !== "undefined") window.__socialAuditDashboardStatePromise = undefined;
+  }
+  return dashboardStatePromise;
+}
+
+export function getBootstrappedDashboardState(): DashboardState | null {
+  if (typeof window === "undefined") return null;
+  if (window.__socialAuditDashboardState) {
+    bootstrappedDashboardStateSource = window.__socialAuditDashboardStateSource ?? "network";
+    return normalizeDashboardState(window.__socialAuditDashboardState);
+  }
+  try {
+    const cachedState = window.localStorage.getItem(dashboardStateStorageKey);
+    if (!cachedState) return null;
+    bootstrappedDashboardStateSource = "storage";
+    return normalizeDashboardState(JSON.parse(cachedState));
+  } catch {
+    return null;
+  }
+}
+
+export function isBootstrappedDashboardStateFromStorage() {
+  return bootstrappedDashboardStateSource === "storage";
+}
+
+export function clearDashboardStateCacheForTests() {
+  dashboardStatePromise = null;
+  bootstrappedDashboardStateSource = null;
+  if (typeof window === "undefined") return;
+  window.__socialAuditDashboardState = undefined;
+  window.__socialAuditDashboardStatePromise = undefined;
+  window.__socialAuditDashboardStateSource = undefined;
+  try {
+    window.localStorage.removeItem(dashboardStateStorageKey);
+  } catch {
+    // Test/runtime storage may be unavailable.
+  }
+}
 
 export async function getLatestSnapshot(): Promise<CapturedAccountSnapshot | null> {
   const response = await fetch("/api/latest");

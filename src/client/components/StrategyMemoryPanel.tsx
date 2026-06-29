@@ -1,7 +1,7 @@
 import { Brain, CheckCircle2, RotateCcw } from "lucide-react";
 import type { StrategyMemory } from "../../shared/strategy-intelligence-schema";
 import type { StrategyMemoryProposal } from "../api";
-import type { AnalysisOutput } from "../../shared/analysis-schema";
+import type { AnalysisSummary } from "../../shared/analysis-schema";
 
 function ChipList({ items }: { items: string[] }) {
   return (
@@ -22,7 +22,7 @@ export function StrategyMemoryPanel({
   onRefresh,
   onApply
 }: {
-  analysis: AnalysisOutput | null;
+  analysis: AnalysisSummary | null;
   memory: StrategyMemory | null;
   proposal: StrategyMemoryProposal | null;
   updating: boolean;
@@ -41,7 +41,13 @@ export function StrategyMemoryPanel({
       </div>
 
       <div className="memory-actions">
-        <button className="secondary-button" type="button" disabled={!analysis || updating || applying} onClick={onRefresh}>
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={!analysis || updating || applying}
+          onClick={onRefresh}
+          aria-busy={updating || undefined}
+        >
           <RotateCcw size={16} aria-hidden="true" /> {updating ? "Updating memory" : "Update strategy memory"}
         </button>
         <button
@@ -49,6 +55,7 @@ export function StrategyMemoryPanel({
           type="button"
           disabled={!proposal || updating || applying}
           onClick={() => proposal && onApply(proposal.id)}
+          aria-busy={applying || undefined}
         >
           <CheckCircle2 size={16} aria-hidden="true" /> {applying ? "Applying" : "Apply memory updates"}
         </button>
