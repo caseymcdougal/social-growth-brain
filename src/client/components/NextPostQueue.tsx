@@ -139,6 +139,7 @@ export function NextPostQueue({
     : null;
   const workflowTrackerLabel = `Open ${workflowSummary.open} · planned ${workflowSummary.planned} · used ${workflowSummary.used} · skipped ${workflowSummary.skipped}`;
   const workflowTrackerOpen = workflowSummary.planned > 0 || workflowSummary.used > 0 || outcomeLoop.entries.length > 0;
+  const workflowHasActivity = workflowTrackerOpen || workflowSummary.skipped > 0;
   const workflowTrackerGuidance = workflowTrackerOpen
     ? "Open because this queue has active workflow history."
     : "Closed until you plan, use, or measure a slot.";
@@ -327,6 +328,7 @@ export function NextPostQueue({
         <ol className="production-slot-list production-primary-slot-list">
           {primarySlot && renderProductionSlot(primarySlot, { position: 1, timing: "Next post" })}
         </ol>
+        {workflowHasActivity && (
         <details className="production-workflow-panel" aria-label="Production workflow tracker" open={workflowTrackerOpen}>
           <summary>
             <span>Workflow tracker</span>
@@ -370,6 +372,7 @@ export function NextPostQueue({
             )}
           </section>
         </details>
+        )}
         {backlogSlots.length > 0 && (
           <details className="production-backlog" aria-label="Queue backlog">
             <summary>

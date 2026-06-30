@@ -1357,7 +1357,7 @@ test("puts the generated production queue before the posting brief support", asy
   expect(within(postingBrief).getAllByText("Position the dashboard as an operating system, not a report.").length).toBeGreaterThan(0);
 });
 
-test("keeps idle production workflow telemetry behind the primary draft", async () => {
+test("hides idle production workflow telemetry until a slot is worked", async () => {
   const generation = {
     posts: [
       {
@@ -1387,12 +1387,8 @@ test("keeps idle production workflow telemetry behind the primary draft", async 
 
   const productionQueue = await screen.findByLabelText("Post production queue");
   const primarySlot = productionQueue.querySelector(".production-primary-slot-list > .production-slot");
-  const workflowTracker = within(productionQueue).getByLabelText("Production workflow tracker");
   expect(primarySlot).not.toBeNull();
-  expect(workflowTracker.tagName).toBe("DETAILS");
-  expect(workflowTracker).not.toHaveAttribute("open");
-  expect(primarySlot!.compareDocumentPosition(workflowTracker)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(within(workflowTracker).getByText("Open 1 · planned 0 · used 0 · skipped 0")).toBeInTheDocument();
+  expect(within(productionQueue).queryByLabelText("Production workflow tracker")).toBeNull();
 });
 
 test("keeps skipped-only production workflow history behind the tracker summary", async () => {

@@ -195,6 +195,7 @@ button {
 }
 
 .step-row {
+  width: 100%;
   min-height: 58px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -205,6 +206,9 @@ button {
   gap: 8px;
   color: var(--muted);
   background: rgba(248, 245, 238, 0.018);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .step-row:hover {
@@ -263,7 +267,6 @@ button {
 }
 
 .privacy-note {
-  margin-top: auto;
   border-top: 1px solid var(--line);
   padding-top: 16px;
   display: flex;
@@ -421,6 +424,33 @@ h3 {
   > :is(.panel, .capture-bar, .dashboard-grid, .intelligence-grid, .evidence-details-panel, .strategy-engine-section)
   + :is(.panel, .capture-bar, .dashboard-grid, .intelligence-grid, .evidence-details-panel, .strategy-engine-section) {
   margin-top: 18px;
+}
+
+.reference-shelf {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-5);
+}
+
+.reference-shelf-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.reference-shelf-head .eyebrow {
+  margin: 0;
+}
+
+.reference-shelf-head span {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* Connected, de-emphasized rows: a deliberate appendix, not 5 floating cards. */
+.reference-shelf > :is(details, .panel) + :is(details, .panel) {
+  margin-top: var(--space-2);
 }
 
 .command-center-panel {
@@ -4101,6 +4131,24 @@ a:focus-visible {
 .direction-foot > span {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Quiet accent: the bright lime fill is reserved for the one primary CTA.
+   This is its lighter echo, so save reads as actionable without competing. */
+.direction-save:not(:disabled) {
+  border-color: var(--accent-line);
+  background: transparent;
+  color: var(--accent);
+}
+
+.direction-save:not(:disabled):hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.direction-save.is-saved:not(:disabled) {
+  border-color: var(--green-soft);
+  color: var(--green);
 }
 
 /* ---------- motion layer (expressive) ---------- */

@@ -60,7 +60,7 @@ export function CreativeDirectionCard({
       <div className="direction-foot">
         <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt)}` : "Not set"}</span>
         <button
-          className={saved ? "primary-button direction-save is-saved" : "primary-button direction-save"}
+          className={saved ? "secondary-button direction-save is-saved" : "secondary-button direction-save"}
           type="button"
           onClick={() => void handleSave()}
           disabled={saving || !isDirty}

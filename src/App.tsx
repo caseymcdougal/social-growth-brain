@@ -52,11 +52,16 @@ const DeferredTopicExplorer = lazy(() =>
 );
 
 const auditSteps = [
-  { key: "scan", label: "Scan", detail: "Public X metrics" },
-  { key: "rank", label: "Rank", detail: "Visible signal" },
-  { key: "diagnose", label: "Diagnose", detail: "Why it moved" },
-  { key: "write", label: "Write", detail: "Next posts" }
+  { key: "scan", label: "Scan", detail: "Public X metrics", target: "command-center-title" },
+  { key: "rank", label: "Rank", detail: "Visible signal", target: "post-breakdown-title" },
+  { key: "diagnose", label: "Diagnose", detail: "Why it moved", target: "coach-report-title" },
+  { key: "write", label: "Write", detail: "Next posts", target: "next-posts-title" }
 ] as const;
+
+function scrollToSection(id: string) {
+  const target = document.getElementById(id);
+  target?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
 
 type AuditStepKey = (typeof auditSteps)[number]["key"];
 type StepState = "idle" | "current" | "complete";
@@ -909,17 +914,20 @@ export function App() {
           {auditSteps.map((item, index) => {
             const stepState = getStepState(item.key, currentStep, generation);
             return (
-              <li
-                aria-current={stepState === "current" ? "step" : undefined}
-                className="step-row"
-                data-state={stepState}
-                key={item.label}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </div>
+              <li key={item.label}>
+                <button
+                  type="button"
+                  aria-current={stepState === "current" ? "step" : undefined}
+                  className="step-row"
+                  data-state={stepState}
+                  onClick={() => scrollToSection(item.target)}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <strong>{item.label}</strong>
+                    <small>{item.detail}</small>
+                  </div>
+                </button>
               </li>
             );
           })}
@@ -1002,17 +1010,22 @@ export function App() {
         {topicError && <RecoveryNoticePanel kind="topic" message={topicError} />}
 
         {generation ? (
-          <>
-            {nextPostWorkspace}
-            <OpportunityDesk brief={opportunityBrief} deferred />
-            {deferredCoachReport}
-          </>
+          nextPostWorkspace
         ) : (
           <>
             <OpportunityDesk brief={opportunityBrief} />
             {pairedPostWorkspace}
           </>
         )}
+
+        <section className="reference-shelf" aria-label="Reference panels">
+        <div className="reference-shelf-head">
+          <p className="eyebrow">Reference</p>
+          <span>Open when you need to dig into the evidence.</span>
+        </div>
+
+        {generation && <OpportunityDesk brief={opportunityBrief} deferred />}
+        {generation && deferredCoachReport}
 
         <details className="evidence-details-panel" aria-label="Evidence details" open={evidenceDetailsOpen}>
           <summary>
@@ -1132,6 +1145,7 @@ export function App() {
             />
           </Suspense>
         )}
+        </section>
       </main>
 
       {importOpen && (

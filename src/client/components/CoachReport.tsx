@@ -46,6 +46,40 @@ export function CoachReport({
     analysis.what_is_holding_back.length +
     analysis.recommended_content_pillars.length;
 
+  const coachDetailsBody = (
+    <div className="coach-details-body">
+      <p className="executive-summary">{analysis.executive_summary}</p>
+      <div className="pattern-strip">
+        {analysis.top_patterns.map((pattern) => (
+          <span key={pattern}>{pattern}</span>
+        ))}
+      </div>
+      <div className="coach-columns">
+        <div>
+          <h3>Working</h3>
+          <ul>
+            {analysis.what_is_working.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3>Holding Back</h3>
+          <ul>
+            {analysis.what_is_holding_back.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="pillar-row">
+        {analysis.recommended_content_pillars.map((pillar) => (
+          <span key={pillar}>{pillar}</span>
+        ))}
+      </div>
+    </div>
+  );
+
   const strategyBrief = (
     <>
       <div className="section-head">
@@ -75,45 +109,18 @@ export function CoachReport({
         </article>
       </div>
 
-      <details className="coach-details" aria-label="Full coach read">
-        <summary>
-          <span>Full coach read</span>
-          <strong>{detailCount} audit notes</strong>
-          <small>Open for the full summary, all patterns, constraints, and content pillars.</small>
-        </summary>
-
-        <div className="coach-details-body">
-          <p className="executive-summary">{analysis.executive_summary}</p>
-          <div className="pattern-strip">
-            {analysis.top_patterns.map((pattern) => (
-              <span key={pattern}>{pattern}</span>
-            ))}
-          </div>
-          <div className="coach-columns">
-            <div>
-              <h3>Working</h3>
-              <ul>
-                {analysis.what_is_working.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Holding Back</h3>
-              <ul>
-                {analysis.what_is_holding_back.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="pillar-row">
-            {analysis.recommended_content_pillars.map((pillar) => (
-              <span key={pillar}>{pillar}</span>
-            ))}
-          </div>
-        </div>
-      </details>
+      {deferred ? (
+        coachDetailsBody
+      ) : (
+        <details className="coach-details" aria-label="Full coach read">
+          <summary>
+            <span>Full coach read</span>
+            <strong>{detailCount} audit notes</strong>
+            <small>Open for the full summary, all patterns, constraints, and content pillars.</small>
+          </summary>
+          {coachDetailsBody}
+        </details>
+      )}
     </>
   );
 
