@@ -44,6 +44,23 @@
   --shadow-lg: 0 28px 64px -22px rgba(0, 0, 0, 0.72);
   --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.055);
   --glass-blur: blur(18px) saturate(1.2);
+
+  /* spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* motion */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
 }
 
 * {
@@ -118,10 +135,10 @@ button {
   height: 100vh;
   border-right: 1px solid var(--line);
   background: var(--bg-deep);
-  padding: 24px 16px;
+  padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-5);
 }
 
 .brand-lockup {
@@ -398,6 +415,12 @@ h3 {
   border: 1px solid var(--line);
   background: var(--panel);
   box-shadow: var(--shadow-sm), var(--inset-top);
+}
+
+.workspace
+  > :is(.panel, .capture-bar, .dashboard-grid, .intelligence-grid, .evidence-details-panel, .strategy-engine-section)
+  + :is(.panel, .capture-bar, .dashboard-grid, .intelligence-grid, .evidence-details-panel, .strategy-engine-section) {
+  margin-top: 18px;
 }
 
 .command-center-panel {
@@ -1438,6 +1461,56 @@ h3 {
   content: "-";
 }
 
+.command-center-panel.is-generated {
+  --command-toggle-size: 32px;
+  --command-toggle-right-rail: 30px;
+}
+
+.command-center-panel.is-generated .command-center-signal-disclosure summary,
+.command-center-panel.is-generated .command-center-maintenance summary,
+.command-center-panel.is-generated .scorecard-breakdown summary {
+  grid-template-columns: minmax(0, 1fr) var(--command-toggle-size);
+  padding-right: var(--command-toggle-right-rail);
+}
+
+.command-center-panel.is-generated .command-center-signal-disclosure summary::after,
+.command-center-panel.is-generated .command-center-maintenance summary::after,
+.command-center-panel.is-generated .scorecard-breakdown summary::after {
+  content: "";
+  width: var(--command-toggle-size);
+  height: var(--command-toggle-size);
+  background-color: rgba(248, 245, 238, 0.018);
+  background-image:
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(currentColor, currentColor);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size:
+    10px 2px,
+    2px 10px;
+  line-height: 1;
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  justify-self: end;
+  align-self: center;
+}
+
+.command-center-panel.is-generated .command-center-maintenance summary::after {
+  grid-row: 1;
+}
+
+.command-center-panel.is-generated .command-center-signal-disclosure[open] summary::after,
+.command-center-panel.is-generated .command-center-maintenance[open] summary::after,
+.command-center-panel.is-generated .scorecard-breakdown[open] summary::after {
+  content: "";
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 10px 2px;
+}
+
+.command-center-panel.is-generated .command-center-maintenance summary {
+  padding-right: 13px;
+}
+
 .scorecard-dimensions article {
   min-width: 0;
   min-height: 150px;
@@ -1546,9 +1619,9 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-4);
   min-height: 92px;
-  padding: 18px 20px;
+  padding: var(--space-4) var(--space-5);
   cursor: pointer;
   outline: none;
 }
@@ -1558,17 +1631,18 @@ h3 {
 }
 
 .strategy-engine-summary::after {
-  content: "v";
-  width: 28px;
-  height: 28px;
+  content: "+";
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition:
-    transform 180ms ease,
     border-color 180ms ease,
     color 180ms ease;
 }
@@ -1578,7 +1652,7 @@ h3 {
 }
 
 .strategy-engine-section[open] .strategy-engine-summary::after {
-  transform: rotate(180deg);
+  content: "-";
 }
 
 .strategy-engine-summary:hover::after,
@@ -4120,6 +4194,95 @@ a:focus-visible {
   h1 {
     font-size: 30px;
   }
+}
+
+/* ---------- motion layer (expressive) ---------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.82);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* staggered card entrances */
+.command-center-card,
+.command-center-signal,
+.opportunity-card,
+.scorecard-dimensions > article {
+  animation: rise-in var(--dur-base) var(--ease-spring) both;
+}
+
+.command-center-grid > .command-center-card:nth-child(2) {
+  animation-delay: 45ms;
+}
+.command-center-grid > .command-center-card:nth-child(3) {
+  animation-delay: 90ms;
+}
+.command-center-grid > .command-center-card:nth-child(4) {
+  animation-delay: 135ms;
+}
+.command-center-signals > .command-center-signal:nth-child(2) {
+  animation-delay: 45ms;
+}
+.command-center-signals > .command-center-signal:nth-child(3) {
+  animation-delay: 90ms;
+}
+.scorecard-dimensions > article:nth-child(2) {
+  animation-delay: 40ms;
+}
+.scorecard-dimensions > article:nth-child(3) {
+  animation-delay: 80ms;
+}
+.scorecard-dimensions > article:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+/* button + copy press feedback (spring) */
+.primary-button,
+.secondary-button,
+.copy-button,
+.direction-save {
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    border-color 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease,
+    color 160ms ease;
+}
+.primary-button:active,
+.secondary-button:active,
+.copy-button:active,
+.direction-save:active {
+  transform: scale(0.97);
+}
+
+/* success pop on confirm */
+.copy-button.is-copied svg,
+.scorecard-copy svg,
+.direction-save.is-saved svg {
+  animation: pop var(--dur-base) var(--ease-spring);
+}
+
+/* disclosure reveal */
+details[open] > .operations-grid,
+details[open] > .strategy-engine-body {
+  animation: rise-in var(--dur-base) var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
