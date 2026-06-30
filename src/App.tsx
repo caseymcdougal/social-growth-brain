@@ -128,7 +128,6 @@ function ActionProgressPanel({ actions }: { actions: ActionProgressItem[] }) {
   const completeCount = actions.filter((action) => action.state === "complete").length;
   const readyCount = actions.filter((action) => action.state === "ready").length;
   const lockedCount = actions.filter((action) => action.state === "locked").length;
-  const shouldOpen = runningCount > 0 || issueCount > 0;
   const statusLabel = runningCount
     ? `${runningCount} running`
     : issueCount
@@ -137,19 +136,19 @@ function ActionProgressPanel({ actions }: { actions: ActionProgressItem[] }) {
   const detailLabel = runningCount
     ? "Live actions are expanded so progress stays visible."
     : issueCount
-      ? "Open the run log to see which action needs a retry."
+      ? "One action needs a retry — see the run log below."
       : `${completeCount} complete · ${readyCount} ready · ${lockedCount} locked`;
 
   return (
-    <details className="action-progress-panel" aria-label="Action progress" aria-live="polite" open={shouldOpen}>
-      <summary className="action-progress-summary">
+    <section className="action-progress-panel" aria-label="Action progress" aria-live="polite">
+      <div className="action-progress-head">
         <div>
           <p className="eyebrow">Run activity</p>
           <h2>Run log</h2>
           <p>{detailLabel}</p>
         </div>
         <span className="status-chip">{statusLabel}</span>
-      </summary>
+      </div>
       <ol className="action-progress-list">
         {actions.map((action) => {
           const value = actionProgressValue[action.state];
@@ -174,7 +173,7 @@ function ActionProgressPanel({ actions }: { actions: ActionProgressItem[] }) {
           );
         })}
       </ol>
-    </details>
+    </section>
   );
 }
 
@@ -357,24 +356,15 @@ function AuditCommandCenter({
               </div>
             </details>
           </div>
-          <details className="command-center-signal-disclosure" aria-label="Status signals">
-            <summary>
-              <span>Status signals</span>
-              <strong>
-                {scorecard.statusLabel} · {scorecard.primaryConstraint.label}
-              </strong>
-              <small>Open for health, constraint, and opportunity context.</small>
-            </summary>
-            <div className="command-center-signals" aria-label="Command signals">
-              {commandSignals.map((signal) => (
-                <article className="command-center-signal" key={signal.label}>
-                  <span>{signal.label}</span>
-                  <strong>{signal.title}</strong>
-                  <p>{signal.detail}</p>
-                </article>
-              ))}
-            </div>
-          </details>
+          <div className="command-center-signals" aria-label="Command signals">
+            {commandSignals.map((signal) => (
+              <article className="command-center-signal" key={signal.label}>
+                <span>{signal.label}</span>
+                <strong>{signal.title}</strong>
+                <p>{signal.detail}</p>
+              </article>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="command-center-grid">
@@ -404,12 +394,11 @@ function AuditCommandCenter({
         </div>
       )}
 
-      <details className="scorecard-breakdown command-score-breakdown" aria-label="Score breakdown">
-        <summary>
+      <section className="scorecard-breakdown-inline command-score-breakdown" aria-label="Score breakdown">
+        <div className="scorecard-inline-head">
           <span>Score breakdown</span>
           <strong>{scorecard.dimensions.length} operating signals</strong>
-          <small>Open for the supporting evidence, momentum, strategy, and production scores.</small>
-        </summary>
+        </div>
 
         <div className="scorecard-breakdown-body">
           <div className="scorecard-dimensions" aria-label="Creator scorecard dimensions">
@@ -432,7 +421,7 @@ function AuditCommandCenter({
             {scorecardCopied ? "Copied brief" : scorecardCopyFailed ? "Copy unavailable" : "Copy scorecard brief"}
           </button>
         </div>
-      </details>
+      </section>
     </section>
   );
 }

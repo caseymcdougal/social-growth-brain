@@ -637,6 +637,13 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.command-center-handoff > .command-center-signals {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.018);
+}
+
 .command-center-signal {
   border-right: 1px solid var(--line);
 }
@@ -867,6 +874,31 @@ h3 {
 
 .action-progress-summary > div > p:last-child {
   margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.action-progress-head {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.action-progress-head > div {
+  min-width: 0;
+}
+
+.action-progress-head h2 {
+  font-size: 18px;
+}
+
+.action-progress-head > div > p:last-child {
+  margin: var(--space-1) 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
@@ -1404,7 +1436,7 @@ h3 {
 }
 
 .scorecard-copy {
-  margin: 14px 18px 18px;
+  margin: var(--space-3) var(--space-5) var(--space-5);
   justify-self: start;
   white-space: nowrap;
 }
@@ -1414,8 +1446,31 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.scorecard-breakdown {
+.scorecard-breakdown,
+.scorecard-breakdown-inline {
   border-top: 1px solid var(--line);
+}
+
+.scorecard-inline-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.scorecard-inline-head span {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scorecard-inline-head strong {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .scorecard-breakdown-body {

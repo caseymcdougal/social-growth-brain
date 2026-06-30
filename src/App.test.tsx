@@ -304,14 +304,11 @@ test("keeps generated command signals behind a closed status disclosure", async 
   render(<App />);
 
   const commandCenter = await screen.findByLabelText("Audit command center");
-  const statusSignals = within(commandCenter).getByLabelText("Status signals");
-  expect(statusSignals.tagName).toBe("DETAILS");
-  expect(statusSignals).not.toHaveAttribute("open");
-  expect(within(statusSignals).getByText("Status signals")).toBeInTheDocument();
-  expect(within(statusSignals).getByText("Health")).toBeInTheDocument();
-  expect(within(statusSignals).getByText("Constraint")).toBeInTheDocument();
-  expect(within(statusSignals).getByText("Opportunity")).toBeInTheDocument();
-  expect(within(commandCenter).getByLabelText("Command signals").closest("details")).toBe(statusSignals);
+  const signals = within(commandCenter).getByLabelText("Command signals");
+  expect(signals.closest("details")).toBeNull();
+  expect(within(signals).getByText("Health")).toBeInTheDocument();
+  expect(within(signals).getByText("Constraint")).toBeInTheDocument();
+  expect(within(signals).getByText("Opportunity")).toBeInTheDocument();
 });
 
 test("surfaces an audit command center before operational telemetry", async () => {
@@ -332,14 +329,13 @@ test("surfaces an audit command center before operational telemetry", async () =
 
   const commandCenter = await screen.findByLabelText("Audit command center");
   expect(within(commandCenter).getByRole("heading", { name: "Audit command center" })).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Overall status")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Creator score")).toBeInTheDocument();
   expect(within(commandCenter).getByText("Biggest constraint")).toBeInTheDocument();
   expect(within(commandCenter).getByText("Best opportunity")).toBeInTheDocument();
   expect(within(commandCenter).getByText("Next action")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Generate the next draft set")).toBeInTheDocument();
+  // Score breakdown is now surfaced inline (no click to reveal), one of the flatten goals.
   const breakdown = within(commandCenter).getByLabelText("Score breakdown");
-  expect(breakdown.tagName).toBe("DETAILS");
-  expect(breakdown).not.toHaveAttribute("open");
+  expect(breakdown.tagName).toBe("SECTION");
   expect(within(breakdown).getByText("4 operating signals")).toBeInTheDocument();
   expect(screen.queryByLabelText("Creator operating scorecard")).not.toBeInTheDocument();
 
@@ -348,7 +344,7 @@ test("surfaces an audit command center before operational telemetry", async () =
   );
 });
 
-test("keeps idle action progress behind a closed run-log disclosure", async () => {
+test("keeps idle run log inline inside the closed evidence disclosure", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -365,8 +361,11 @@ test("keeps idle action progress behind a closed run-log disclosure", async () =
   render(<App />);
 
   const progressPanel = await screen.findByLabelText("Action progress");
-  expect(progressPanel.tagName).toBe("DETAILS");
-  expect(progressPanel).not.toHaveAttribute("open");
+  // Run log is now inline content within the single Evidence disclosure (no nested details).
+  expect(progressPanel.tagName).toBe("SECTION");
+  const evidence = progressPanel.closest("details");
+  expect(evidence).toHaveAttribute("aria-label", "Evidence details");
+  expect(evidence).not.toHaveAttribute("open");
   expect(within(progressPanel).getByText("Run log")).toBeInTheDocument();
   expect(within(progressPanel).getByText("All systems idle")).toBeInTheDocument();
 });
@@ -418,8 +417,9 @@ test("shows progress feedback while a dashboard action is running", async () => 
   fireEvent.click(await screen.findByRole("button", { name: /Generate today's ideas/i }));
 
   const progressPanel = await screen.findByLabelText("Action progress");
-  expect(progressPanel.tagName).toBe("DETAILS");
-  expect(progressPanel).toHaveAttribute("open");
+  expect(progressPanel.tagName).toBe("SECTION");
+  // The single Evidence disclosure auto-opens on activity so the inline run log is visible.
+  expect(progressPanel.closest("details")).toHaveAttribute("open");
   expect(within(progressPanel).getByText("1 running")).toBeInTheDocument();
   const generationRow = within(progressPanel).getByText("Today's ideas").closest("li");
   expect(generationRow).toHaveAttribute("data-state", "running");
@@ -1065,11 +1065,9 @@ test("keeps creator score details inside the compact generated command center", 
   expect(within(constraintSignal as HTMLElement).getByText("Production")).toBeInTheDocument();
   expect(within(constraintSignal as HTMLElement).getByText(/Pick one draft, mark the slot used/i)).toBeInTheDocument();
   const breakdown = within(commandCenter).getByLabelText("Score breakdown");
-  expect(breakdown.tagName).toBe("DETAILS");
-  expect(breakdown).not.toHaveAttribute("open");
+  expect(breakdown.tagName).toBe("SECTION");
   expect(within(breakdown).getByText("4 operating signals")).toBeInTheDocument();
 
-  fireEvent.click(within(breakdown).getByText("Score breakdown"));
   fireEvent.click(within(breakdown).getByRole("button", { name: /Copy scorecard brief/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalled());
   expect(writeText.mock.calls[0]?.[0]).toContain("Creator scorecard:");
