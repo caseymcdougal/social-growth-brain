@@ -14,10 +14,13 @@ import {
   importSnapshot,
   isBootstrappedDashboardStateFromStorage,
   refreshStrategyMemory,
+  saveCreativeDirection,
+  type CreativeDirection,
   type DashboardState,
   type StrategyMemoryProposal
 } from "./client/api";
 import { CaptureBar } from "./client/components/CaptureBar";
+import { CreativeDirectionCard } from "./client/components/CreativeDirectionCard";
 import { CoachReport } from "./client/components/CoachReport";
 import { NextPostQueue } from "./client/components/NextPostQueue";
 import { OpportunityDesk } from "./client/components/OpportunityDesk";
@@ -460,6 +463,7 @@ export function App() {
   const [exploringTopics, setExploringTopics] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [direction, setDirection] = useState<CreativeDirection>(() => bootstrappedDashboard?.direction ?? null);
   const [strategyEngineView, setStrategyEngineView] = useState<StrategyEngineView>("experiments");
   const [deferredPanelsReady, setDeferredPanelsReady] = useState(false);
   const [initialDashboardState] = useState<Promise<DashboardState>>(() =>
@@ -669,6 +673,7 @@ export function App() {
       setStrategyMemory(dashboard.strategyMemory.memory);
       setMemoryProposal(dashboard.strategyMemory.proposal);
       setTopicExploration(dashboard.topicExploration);
+      setDirection(dashboard.direction);
       if (!dashboard.snapshot?.posts.some((post) => post.xPostId === selectedPostId)) {
         setSelectedPostId(null);
       }
@@ -960,6 +965,15 @@ export function App() {
           opportunityBrief={opportunityBrief}
           postCount={postCount}
           scorecard={creatorScorecard}
+        />
+
+        <CreativeDirectionCard
+          initial={direction}
+          onSave={async (text) => {
+            const saved = await saveCreativeDirection(text);
+            setDirection(saved);
+            return saved;
+          }}
         />
 
         {!generation && (
