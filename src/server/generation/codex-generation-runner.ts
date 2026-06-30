@@ -52,13 +52,14 @@ export function buildCodexGenerationArgs(paths: { jobDir: string; schemaPath: st
 
 export function writeGenerationJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; mode: "today" }
+  input: { snapshot: unknown; analysis: unknown; mode: "today"; direction?: string | null }
 ) {
   mkdirSync(jobDir, { recursive: true });
   const inputPath = join(jobDir, "input.json");
   const promptPath = join(jobDir, "prompt.md");
   const schemaPath = join(jobDir, "schema.json");
   const outputPath = join(jobDir, "output.json");
+  const direction = typeof input.direction === "string" ? input.direction.trim() : "";
   const inputJson = JSON.stringify(input, null, 2);
 
   writeFileSync(inputPath, inputJson);
@@ -71,6 +72,7 @@ export function writeGenerationJobFiles(
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
       "Each draft should have a specific angle, a strong hook, and a clear reason tied to the audit.",
+      ...(direction ? [`Casey's current creative direction (follow it): ${direction}`] : []),
       "Return JSON only. Do not include markdown.",
       "",
       "Input JSON:",
@@ -86,12 +88,14 @@ export class CodexGenerationRunner implements GenerationRunner {
   async generateToday(input: {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
+    direction?: string | null;
     jobDir: string;
   }): Promise<GenerationOutput> {
     const files = writeGenerationJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      mode: "today"
+      mode: "today",
+      direction: input.direction ?? null
     });
     const args = buildCodexGenerationArgs({
       jobDir: input.jobDir,

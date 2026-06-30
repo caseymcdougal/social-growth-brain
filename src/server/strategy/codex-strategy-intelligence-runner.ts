@@ -131,9 +131,14 @@ function writeJobFiles(jobDir: string, input: unknown, promptLines: string[], sc
   return { inputPath, promptPath, schemaPath, outputPath };
 }
 
+function directionLines(direction?: string | null): string[] {
+  const trimmed = typeof direction === "string" ? direction.trim() : "";
+  return trimmed ? [`Casey's current creative direction (follow it): ${trimmed}`] : [];
+}
+
 export function writeStrategyMemoryJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown }
+  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown; direction?: string | null }
 ) {
   return writeJobFiles(
     jobDir,
@@ -144,6 +149,7 @@ export function writeStrategyMemoryJobFiles(
       "Do not silently mutate memory. Return a proposed full memory and a concise list of evidence-backed updates.",
       "Preserve useful existing memory when it remains supported by the latest evidence.",
       "Prefer specific lanes, voice rules, audience assumptions, and experiments over generic creator advice.",
+      ...directionLines(input.direction),
       "Return JSON only. Do not include markdown."
     ],
     strategyMemoryProposalJsonSchema
@@ -152,7 +158,7 @@ export function writeStrategyMemoryJobFiles(
 
 export function writeTopicExplorerJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown }
+  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown; direction?: string | null }
 ) {
   return writeJobFiles(
     jobDir,
@@ -164,6 +170,7 @@ export function writeTopicExplorerJobFiles(
       "Explain why each topic is near Casey's lane and cite evidence from the audit, memory, or recent posts.",
       "Make every topic actionable with hooks and one copy-ready X draft.",
       "do not drift into generic AI news, vague productivity advice, or broad motivational content.",
+      ...directionLines(input.direction),
       "Return JSON only. Do not include markdown."
     ],
     topicExplorationJsonSchema
@@ -201,12 +208,14 @@ export class CodexStrategyIntelligenceRunner implements StrategyIntelligenceRunn
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<StrategyMemoryProposalOutput> {
     const files = writeStrategyMemoryJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      currentMemory: input.currentMemory
+      currentMemory: input.currentMemory,
+      direction: input.direction ?? null
     });
     await runCodexJob(files, input.jobDir);
     return strategyMemoryProposalOutputSchema.parse(JSON.parse(readFileSync(files.outputPath, "utf8")));
@@ -216,12 +225,14 @@ export class CodexStrategyIntelligenceRunner implements StrategyIntelligenceRunn
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<TopicExplorationOutput> {
     const files = writeTopicExplorerJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      currentMemory: input.currentMemory
+      currentMemory: input.currentMemory,
+      direction: input.direction ?? null
     });
     await runCodexJob(files, input.jobDir);
     return topicExplorationOutputSchema.parse(JSON.parse(readFileSync(files.outputPath, "utf8")));
