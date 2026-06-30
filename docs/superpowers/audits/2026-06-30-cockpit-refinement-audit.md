@@ -58,7 +58,7 @@ A pre-existing failure (`App.test.tsx` "Overall status", stale since the redesig
 ## Deferred / not blocking
 
 - Audit-mode (non-generated) command center verified by test (`317`), not re-screenshotted (local DB holds a generation; not cleared to preserve Casey's data).
-- Dead CSS remains for the removed disclosures (`.command-center-signal-disclosure …`, `.scorecard-breakdown summary …`, `.action-progress-summary …`). Harmless (no matching elements); a later cleanup pass can delete.
+- Dead CSS for the removed disclosures (`.command-center-signal-disclosure …`, `.scorecard-breakdown summary …`, `.action-progress-summary …`) was deleted in a follow-up commit; shared selectors (`.scorecard-dimension-top span`, `.command-center-maintenance` toggle) were split out and preserved. Verified no visual regression.
 
 ## Verdict
 

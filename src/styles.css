@@ -559,79 +559,6 @@ h3 {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.command-center-signal-disclosure {
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 0;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.018);
-}
-
-.command-center-signal-disclosure summary {
-  min-height: 100%;
-  padding: 15px 16px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-content: center;
-  gap: 4px 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.command-center-signal-disclosure summary::-webkit-details-marker {
-  display: none;
-}
-
-.command-center-signal-disclosure summary::after {
-  content: "+";
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  display: grid;
-  place-items: center;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 700;
-  grid-column: 2;
-  grid-row: 1 / span 3;
-}
-
-.command-center-signal-disclosure[open] summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.command-center-signal-disclosure[open] summary::after {
-  content: "-";
-}
-
-.command-center-signal-disclosure summary span,
-.command-center-signal-disclosure summary strong,
-.command-center-signal-disclosure summary small {
-  display: block;
-}
-
-.command-center-signal-disclosure summary span {
-  color: var(--faint);
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.command-center-signal-disclosure summary strong {
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 620;
-  line-height: 1.2;
-}
-
-.command-center-signal-disclosure summary small {
-  color: var(--faint);
-  line-height: 1.35;
-}
-
 .command-center-signals {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -717,15 +644,6 @@ h3 {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-}
-
-.command-center-panel.is-generated .scorecard-breakdown summary {
-  min-height: 58px;
-  padding-block: 11px;
-}
-
-.command-center-panel.is-generated .scorecard-breakdown summary small {
-  display: none;
 }
 
 .operations-grid {
@@ -827,57 +745,6 @@ h3 {
   overflow: hidden;
 }
 
-.action-progress-summary {
-  min-height: 64px;
-  padding: 12px 14px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.action-progress-summary::-webkit-details-marker {
-  display: none;
-}
-
-.action-progress-summary::after {
-  content: "+";
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  display: grid;
-  place-items: center;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.action-progress-panel[open] .action-progress-summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.action-progress-panel[open] .action-progress-summary::after {
-  content: "-";
-}
-
-.action-progress-summary > div {
-  min-width: 0;
-}
-
-.action-progress-summary h2 {
-  font-size: 18px;
-}
-
-.action-progress-summary > div > p:last-child {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
-}
 
 .action-progress-head {
   min-height: 64px;
@@ -1446,7 +1313,6 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.scorecard-breakdown,
 .scorecard-breakdown-inline {
   border-top: 1px solid var(--line);
 }
@@ -1477,60 +1343,17 @@ h3 {
   display: grid;
 }
 
-.scorecard-breakdown summary {
-  min-height: 70px;
-  padding: 14px 18px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.scorecard-breakdown summary::-webkit-details-marker {
-  display: none;
-}
-
-.scorecard-breakdown summary::after {
-  content: "+";
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  display: grid;
-  place-items: center;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 700;
-  grid-column: 2;
-  grid-row: 1 / span 3;
-}
-
-.scorecard-breakdown[open] summary {
-  border-bottom: 1px solid var(--line);
-}
-
-.scorecard-breakdown[open] summary::after {
-  content: "-";
-}
-
 .command-center-panel.is-generated {
   --command-toggle-size: 32px;
   --command-toggle-right-rail: 30px;
 }
 
-.command-center-panel.is-generated .command-center-signal-disclosure summary,
-.command-center-panel.is-generated .command-center-maintenance summary,
-.command-center-panel.is-generated .scorecard-breakdown summary {
+.command-center-panel.is-generated .command-center-maintenance summary {
   grid-template-columns: minmax(0, 1fr) var(--command-toggle-size);
   padding-right: var(--command-toggle-right-rail);
 }
 
-.command-center-panel.is-generated .command-center-signal-disclosure summary::after,
-.command-center-panel.is-generated .command-center-maintenance summary::after,
-.command-center-panel.is-generated .scorecard-breakdown summary::after {
+.command-center-panel.is-generated .command-center-maintenance summary::after {
   content: "";
   width: var(--command-toggle-size);
   height: var(--command-toggle-size);
@@ -1545,18 +1368,12 @@ h3 {
     2px 10px;
   line-height: 1;
   grid-column: 2;
-  grid-row: 1 / span 3;
+  grid-row: 1;
   justify-self: end;
   align-self: center;
 }
 
-.command-center-panel.is-generated .command-center-maintenance summary::after {
-  grid-row: 1;
-}
-
-.command-center-panel.is-generated .command-center-signal-disclosure[open] summary::after,
-.command-center-panel.is-generated .command-center-maintenance[open] summary::after,
-.command-center-panel.is-generated .scorecard-breakdown[open] summary::after {
+.command-center-panel.is-generated .command-center-maintenance[open] summary::after {
   content: "";
   background-image: linear-gradient(currentColor, currentColor);
   background-size: 10px 2px;
@@ -1585,30 +1402,12 @@ h3 {
   gap: 12px;
 }
 
-.scorecard-dimension-top span,
-.scorecard-breakdown summary span {
+.scorecard-dimension-top span {
   color: var(--faint);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-}
-
-.scorecard-breakdown summary span,
-.scorecard-breakdown summary strong,
-.scorecard-breakdown summary small {
-  display: block;
-}
-
-.scorecard-breakdown summary strong {
-  color: var(--text);
-  font-size: 17px;
-  line-height: 1.25;
-}
-
-.scorecard-breakdown summary small {
-  color: var(--faint);
-  line-height: 1.35;
 }
 
 .scorecard-dimension-top strong {
@@ -4148,19 +3947,14 @@ a:focus-visible {
     display: block;
   }
 
-  .action-progress-summary {
+  .action-progress-head {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .action-progress-summary .status-chip {
+  .action-progress-head .status-chip {
     width: max-content;
     margin-top: 10px;
     grid-column: 1 / -1;
-  }
-
-  .action-progress-summary::after {
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .action-progress-row,
