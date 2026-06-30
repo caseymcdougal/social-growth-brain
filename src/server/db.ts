@@ -139,5 +139,11 @@ function migrate(db: AppDatabase) {
       finished_at TEXT,
       job_dir TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS creative_direction (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 }

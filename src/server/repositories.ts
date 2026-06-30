@@ -494,6 +494,23 @@ export function createRepositories(db: AppDatabase) {
       if (!row) return null;
 
       return topicExplorationOutputSchema.parse(JSON.parse(row.output_json));
+    },
+
+    getCreativeDirection(): { text: string; updatedAt: string } | null {
+      const row = db
+        .prepare("SELECT text, updated_at as updatedAt FROM creative_direction ORDER BY id DESC LIMIT 1")
+        .get() as { text: string; updatedAt: string } | undefined;
+      return row ?? null;
+    },
+
+    setCreativeDirection(text: string): { text: string; updatedAt: string } | null {
+      // ponytail: single-row table, latest-wins via delete-then-insert; fine for one local user.
+      const trimmed = text.trim();
+      db.prepare("DELETE FROM creative_direction").run();
+      if (!trimmed) return null;
+      const updatedAt = new Date().toISOString();
+      db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES (?, ?)").run(trimmed, updatedAt);
+      return { text: trimmed, updatedAt };
     }
   };
 }
