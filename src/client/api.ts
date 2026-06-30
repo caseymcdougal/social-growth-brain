@@ -22,7 +22,10 @@ export type DashboardState = {
     proposal: StrategyMemoryProposal | null;
   };
   topicExploration: TopicExplorationOutput | null;
+  direction: { text: string; updatedAt: string } | null;
 };
+
+export type CreativeDirection = { text: string; updatedAt: string } | null;
 
 declare global {
   interface Window {
@@ -54,7 +57,8 @@ function normalizeDashboardState(data: any): DashboardState {
       memory: data.strategyMemory?.memory ?? null,
       proposal: data.strategyMemory?.proposal ?? null
     },
-    topicExploration: data.topicExploration ?? null
+    topicExploration: data.topicExploration ?? null,
+    direction: data.direction ?? null
   };
   if (typeof window !== "undefined") storeDashboardState(dashboardState);
   return dashboardState;
@@ -224,4 +228,17 @@ export async function exploreNearbyTopics(): Promise<TopicExplorationOutput> {
     throw new Error(data?.errorMessage ?? "Topic exploration failed");
   }
   return data.exploration;
+}
+
+export async function saveCreativeDirection(text: string): Promise<CreativeDirection> {
+  const response = await fetch("/api/direction", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to save creative direction");
+  }
+  return data.direction ?? null;
 }

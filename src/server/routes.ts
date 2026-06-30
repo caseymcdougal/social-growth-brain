@@ -62,8 +62,18 @@ export function createServerApp(options: {
       analysis,
       generation: generation ? { posts: generation.posts.slice(0, 1) } : null,
       strategyMemory: { memory: null, proposal: null },
-      topicExploration: null
+      topicExploration: null,
+      direction: repos.getCreativeDirection()
     });
+  });
+
+  app.get("/api/direction", (_request, response) => {
+    response.json({ ok: true, direction: repos.getCreativeDirection() });
+  });
+
+  app.post("/api/direction", (request, response) => {
+    const text = typeof request.body?.text === "string" ? request.body.text : "";
+    response.json({ ok: true, direction: repos.setCreativeDirection(text) });
   });
 
   app.get("/api/analysis/latest", (_request, response) => {
@@ -167,6 +177,7 @@ export function createServerApp(options: {
       const generation = await generationRunner.generateToday({
         snapshot,
         analysis: latestAnalysis.analysis,
+        direction: repos.getCreativeDirection()?.text ?? null,
         jobDir
       });
       const generationRunId = repos.saveGeneration({
@@ -215,6 +226,7 @@ export function createServerApp(options: {
         snapshot,
         analysis: latestAnalysis.analysis,
         currentMemory: currentMemory?.memory ?? null,
+        direction: repos.getCreativeDirection()?.text ?? null,
         jobDir
       });
       const proposalId = repos.saveStrategyMemoryProposal({
@@ -292,6 +304,7 @@ export function createServerApp(options: {
         snapshot,
         analysis: latestAnalysis.analysis,
         currentMemory: currentMemory?.memory ?? null,
+        direction: repos.getCreativeDirection()?.text ?? null,
         jobDir
       });
       const topicRunId = repos.saveTopicExploration({
