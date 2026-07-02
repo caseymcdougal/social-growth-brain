@@ -115,14 +115,14 @@ describe("creator scorecard", () => {
     });
 
     expect(scorecard.overallScore).toBe(88);
-    expect(scorecard.statusLabel).toBe("Compounding");
-    expect(scorecard.summary).toBe("Creator system is compounding; keep the strongest loop active.");
-    expect(scorecard.primaryConstraint.label).toBe("Production");
+    expect(scorecard.statusLabel).toBe("Growing strong");
+    expect(scorecard.summary).toBe("You're on a good roll — keep doing what's working.");
+    expect(scorecard.primaryConstraint.label).toBe("Ready to post");
     expect(scorecard.dimensions.map((dimension) => dimension.label)).toEqual([
-      "Evidence",
-      "Momentum",
-      "Strategy",
-      "Production"
+      "Post data",
+      "Growth trend",
+      "Your strategy",
+      "Ready to post"
     ]);
   });
 
@@ -137,9 +137,9 @@ describe("creator scorecard", () => {
     });
 
     expect(scorecard.overallScore).toBe(19);
-    expect(scorecard.statusLabel).toBe("Setup required");
-    expect(scorecard.primaryConstraint.label).toBe("Evidence");
-    expect(scorecard.primaryConstraint.nextAction).toBe("Scan or paste the public profile before trusting any strategic read.");
+    expect(scorecard.statusLabel).toBe("Just getting started");
+    expect(scorecard.primaryConstraint.label).toBe("Post data");
+    expect(scorecard.primaryConstraint.nextAction).toBe("Scan or paste your X profile so we can see how your posts are doing.");
   });
 
   it("makes negative scan movement the main constraint even when drafts exist", () => {
@@ -163,8 +163,8 @@ describe("creator scorecard", () => {
       memory: memory()
     });
 
-    expect(scorecard.statusLabel).toBe("Operational");
-    expect(scorecard.primaryConstraint.label).toBe("Momentum");
+    expect(scorecard.statusLabel).toBe("On track");
+    expect(scorecard.primaryConstraint.label).toBe("Growth trend");
     expect(scorecard.primaryConstraint.statusLabel).toBe("Down");
     expect(scorecard.primaryConstraint.nextAction).toContain("weaker scan");
   });
@@ -181,9 +181,9 @@ describe("creator scorecard", () => {
 
     const copied = formatCreatorScorecardForClipboard(scorecard);
 
-    expect(copied).toContain("Creator scorecard: 19/100 - Setup required");
-    expect(copied).toContain("Primary constraint: Evidence");
-    expect(copied).toContain("- Evidence [No capture] 10/100");
-    expect(copied).toContain("Next: Scan or paste the public profile before trusting any strategic read.");
+    expect(copied).toContain("Creator scorecard: 19/100 - Just getting started");
+    expect(copied).toContain("What to fix first: Post data");
+    expect(copied).toContain("- Post data [No posts yet] 10/100");
+    expect(copied).toContain("Next: Scan or paste your X profile so we can see how your posts are doing.");
   });
 });

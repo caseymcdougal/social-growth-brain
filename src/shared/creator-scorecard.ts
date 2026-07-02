@@ -6,7 +6,7 @@ import type { StrategyMemory } from "./strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "./types";
 
 export type CreatorScorecardDimensionKey = "evidence" | "momentum" | "strategy" | "production";
-export type CreatorScorecardStatus = "Compounding" | "Operational" | "Needs focus" | "Setup required";
+export type CreatorScorecardStatus = "Growing strong" | "On track" | "Needs attention" | "Just getting started";
 
 export interface CreatorScorecardDimension {
   key: CreatorScorecardDimensionKey;
@@ -43,28 +43,28 @@ function buildEvidenceDimension({
   if (!snapshot) {
     return {
       key: "evidence",
-      label: "Evidence",
+      label: "Post data",
       score: 10,
-      statusLabel: "No capture",
-      detail: "No public profile capture is loaded.",
-      nextAction: "Scan or paste the public profile before trusting any strategic read."
+      statusLabel: "No posts yet",
+      detail: "No posts are loaded yet.",
+      nextAction: "Scan or paste your X profile so we can see how your posts are doing."
     };
   }
 
   const percent = coveragePercent(metricSummary);
   const score = percent >= 85 ? 95 : percent >= 55 ? 65 : 35;
-  const statusLabel = percent >= 85 ? "Reliable" : percent >= 55 ? "Partial" : "Thin";
+  const statusLabel = percent >= 85 ? "Solid" : percent >= 55 ? "Partial" : "Thin";
 
   return {
     key: "evidence",
-    label: "Evidence",
+    label: "Post data",
     score,
     statusLabel,
-    detail: `${percent}% metric coverage across ${metricSummary.postsWithAnyMetrics}/${snapshot.posts.length} ranked posts.`,
+    detail: `${percent}% of metrics captured across ${metricSummary.postsWithAnyMetrics}/${snapshot.posts.length} posts.`,
     nextAction:
       percent >= 85
-        ? "Use the current evidence base for ranking and diagnosis."
-        : "Improve capture coverage before making fine-grained strategic calls."
+        ? "You have enough data to trust the audit — keep going."
+        : "Scan again for fuller metrics before making fine-grained calls."
   };
 }
 
@@ -72,7 +72,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.status === "empty") {
     return {
       key: "momentum",
-      label: "Momentum",
+      label: "Growth trend",
       score: 15,
       statusLabel: "No trend",
       detail: "No scan history is available yet.",
@@ -83,7 +83,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.status === "single-scan") {
     return {
       key: "momentum",
-      label: "Momentum",
+      label: "Growth trend",
       score: 45,
       statusLabel: "Baseline only",
       detail: "One scan is captured, but movement is not measurable yet.",
@@ -94,7 +94,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal > 50) {
     return {
       key: "momentum",
-      label: "Momentum",
+      label: "Growth trend",
       score: 92,
       statusLabel: "Accelerating",
       detail: `Median visible signal is up by ${scanHistory.deltas.medianSignal} since the previous scan.`,
@@ -105,7 +105,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal > 0) {
     return {
       key: "momentum",
-      label: "Momentum",
+      label: "Growth trend",
       score: 78,
       statusLabel: "Up",
       detail: `Median visible signal is up by ${scanHistory.deltas.medianSignal} since the previous scan.`,
@@ -116,7 +116,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal < 0) {
     return {
       key: "momentum",
-      label: "Momentum",
+      label: "Growth trend",
       score: 35,
       statusLabel: "Down",
       detail: `Median visible signal is down by ${Math.abs(scanHistory.deltas.medianSignal)} since the previous scan.`,
@@ -126,11 +126,11 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
 
   return {
     key: "momentum",
-    label: "Momentum",
+    label: "Growth trend",
     score: 60,
     statusLabel: "Flat",
-    detail: "Median visible signal is flat since the previous scan.",
-    nextAction: "Run one sharper experiment before changing the whole strategy."
+    detail: "Your posts are getting about the same traction as last scan.",
+    nextAction: "Try one sharper post before changing your whole approach."
   };
 }
 
@@ -145,7 +145,7 @@ function buildStrategyDimension({
   if (analysis && activeExperimentCount > 0) {
     return {
       key: "strategy",
-      label: "Strategy",
+      label: "Your strategy",
       score: 88,
       statusLabel: "Instrumented",
       detail: `${pluralize(activeExperimentCount, "active experiment")} connected to accepted strategy memory.`,
@@ -156,7 +156,7 @@ function buildStrategyDimension({
   if (analysis) {
     return {
       key: "strategy",
-      label: "Strategy",
+      label: "Your strategy",
       score: 65,
       statusLabel: "Audited",
       detail: "Audit patterns are available, but accepted strategy memory is not applied.",
@@ -166,11 +166,11 @@ function buildStrategyDimension({
 
   return {
     key: "strategy",
-    label: "Strategy",
+    label: "Your strategy",
     score: 25,
-    statusLabel: "Unscored",
-    detail: "No strategy audit is available.",
-    nextAction: "Run the strategy audit to turn ranked posts into reusable context."
+    statusLabel: "Not yet",
+    detail: "No audit yet — we can't spot patterns until you run one.",
+    nextAction: "Run the audit to see what's working on your account."
   };
 }
 
@@ -185,45 +185,48 @@ function buildProductionDimension({
     const score = generation.posts.length >= 3 ? 86 : 76;
     return {
       key: "production",
-      label: "Production",
+      label: "Ready to post",
       score,
       statusLabel: "Drafts ready",
-      detail: `${pluralize(generation.posts.length, "draft")} staged for review.`,
-      nextAction: "Pick one draft, mark the slot used, and confirm it against the next scan."
+      detail: `${pluralize(generation.posts.length, "draft")} ready to review.`,
+      nextAction: "Pick a draft, post it on X, then scan again to see how it did."
     };
   }
 
   if (analysis) {
     return {
       key: "production",
-      label: "Production",
+      label: "Ready to post",
       score: 60,
       statusLabel: "Needs drafts",
-      detail: "The audit is ready, but no current draft queue is staged.",
-      nextAction: "Generate today's ideas from the strongest pattern."
+      detail: "Your audit is ready, but no drafts yet.",
+      nextAction: "Generate draft ideas from what's working."
     };
   }
 
   return {
     key: "production",
-    label: "Production",
+    label: "Ready to post",
     score: 25,
     statusLabel: "Waiting",
-    detail: "Draft production starts after the strategy audit.",
-    nextAction: "Run the audit before generating or copying drafts."
+    detail: "Drafts come after the audit finds what's working.",
+    nextAction: "Run the audit before writing drafts."
   };
 }
 
 function statusForScore(score: number): CreatorScorecardStatus {
-  if (score >= 85) return "Compounding";
-  if (score >= 70) return "Operational";
-  if (score >= 50) return "Needs focus";
-  return "Setup required";
+  if (score >= 85) return "Growing strong";
+  if (score >= 70) return "On track";
+  if (score >= 50) return "Needs attention";
+  return "Just getting started";
 }
 
 function buildSummary(statusLabel: CreatorScorecardStatus, primaryConstraint: CreatorScorecardDimension) {
-  if (statusLabel === "Compounding") return "Creator system is compounding; keep the strongest loop active.";
-  return `Creator system is ${statusLabel.toLowerCase()}; ${primaryConstraint.label.toLowerCase()} is the constraint.`;
+  if (statusLabel === "Growing strong") return "You're on a good roll — keep doing what's working.";
+  if (statusLabel === "Just getting started") {
+    return `Start by loading your posts — ${primaryConstraint.label.toLowerCase()} is the first thing to fix.`;
+  }
+  return `Your account could grow faster — focus on ${primaryConstraint.label.toLowerCase()} first.`;
 }
 
 export function buildCreatorScorecard({
@@ -264,7 +267,7 @@ export function formatCreatorScorecardForClipboard(scorecard: CreatorScorecard) 
   return [
     `Creator scorecard: ${scorecard.overallScore}/100 - ${scorecard.statusLabel}`,
     scorecard.summary,
-    `Primary constraint: ${scorecard.primaryConstraint.label}`,
+    `What to fix first: ${scorecard.primaryConstraint.label}`,
     `Next: ${scorecard.primaryConstraint.nextAction}`,
     "",
     "Dimensions:",

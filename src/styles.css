@@ -859,6 +859,36 @@ h3 {
   line-height: 1.35;
 }
 
+/* When the step-by-step breakdown is collapsed, the head is the whole panel —
+   drop the divider so the calm one-line view has no dangling border. */
+.action-progress-panel[data-steps-open="false"] .action-progress-head {
+  border-bottom: none;
+}
+
+.action-progress-statusline {
+  margin: var(--space-1) 0 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.action-progress-details {
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.action-progress-details > summary {
+  background: var(--tint-1);
+}
+
+.action-progress-details .action-progress-list {
+  border-top: 1px solid var(--line);
+}
+
 .action-progress-list {
   list-style: none;
   margin: 0;
@@ -1528,7 +1558,14 @@ h3 {
   display: block;
   margin-top: 7px;
   color: var(--faint);
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scorecard-dimension-hint {
+  margin-top: 10px !important;
+  color: var(--muted) !important;
+  font-style: italic;
 }
 
 .dashboard-grid {
@@ -2655,6 +2692,46 @@ h3 {
   font-size: 18px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.coach-lesson {
+  margin-top: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--tint-3), var(--tint-1));
+  padding: var(--pad-card);
+}
+
+.coach-lesson-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.coach-lesson-head svg {
+  color: var(--accent);
+}
+
+.coach-lesson-title {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.coach-lesson-why {
+  margin: 8px 0 0;
+  max-width: 60ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .coach-brief-grid {

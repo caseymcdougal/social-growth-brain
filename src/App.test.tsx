@@ -86,12 +86,12 @@ test("renders the dashboard shell", async () => {
 
   render(<App />);
 
-  expect(screen.getByText("Local creator intelligence")).toBeInTheDocument();
+  expect(screen.getByText("Your X growth workspace")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Social Audit Studio" })).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "Audit sequence" })).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: /Paste snapshot/i })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Scan public metrics/i })).toHaveClass("primary-button");
-  expect(screen.queryByRole("button", { name: /Run strategy audit/i })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Scan my posts/i })).toHaveClass("primary-button");
+  expect(screen.queryByRole("button", { name: /Find what's working/i })).not.toBeInTheDocument();
 });
 
 test("announces capture load failures as alerts", async () => {
@@ -121,7 +121,7 @@ test("shows generate today's ideas after an audit is available", async () => {
 
   render(<App />);
 
-  expect(await screen.findByRole("button", { name: /Generate today's ideas/i })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /Write draft ideas/i })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Create the next post" })).toBeInTheDocument();
   expect(screen.getByText(/The audit has enough signal to turn into a post/i)).toBeInTheDocument();
   expect(screen.getByLabelText("Recommended posting brief")).toBeInTheDocument();
@@ -131,7 +131,7 @@ test("shows generate today's ideas after an audit is available", async () => {
   expect(ideaBacklog).not.toHaveAttribute("open");
   expect(within(ideaBacklog).getByText(`${auditIdeaCount} audit ${auditIdeaCount === 1 ? "idea" : "ideas"}`)).toBeInTheDocument();
   expect(within(screen.getByLabelText("Capture status")).queryByLabelText("Current posting brief")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Re-run audit/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Run audit again/i })).toBeInTheDocument();
 });
 
 test("uses review draft queue as the primary command inside the generated command center", async () => {
@@ -164,36 +164,36 @@ test("uses review draft queue as the primary command inside the generated comman
 
   const commandCenter = await screen.findByLabelText("Audit command center");
   expect(commandCenter).toHaveAttribute("data-mode", "draft");
-  expect(screen.queryByLabelText("Capture status")).not.toBeInTheDocument();
-  const reviewButton = within(commandCenter).getByRole("button", { name: /Review draft queue/i });
+  expect(screen.getByLabelText("Capture status")).toBeInTheDocument();
+  const reviewButton = within(commandCenter).getByRole("button", { name: /See my drafts/i });
   const draftQueueTitle = await screen.findByRole("heading", { name: "Drafts for today" });
   const scrollIntoView = vi.fn();
   Object.defineProperty(draftQueueTitle, "scrollIntoView", { configurable: true, value: scrollIntoView });
 
   expect(reviewButton).toHaveClass("primary-button");
-  expect(within(commandCenter).getByRole("button", { name: /Generate fresh ideas/i })).toHaveClass("secondary-button");
-  expect(within(commandCenter).queryByRole("button", { name: /Generate today's ideas/i })).not.toBeInTheDocument();
-  const updateSource = within(commandCenter).getByLabelText("Update source actions");
+  expect(within(commandCenter).getByRole("button", { name: /Write new ideas/i })).toHaveClass("secondary-button");
+  expect(within(commandCenter).queryByRole("button", { name: /Write draft ideas/i })).not.toBeInTheDocument();
+  const updateSource = within(commandCenter).getByLabelText("More options");
   expect(updateSource.tagName).toBe("DETAILS");
   expect(updateSource).not.toHaveAttribute("open");
   const directActionLabels = Array.from(commandCenter.querySelectorAll(".command-center-actions > button")).map((button) =>
     button.textContent?.replace(/\s+/g, " ").trim()
   );
-  expect(directActionLabels).toEqual(["Review draft queue", "Generate fresh ideas"]);
-  expect(within(commandCenter).getByRole("button", { name: /Re-run audit/i }).closest("details")).toBe(updateSource);
-  expect(within(commandCenter).getByRole("button", { name: /Rescan public metrics/i }).closest("details")).toBe(updateSource);
+  expect(directActionLabels).toEqual(["See my drafts", "Write new ideas"]);
+  expect(within(commandCenter).getByRole("button", { name: /Run audit again/i }).closest("details")).toBe(updateSource);
+  expect(within(commandCenter).getByRole("button", { name: /Scan again/i }).closest("details")).toBe(updateSource);
   expect(within(commandCenter).getByRole("button", { name: /Paste snapshot/i }).closest("details")).toBe(updateSource);
 
-  fireEvent.click(within(updateSource).getByText("Update source"));
-  expect(within(commandCenter).getByRole("button", { name: /Re-run audit/i })).toBeInTheDocument();
-  expect(within(commandCenter).getByRole("button", { name: /Rescan public metrics/i })).toBeInTheDocument();
+  fireEvent.click(within(updateSource).getByText("More options"));
+  expect(within(commandCenter).getByRole("button", { name: /Run audit again/i })).toBeInTheDocument();
+  expect(within(commandCenter).getByRole("button", { name: /Scan again/i })).toBeInTheDocument();
   expect(within(commandCenter).getByRole("button", { name: /Paste snapshot/i })).toBeInTheDocument();
 
   fireEvent.click(reviewButton);
   expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
 });
 
-test("skips the duplicate capture strip once the generated handoff owns draft actions", async () => {
+test("shows a compact capture strip alongside the generated command center", async () => {
   const generation = {
     posts: [
       {
@@ -223,11 +223,11 @@ test("skips the duplicate capture strip once the generated handoff owns draft ac
 
   const commandCenter = await screen.findByLabelText("Audit command center");
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
-  expect(screen.queryByLabelText("Capture status")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Capture status")).toBeInTheDocument();
   expect(within(handoff).getByText("1 draft staged")).toBeInTheDocument();
-  expect(within(handoff).getByText("Copy the top draft or refresh ideas.")).toBeInTheDocument();
-  expect(within(commandCenter).getByRole("button", { name: /Review draft queue/i })).toHaveClass("primary-button");
-  expect(within(commandCenter).getByLabelText("Update source actions")).not.toHaveAttribute("open");
+  expect(within(handoff).getByText("Pick one, copy it into X, or write fresh ideas.")).toBeInTheDocument();
+  expect(within(commandCenter).getByRole("button", { name: /See my drafts/i })).toHaveClass("primary-button");
+  expect(within(commandCenter).getByLabelText("More options")).not.toHaveAttribute("open");
 });
 
 test("describes generated handoff by staged drafts instead of repeating the review action", async () => {
@@ -268,11 +268,11 @@ test("describes generated handoff by staged drafts instead of repeating the revi
 
   const commandCenter = await screen.findByLabelText("Audit command center");
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
-  expect(within(commandCenter).getByText("2 drafts · 100% evidence")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("2 drafts · 100% of metrics captured")).toBeInTheDocument();
   expect(within(handoff).getByText("2 drafts staged")).toBeInTheDocument();
-  expect(within(handoff).getByText("Copy the top draft or refresh ideas.")).toBeInTheDocument();
+  expect(within(handoff).getByText("Pick one, copy it into X, or write fresh ideas.")).toBeInTheDocument();
   expect(within(handoff).queryByText("Review the draft queue")).not.toBeInTheDocument();
-  expect(within(commandCenter).getByRole("button", { name: /Review draft queue/i })).toBeInTheDocument();
+  expect(within(commandCenter).getByRole("button", { name: /See my drafts/i })).toBeInTheDocument();
 });
 
 test("keeps generated command signals behind a closed status disclosure", async () => {
@@ -306,9 +306,9 @@ test("keeps generated command signals behind a closed status disclosure", async 
   const commandCenter = await screen.findByLabelText("Audit command center");
   const signals = within(commandCenter).getByLabelText("Command signals");
   expect(signals.closest("details")).toBeNull();
-  expect(within(signals).getByText("Health")).toBeInTheDocument();
-  expect(within(signals).getByText("Constraint")).toBeInTheDocument();
-  expect(within(signals).getByText("Opportunity")).toBeInTheDocument();
+  expect(within(signals).getByText("Your account health")).toBeInTheDocument();
+  expect(within(signals).getByText("What to fix")).toBeInTheDocument();
+  expect(within(signals).getByText("Your best next post")).toBeInTheDocument();
 });
 
 test("surfaces an audit command center before operational telemetry", async () => {
@@ -328,18 +328,18 @@ test("surfaces an audit command center before operational telemetry", async () =
   render(<App />);
 
   const commandCenter = await screen.findByLabelText("Audit command center");
-  expect(within(commandCenter).getByRole("heading", { name: "Audit command center" })).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Creator score")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Biggest constraint")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Best opportunity")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Next action")).toBeInTheDocument();
+  expect(within(commandCenter).getByRole("heading", { name: "Your account at a glance" })).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Your account health")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("What to fix")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Your best next post")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Your next move")).toBeInTheDocument();
   // Score breakdown is now surfaced inline (no click to reveal), one of the flatten goals.
   const breakdown = within(commandCenter).getByLabelText("Score breakdown");
   expect(breakdown.tagName).toBe("SECTION");
-  expect(within(breakdown).getByText("4 operating signals")).toBeInTheDocument();
+  expect(within(breakdown).getByText("4 things we measure")).toBeInTheDocument();
   expect(screen.queryByLabelText("Creator operating scorecard")).not.toBeInTheDocument();
 
-  expect(commandCenter.compareDocumentPosition(screen.getByLabelText("Action progress"))).toBe(
+  expect(commandCenter.compareDocumentPosition(screen.getByLabelText("What's happening"))).toBe(
     Node.DOCUMENT_POSITION_FOLLOWING
   );
 });
@@ -360,14 +360,14 @@ test("keeps idle run log inline inside the closed evidence disclosure", async ()
 
   render(<App />);
 
-  const progressPanel = await screen.findByLabelText("Action progress");
-  // Run log is now inline content within the single Evidence disclosure (no nested details).
+  const progressPanel = await screen.findByLabelText("What's happening");
+  // Progress lives inside the About your data disclosure (collapsed by default when idle).
   expect(progressPanel.tagName).toBe("SECTION");
   const evidence = progressPanel.closest("details");
-  expect(evidence).toHaveAttribute("aria-label", "Evidence details");
+  expect(evidence).toHaveAttribute("aria-label", "About your data");
   expect(evidence).not.toHaveAttribute("open");
-  expect(within(progressPanel).getByText("Run log")).toBeInTheDocument();
-  expect(within(progressPanel).getByText("All systems idle")).toBeInTheDocument();
+  expect(within(progressPanel).getByText("What's happening")).toBeInTheDocument();
+  expect(within(progressPanel).getByText("Nothing running right now")).toBeInTheDocument();
 });
 
 test("keeps operational evidence behind a closed details disclosure", async () => {
@@ -386,13 +386,13 @@ test("keeps operational evidence behind a closed details disclosure", async () =
 
   render(<App />);
 
-  const evidenceDetails = await screen.findByLabelText("Evidence details");
+  const evidenceDetails = await screen.findByLabelText("About your data");
   expect(evidenceDetails.tagName).toBe("DETAILS");
   expect(evidenceDetails).not.toHaveAttribute("open");
-  expect(within(evidenceDetails).getByText("Evidence details")).toBeInTheDocument();
+  expect(within(evidenceDetails).getByText("About your data")).toBeInTheDocument();
   expect(within(evidenceDetails).getByLabelText("Scan history trend")).toBeInTheDocument();
-  expect(within(evidenceDetails).getByLabelText("Public metric signal")).toBeInTheDocument();
-  expect(within(evidenceDetails).getByLabelText("Action progress")).toBeInTheDocument();
+  expect(within(evidenceDetails).getByLabelText("Data quality")).toBeInTheDocument();
+  expect(within(evidenceDetails).getByLabelText("What's happening")).toBeInTheDocument();
 });
 
 test("shows progress feedback while a dashboard action is running", async () => {
@@ -414,18 +414,18 @@ test("shows progress feedback while a dashboard action is running", async () => 
 
   render(<App />);
 
-  fireEvent.click(await screen.findByRole("button", { name: /Generate today's ideas/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /Write draft ideas/i }));
 
-  const progressPanel = await screen.findByLabelText("Action progress");
+  const progressPanel = await screen.findByLabelText("What's happening");
   expect(progressPanel.tagName).toBe("SECTION");
-  // The single Evidence disclosure auto-opens on activity so the inline run log is visible.
+  // The About your data disclosure auto-opens on activity so progress stays visible.
   expect(progressPanel.closest("details")).toHaveAttribute("open");
-  expect(within(progressPanel).getByText("1 running")).toBeInTheDocument();
-  const generationRow = within(progressPanel).getByText("Today's ideas").closest("li");
+  expect(within(progressPanel).getByText("1 step running")).toBeInTheDocument();
+  const generationRow = within(progressPanel).getByText("Writing draft ideas").closest("li");
   expect(generationRow).toHaveAttribute("data-state", "running");
-  expect(within(generationRow as HTMLElement).getByText("Running")).toBeInTheDocument();
-  expect(within(generationRow as HTMLElement).getByRole("progressbar", { name: /Today's ideas progress/i })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Generating/i })).toHaveAttribute("aria-busy", "true");
+  expect(within(generationRow as HTMLElement).getByText("Working")).toBeInTheDocument();
+  expect(within(generationRow as HTMLElement).getByRole("progressbar", { name: /Writing draft ideas progress/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Writing…/i })).toHaveAttribute("aria-busy", "true");
 });
 
 test("gives recovery guidance when draft generation fails", async () => {
@@ -447,12 +447,12 @@ test("gives recovery guidance when draft generation fails", async () => {
 
   render(<App />);
 
-  fireEvent.click(await screen.findByRole("button", { name: /Generate today's ideas/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /Write draft ideas/i }));
 
   const alert = await screen.findByRole("alert");
-  expect(within(alert).getByRole("heading", { name: "Today's ideas did not generate" })).toBeInTheDocument();
+  expect(within(alert).getByRole("heading", { name: "We couldn't write your drafts" })).toBeInTheDocument();
   expect(within(alert).getByText("Model quota exhausted")).toBeInTheDocument();
-  expect(within(alert).getByText(/Keep the audit in place and try Generate today's ideas again/i)).toBeInTheDocument();
+  expect(within(alert).getByText(/try generating ideas again/i)).toBeInTheDocument();
 });
 
 test("surfaces copyable priority signals without repeating the top command", async () => {
@@ -547,13 +547,12 @@ test("keeps generated-state strategy brief behind a closed strategy context disc
 
   const postLab = (await screen.findByRole("heading", { name: "Drafts for today" })).closest("section");
   const decisionSupport = await screen.findByLabelText("Decision support");
-  const strategyContext = await screen.findByLabelText("Strategy context");
+  const strategyContext = await screen.findByLabelText("Why these suggestions");
   expect(postLab).not.toBeNull();
   expect(decisionSupport).not.toBeNull();
   expect(strategyContext.tagName).toBe("DETAILS");
   expect(strategyContext).not.toHaveAttribute("open");
-  expect(within(strategyContext).getByText("Latest audit read")).toBeInTheDocument();
-  expect(within(strategyContext).getByText("Strategy brief")).toBeInTheDocument();
+  expect(within(strategyContext).getByRole("heading", { name: "Your strategy" })).toBeInTheDocument();
   expect(postLab!.compareDocumentPosition(decisionSupport)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(decisionSupport.compareDocumentPosition(strategyContext)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
@@ -589,7 +588,7 @@ test("keeps generated-state ranked review behind a closed source evidence disclo
 
   render(<App />);
 
-  const strategyEngine = await screen.findByLabelText("Advanced strategy tools");
+  const strategyEngine = await screen.findByLabelText("Go deeper");
   const sourceEvidence = await screen.findByLabelText("Source evidence");
   expect(sourceEvidence.tagName).toBe("DETAILS");
   expect(sourceEvidence).not.toHaveAttribute("open");
@@ -708,7 +707,7 @@ test("keeps a single enabled generation command after an audit is available", as
   await screen.findByRole("heading", { name: "Create the next post" });
   const enabledGenerationCommands = screen
     .getAllByRole("button")
-    .filter((button) => /Generate today's ideas|Create draft set|Today's ideas/i.test(button.textContent ?? ""))
+    .filter((button) => /Write draft ideas|Create draft set|Writing…/i.test(button.textContent ?? ""))
     .filter((button) => !button.hasAttribute("disabled"));
 
   expect(enabledGenerationCommands).toHaveLength(1);
@@ -728,14 +727,16 @@ test("shows the ready audit shell from one consolidated dashboard request", asyn
 
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: "Strategy brief" })).toBeInTheDocument();
-  expect(screen.getByText("Winning pattern")).toBeInTheDocument();
-  expect(screen.getByText("Main risk")).toBeInTheDocument();
-  expect(screen.getByText("Content lane")).toBeInTheDocument();
+  const coachReport = (await screen.findByRole("heading", { name: "Your strategy" })).closest("section");
+  expect(coachReport).not.toBeNull();
+  const coachBrief = within(coachReport as HTMLElement).getByLabelText("Strategy highlights");
+  expect(within(coachBrief).getByText("What's working")).toBeInTheDocument();
+  expect(within(coachBrief).getByText("What to fix")).toBeInTheDocument();
+  expect(within(coachBrief).getByText("Your content lane")).toBeInTheDocument();
   const coachDetails = screen.getByLabelText("Full coach read");
   expect(coachDetails.tagName).toBe("DETAILS");
   expect(coachDetails).not.toHaveAttribute("open");
-  expect(screen.getByText("1 post ready")).toBeInTheDocument();
+  expect(screen.getByText("1 post loaded")).toBeInTheDocument();
   expect(screen.queryByText("Loading")).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(fetchMock).toHaveBeenCalledWith("/api/dashboard");
@@ -1049,29 +1050,29 @@ test("keeps creator score details inside the compact generated command center", 
   expect(commandCenter).toHaveClass("is-generated");
   expect(screen.queryByLabelText("Creator operating scorecard")).not.toBeInTheDocument();
   expect(within(commandCenter).queryByRole("heading", { name: "Creator health brief" })).not.toBeInTheDocument();
-  expect(within(commandCenter).getByText("Draft handoff")).toBeInTheDocument();
-  expect(within(commandCenter).getByRole("heading", { name: "Ready-to-write command center" })).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Ready to write")).toBeInTheDocument();
+  expect(within(commandCenter).getByRole("heading", { name: "Your next post, ready to go" })).toBeInTheDocument();
   expect(commandCenter.querySelector(".command-center-grid")).not.toBeInTheDocument();
-  expect(within(commandCenter).getByText("Compounding · 88")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("Creator system is compounding; keep the strongest loop active.")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Growing strong · 88")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("You're on a good roll — keep doing what's working.")).toBeInTheDocument();
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
-  expect(within(handoff).getByText("Draft queue")).toBeInTheDocument();
+  expect(within(handoff).getByText("Your drafts")).toBeInTheDocument();
   expect(within(handoff).getByText("1 draft staged")).toBeInTheDocument();
-  expect(within(handoff).getByText("Copy the top draft or refresh ideas.")).toBeInTheDocument();
+  expect(within(handoff).getByText("Pick one, copy it into X, or write fresh ideas.")).toBeInTheDocument();
   const constraintSignal = Array.from(handoff.querySelectorAll(".command-center-signal")).find((signal) =>
-    signal.textContent?.includes("Constraint")
+    signal.textContent?.includes("What to fix")
   );
   expect(constraintSignal).not.toBeUndefined();
-  expect(within(constraintSignal as HTMLElement).getByText("Production")).toBeInTheDocument();
-  expect(within(constraintSignal as HTMLElement).getByText(/Pick one draft, mark the slot used/i)).toBeInTheDocument();
+  expect(within(constraintSignal as HTMLElement).getByText("Ready to post")).toBeInTheDocument();
+  expect(within(constraintSignal as HTMLElement).getByText(/Pick a draft, post it on X/i)).toBeInTheDocument();
   const breakdown = within(commandCenter).getByLabelText("Score breakdown");
   expect(breakdown.tagName).toBe("SECTION");
-  expect(within(breakdown).getByText("4 operating signals")).toBeInTheDocument();
+  expect(within(breakdown).getByText("4 things we measure")).toBeInTheDocument();
 
-  fireEvent.click(within(breakdown).getByRole("button", { name: /Copy scorecard brief/i }));
+  fireEvent.click(within(breakdown).getByRole("button", { name: /Copy my summary/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalled());
   expect(writeText.mock.calls[0]?.[0]).toContain("Creator scorecard:");
-  expect(writeText.mock.calls[0]?.[0]).toContain("Primary constraint: Production");
+  expect(writeText.mock.calls[0]?.[0]).toContain("What to fix first: Ready to post");
 });
 
 test("marks the workflow rail with completed and current steps", async () => {
@@ -1092,10 +1093,11 @@ test("marks the workflow rail with completed and current steps", async () => {
 
   await screen.findByRole("heading", { name: "Create the next post" });
 
-  expect(screen.getByText("Scan").closest(".step-row")).toHaveAttribute("data-state", "complete");
-  expect(screen.getByText("Rank").closest(".step-row")).toHaveAttribute("data-state", "complete");
-  expect(screen.getByText("Diagnose").closest(".step-row")).toHaveAttribute("data-state", "complete");
-  expect(screen.getByText("Write").closest(".step-row")).toHaveAttribute("aria-current", "step");
+  const stepRail = screen.getByRole("list", { name: "Audit sequence" });
+  expect(within(stepRail).getByText("See your posts").closest(".step-row")).toHaveAttribute("data-state", "complete");
+  expect(within(stepRail).getByText("Find what worked").closest(".step-row")).toHaveAttribute("data-state", "complete");
+  expect(within(stepRail).getByText("Understand why").closest(".step-row")).toHaveAttribute("data-state", "complete");
+  expect(within(stepRail).getByText("Write your next post").closest(".step-row")).toHaveAttribute("aria-current", "step");
 });
 
 test("does not block the ready shell on deferred panel hydration", async () => {
@@ -1120,9 +1122,9 @@ test("does not block the ready shell on deferred panel hydration", async () => {
 
   render(<App />);
 
-  expect(await screen.findByRole("heading", { name: "Strategy brief" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Your strategy" })).toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/dashboard"));
-  expect(screen.getByText("1 post ready")).toBeInTheDocument();
+  expect(screen.getByText("1 post loaded")).toBeInTheDocument();
   expect(screen.queryByText("Loading")).not.toBeInTheDocument();
 });
 
@@ -1142,17 +1144,17 @@ test("keeps advanced strategy tools behind a closed strategy engine disclosure",
 
   render(<App />);
 
-  const strategyEngine = await screen.findByLabelText("Advanced strategy tools");
+  const strategyEngine = await screen.findByLabelText("Go deeper");
   expect(strategyEngine.tagName).toBe("DETAILS");
   expect(strategyEngine).not.toHaveAttribute("open");
-  expect(within(strategyEngine).getByText("Strategy engine")).toBeInTheDocument();
-  expect(within(strategyEngine).getByText(/Optional hypotheses, memory, and topic tools/i)).toBeInTheDocument();
+  expect(within(strategyEngine).getByText("Advanced tools")).toBeInTheDocument();
+  expect(within(strategyEngine).getByText(/Once you're comfortable with the basics/i)).toBeInTheDocument();
 
-  fireEvent.click(within(strategyEngine).getByText("Strategy engine"));
+  fireEvent.click(within(strategyEngine).getByText("Advanced tools"));
 
   expect(await within(strategyEngine).findByRole("tablist", { name: "Strategy engine views" })).toBeInTheDocument();
-  const hypothesesTab = within(strategyEngine).getByRole("tab", { name: /Hypotheses/i });
-  expect(hypothesesTab).toHaveAttribute("aria-selected", "true");
+  const experimentsTab = within(strategyEngine).getByRole("tab", { name: /Experiments/i });
+  expect(experimentsTab).toHaveAttribute("aria-selected", "true");
   expect(within(strategyEngine).getByRole("heading", { name: "Hypothesis tracker" })).toBeInTheDocument();
   expect(within(strategyEngine).queryByRole("button", { name: /Update strategy memory/i })).not.toBeInTheDocument();
 
@@ -1183,9 +1185,9 @@ test("opens advanced strategy tools when a memory proposal needs review", async 
 
   render(<App />);
 
-  const strategyEngine = await screen.findByLabelText("Advanced strategy tools");
+  const strategyEngine = await screen.findByLabelText("Go deeper");
   await waitFor(() => expect(strategyEngine).toHaveAttribute("open"));
-  await waitFor(() => expect(within(strategyEngine).getByText("Memory proposal waiting")).toBeInTheDocument());
+  await waitFor(() => expect(within(strategyEngine).getByText("Memory suggestion ready")).toBeInTheDocument());
 });
 
 test("lets the ranked review send a selected post into Post Lab", async () => {

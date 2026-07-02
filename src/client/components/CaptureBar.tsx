@@ -33,21 +33,21 @@ export function CaptureBar(props: {
   const postingWindow = formatPostingWindow();
   const draftCount = props.generation?.posts.length ?? 0;
   const draftLabel = draftCount === 1 ? "draft" : "drafts";
-  const phase = props.generation ? "Choose" : props.hasAnalysis ? "Draft" : props.snapshot ? "Audit" : "Scan";
+  const phase = props.generation ? "Choose" : props.hasAnalysis ? "Draft" : props.snapshot ? "Analyze" : "Scan";
   const headline = props.generation
-    ? "Choose the sharpest draft"
+    ? "Pick your favorite draft"
     : props.hasAnalysis
-      ? "Draft from the latest read"
+      ? "Write your next post"
       : props.snapshot
-        ? "Run the strategy read"
-        : "Start with a fresh scan";
+        ? "Find what's working"
+        : "Let's look at your posts";
   const guidance = props.generation
-    ? "Drafts are staged. Pick the angle that feels true, then copy it into X."
+    ? "Your drafts are ready. Pick the one that feels most like you, then copy it into X."
     : props.hasAnalysis
-      ? "The audit is ready. Generate a draft set while the pattern is still specific."
+      ? "Your audit is ready. Let's turn what's working into a few draft posts."
       : props.snapshot
-        ? "Metrics are captured. Turn the visible signal into a ranked read before writing."
-        : "Pull public X metrics into this local workspace before judging what to post.";
+        ? "Your posts are loaded. Next we'll find the patterns behind your best ones."
+        : "Pull your public X posts into here so we can see how they're doing.";
 
   function handleReviewDraftQueue() {
     const target = document.getElementById("next-posts-title") ?? document.querySelector(".next-posts");
@@ -59,7 +59,7 @@ export function CaptureBar(props: {
   const generatedActions = (
     <>
       <button className="primary-button" type="button" disabled={isBusy} onClick={handleReviewDraftQueue}>
-        <ListChecks size={16} aria-hidden="true" /> Review draft queue
+        <ListChecks size={16} aria-hidden="true" /> See my drafts
       </button>
       <button
         className="secondary-button"
@@ -68,12 +68,12 @@ export function CaptureBar(props: {
         onClick={props.onGenerateToday}
         aria-busy={props.generating || undefined}
       >
-        <Sparkles size={16} aria-hidden="true" /> {props.generating ? "Generating" : "Generate fresh ideas"}
+        <Sparkles size={16} aria-hidden="true" /> {props.generating ? "Writing…" : "Write new ideas"}
       </button>
-      <details className="capture-maintenance" aria-label="Update source actions">
+      <details className="capture-maintenance" aria-label="More options">
         <summary>
-          <span>Update source</span>
-          <small>Audit, scan, import</small>
+          <span>More options</span>
+          <small>Audit, scan, paste</small>
         </summary>
         <div className="capture-maintenance-actions">
           <button
@@ -83,7 +83,7 @@ export function CaptureBar(props: {
             onClick={props.onAnalyze}
             aria-busy={props.analyzing || undefined}
           >
-            <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Re-run audit"}
+            <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing…" : "Run audit again"}
           </button>
           <button
             className="secondary-button"
@@ -92,7 +92,7 @@ export function CaptureBar(props: {
             disabled={isBusy}
             aria-busy={props.capturing || undefined}
           >
-            <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning X" : "Rescan public metrics"}
+            <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning…" : "Scan again"}
           </button>
           <button className="secondary-button" type="button" onClick={props.onOpenImport} disabled={isBusy}>
             <Upload size={16} aria-hidden="true" /> Paste snapshot
@@ -107,9 +107,9 @@ export function CaptureBar(props: {
       <section className="capture-bar capture-bar-compact" aria-label="Capture status">
         <div className="capture-summary">
           <p className="eyebrow">Next move</p>
-          <h2>Draft actions</h2>
+          <h2>Your drafts are ready</h2>
           <p>
-            {draftCount} {draftLabel} staged from the latest audit.
+            {draftCount} {draftLabel} ready from your latest audit.
           </p>
           {props.status && <p className="inline-status">{props.status}</p>}
           {props.error && (
@@ -135,7 +135,7 @@ export function CaptureBar(props: {
           <span>
             {postCount} {postLabel}
           </span>
-          <span>{coverage}% coverage</span>
+          <span>{coverage}% of metrics captured</span>
           {props.hasAnalysis && <span>Post window {postingWindow}</span>}
         </div>
         {props.status && <p className="inline-status">{props.status}</p>}
@@ -155,7 +155,7 @@ export function CaptureBar(props: {
               disabled={isBusy}
               aria-busy={props.capturing || undefined}
             >
-              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning X" : "Scan public metrics"}
+              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning…" : "Scan my posts"}
             </button>
             <button
               className="secondary-button"
@@ -175,7 +175,7 @@ export function CaptureBar(props: {
               onClick={props.onGenerateToday}
               aria-busy={props.generating || undefined}
             >
-              <Sparkles size={16} aria-hidden="true" /> {props.generating ? "Generating" : "Generate today's ideas"}
+              <Sparkles size={16} aria-hidden="true" /> {props.generating ? "Writing…" : "Write draft ideas"}
             </button>
             <button
               className="secondary-button"
@@ -184,7 +184,7 @@ export function CaptureBar(props: {
               onClick={props.onAnalyze}
               aria-busy={props.analyzing || undefined}
             >
-              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Re-run audit"}
+              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing…" : "Run audit again"}
             </button>
             <button
               className="secondary-button"
@@ -193,7 +193,7 @@ export function CaptureBar(props: {
               disabled={isBusy}
               aria-busy={props.capturing || undefined}
             >
-              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning X" : "Rescan public metrics"}
+              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning…" : "Scan again"}
             </button>
             <button className="secondary-button" type="button" onClick={props.onOpenImport} disabled={isBusy}>
               <Upload size={16} aria-hidden="true" /> Paste snapshot
@@ -208,7 +208,7 @@ export function CaptureBar(props: {
               onClick={props.onAnalyze}
               aria-busy={props.analyzing || undefined}
             >
-              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Auditing" : "Run strategy audit"}
+              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? "Analyzing…" : "Find what's working"}
             </button>
             <button
               className="secondary-button"
@@ -217,7 +217,7 @@ export function CaptureBar(props: {
               disabled={isBusy}
               aria-busy={props.capturing || undefined}
             >
-              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning X" : "Rescan public metrics"}
+              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? "Scanning…" : "Scan again"}
             </button>
             <button className="secondary-button" type="button" onClick={props.onOpenImport} disabled={isBusy}>
               <Upload size={16} aria-hidden="true" /> Paste snapshot
