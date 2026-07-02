@@ -38,7 +38,7 @@ describe("XMcpCaptureRunner", () => {
               public_metrics: {
                 impression_count: 1400,
                 like_count: 22,
-                retweet_count: 5,
+                repost_count: 5,
                 reply_count: 3,
                 bookmark_count: 1
               }

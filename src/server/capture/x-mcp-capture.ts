@@ -40,6 +40,7 @@ interface XPost {
   public_metrics?: {
     impression_count?: unknown;
     like_count?: unknown;
+    repost_count?: unknown;
     retweet_count?: unknown;
     reply_count?: unknown;
     bookmark_count?: unknown;
@@ -184,7 +185,7 @@ export class XMcpCaptureRunner implements CaptureRunner {
             source: "x_mcp",
             viewsCount: asNumber(post.public_metrics?.impression_count),
             likesCount: asNumber(post.public_metrics?.like_count),
-            repostsCount: asNumber(post.public_metrics?.retweet_count),
+            repostsCount: asNumber(post.public_metrics?.repost_count ?? post.public_metrics?.retweet_count),
             repliesCount: asNumber(post.public_metrics?.reply_count),
             bookmarksCount: asNumber(post.public_metrics?.bookmark_count)
           };
