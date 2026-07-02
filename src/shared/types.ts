@@ -1,4 +1,4 @@
-export type CaptureSource = "browser" | "manual";
+export type CaptureSource = "browser" | "manual" | "x_mcp";
 
 export interface VisibleMetrics {
   viewsCount: number | null;

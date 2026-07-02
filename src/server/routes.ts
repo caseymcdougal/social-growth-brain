@@ -5,6 +5,8 @@ import { CodexCliRunner } from "./ai/codex-cli-runner";
 import type { AiRunner } from "./ai/ai-runner";
 import { BrowserHarnessXCaptureRunner } from "./capture/browser-harness-x";
 import { CaptureError, type CaptureRunner } from "./capture/capture-runner";
+import { FallbackCaptureRunner } from "./capture/fallback-capture-runner";
+import { createXMcpCaptureRunnerFromEnv } from "./capture/x-mcp-capture";
 import { openDatabase } from "./db";
 import { CodexGenerationRunner } from "./generation/codex-generation-runner";
 import type { GenerationRunner } from "./generation/generation-runner";
@@ -25,7 +27,7 @@ export function createServerApp(options: {
 
   const db = openDatabase(join(options.dataDir, "social-audit.sqlite"));
   const repos = createRepositories(db);
-  const captureRunner = options.captureRunner ?? new BrowserHarnessXCaptureRunner();
+  const captureRunner = options.captureRunner ?? createDefaultCaptureRunner();
   const aiRunner = options.aiRunner ?? new CodexCliRunner();
   const generationRunner = options.generationRunner ?? new CodexGenerationRunner();
   const strategyRunner = options.strategyRunner ?? new CodexStrategyIntelligenceRunner();
@@ -188,6 +190,7 @@ export function createServerApp(options: {
       const generation = await generationRunner.generateToday({
         snapshot,
         analysis: latestAnalysis.analysis,
+        strategyMemory: repos.getLatestStrategyMemory()?.memory ?? null,
         direction: repos.getCreativeDirection()?.text ?? null,
         jobDir
       });
@@ -337,4 +340,10 @@ export function createServerApp(options: {
   });
 
   return app;
+}
+
+function createDefaultCaptureRunner(): CaptureRunner {
+  const browserRunner = new BrowserHarnessXCaptureRunner();
+  const mcpRunner = createXMcpCaptureRunnerFromEnv();
+  return mcpRunner ? new FallbackCaptureRunner(mcpRunner, browserRunner) : browserRunner;
 }

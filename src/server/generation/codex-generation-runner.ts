@@ -2,7 +2,9 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
+import { buildGenerationStrategyBrief } from "../../shared/generation-context";
 import { generationOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
+import type { StrategyMemory } from "../../shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 import type { GenerationRunner } from "./generation-runner";
 
@@ -52,7 +54,13 @@ export function buildCodexGenerationArgs(paths: { jobDir: string; schemaPath: st
 
 export function writeGenerationJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; mode: "today"; direction?: string | null }
+  input: {
+    snapshot: CapturedAccountSnapshot;
+    analysis: AnalysisOutput;
+    mode: "today";
+    strategyMemory?: StrategyMemory | null;
+    direction?: string | null;
+  }
 ) {
   mkdirSync(jobDir, { recursive: true });
   const inputPath = join(jobDir, "input.json");
@@ -60,7 +68,19 @@ export function writeGenerationJobFiles(
   const schemaPath = join(jobDir, "schema.json");
   const outputPath = join(jobDir, "output.json");
   const direction = typeof input.direction === "string" ? input.direction.trim() : "";
-  const inputJson = JSON.stringify(input, null, 2);
+  const generationBrief = buildGenerationStrategyBrief({
+    snapshot: input.snapshot,
+    analysis: input.analysis,
+    strategyMemory: input.strategyMemory ?? null,
+    direction
+  });
+  const modelInput = {
+    snapshot: input.snapshot,
+    analysis: input.analysis,
+    generationBrief,
+    mode: input.mode
+  };
+  const inputJson = JSON.stringify(modelInput, null, 2);
 
   writeFileSync(inputPath, inputJson);
   writeFileSync(
@@ -69,11 +89,17 @@ export function writeGenerationJobFiles(
       "You are Casey McDougal's direct X/Twitter post strategist.",
       "Generate today's ideas as copy-ready X posts based on the latest public-metric audit.",
       "Use the provided strategy audit, top patterns, weak spots, and captured posts as evidence.",
+      "Use the Generation strategy brief as the operating frame before looking at raw posts.",
+      "Do not average Casey's voice into generic AI commentary. Preserve the strongest lanes, voice rules, and current direction.",
+      "Every draft must make a concrete claim, name a specific workflow/product tension, or create a useful enemy. No abstract motivation.",
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
       "Each draft should have a specific angle, a strong hook, and a clear reason tied to the audit.",
       ...(direction ? [`Casey's current creative direction (follow it): ${direction}`] : []),
       "Return JSON only. Do not include markdown.",
+      "",
+      "Generation strategy brief:",
+      JSON.stringify(generationBrief, null, 2),
       "",
       "Input JSON:",
       inputJson
@@ -88,6 +114,7 @@ export class CodexGenerationRunner implements GenerationRunner {
   async generateToday(input: {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
+    strategyMemory?: StrategyMemory | null;
     direction?: string | null;
     jobDir: string;
   }): Promise<GenerationOutput> {
@@ -95,6 +122,7 @@ export class CodexGenerationRunner implements GenerationRunner {
       snapshot: input.snapshot,
       analysis: input.analysis,
       mode: "today",
+      strategyMemory: input.strategyMemory ?? null,
       direction: input.direction ?? null
     });
     const args = buildCodexGenerationArgs({

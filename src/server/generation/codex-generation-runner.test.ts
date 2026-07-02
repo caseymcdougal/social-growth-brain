@@ -3,9 +3,51 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeGenerationJobFiles } from "./codex-generation-runner";
+import type { AnalysisOutput } from "../../shared/analysis-schema";
+import type { CapturedAccountSnapshot } from "../../shared/types";
 
-const snapshot = { profile: { handle: "x" }, posts: [] } as unknown;
-const analysis = { strategy_report: {}, post_analyses: [] } as unknown;
+const snapshot: CapturedAccountSnapshot = {
+  profile: {
+    handle: "x",
+    displayName: "X",
+    bio: "",
+    profileUrl: "https://x.com/x",
+    followersCount: null,
+    followingCount: null,
+    capturedAt: "2026-06-30T17:00:00.000Z",
+    source: "manual"
+  },
+  posts: []
+};
+const analysis: AnalysisOutput = {
+  executive_summary: "Minimal summary",
+  account_positioning_read: "Minimal positioning",
+  top_patterns: ["Specific posts work"],
+  what_is_working: ["Concrete claims"],
+  what_is_holding_back: ["Generic language"],
+  recommended_content_pillars: ["AI tools"],
+  next_post_ideas: [
+    {
+      title: "Next post",
+      reason: "Matches the account",
+      hook: "The hook",
+      draft: "The draft"
+    }
+  ],
+  post_analyses: [
+    {
+      post_id: "1",
+      performance_read: "No posts provided",
+      likely_reason: "Fixture only",
+      hook_diagnosis: "Fixture only",
+      clarity_diagnosis: "Fixture only",
+      audience_fit: "Fixture only",
+      recommended_change: "Fixture only",
+      rewrite: "Fixture only",
+      variant_hooks: ["Fixture hook"]
+    }
+  ]
+};
 
 describe("generation prompt direction", () => {
   it("adds direction block to prompt and input when set", () => {

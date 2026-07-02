@@ -9,7 +9,7 @@ import {
   type StrategyMemoryProposalOutput,
   type TopicExplorationOutput
 } from "../shared/strategy-intelligence-schema";
-import type { CapturedAccountSnapshot } from "../shared/types";
+import type { CapturedAccountSnapshot, CaptureSource } from "../shared/types";
 
 interface StoredProfile {
   id: number;
@@ -20,7 +20,7 @@ interface StoredProfile {
   followers_count: number | null;
   following_count: number | null;
   captured_at: string;
-  source: "browser" | "manual";
+  source: CaptureSource;
 }
 
 interface StoredPost {
@@ -36,7 +36,7 @@ interface StoredPost {
   replies_count: number | null;
   bookmarks_count: number | null;
   captured_at: string;
-  source: "browser" | "manual";
+  source: CaptureSource;
 }
 
 interface StoredAnalysisRun {
