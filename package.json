@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:web": "vite --host 127.0.0.1",
+    "dev:web": "vite",
     "dev:api": "tsx watch src/server/index.ts",
     "start:api": "tsx src/server/index.ts",
-    "preview:web": "vite preview --host 127.0.0.1 --port 5175",
+    "preview:web": "vite preview --port 5175",
     "local:open": "./scripts/open-dashboard.command",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
