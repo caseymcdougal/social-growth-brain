@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runLlmJob } from "../ai/llm-job";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
 import { buildGenerationStrategyBrief } from "../../shared/generation-context";
 import { generationOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
@@ -125,35 +125,6 @@ export class CodexGenerationRunner implements GenerationRunner {
       strategyMemory: input.strategyMemory ?? null,
       direction: input.direction ?? null
     });
-    const args = buildCodexGenerationArgs({
-      jobDir: input.jobDir,
-      schemaPath: files.schemaPath,
-      outputPath: files.outputPath
-    });
-    const prompt = readFileSync(files.promptPath, "utf8");
-
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("codex", args, {
-        env: process.env,
-        stdio: ["pipe", "ignore", "pipe"]
-      });
-      let stderr = "";
-
-      child.stderr.on("data", (chunk) => {
-        stderr += String(chunk);
-      });
-      child.on("error", reject);
-      child.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(`codex exec failed with code ${code}: ${stderr.slice(0, 1000)}`));
-      });
-      child.stdin.end(prompt);
-    });
-
-    const output: unknown = JSON.parse(readFileSync(files.outputPath, "utf8"));
-    return generationOutputSchema.parse(output);
+    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => generationOutputSchema.parse(raw));
   }
 }

@@ -1,9 +1,9 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { analysisOutputSchema, type AnalysisOutput } from "../../shared/analysis-schema";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 import type { AiRunner } from "./ai-runner";
+import { runLlmJob } from "./llm-job";
 
 const requiredTextSchema = { type: "string", minLength: 1 };
 
@@ -126,31 +126,6 @@ export function writeCodexJobFiles(jobDir: string, snapshot: unknown) {
 export class CodexCliRunner implements AiRunner {
   async analyze(snapshot: CapturedAccountSnapshot, jobDir: string): Promise<AnalysisOutput> {
     const files = writeCodexJobFiles(jobDir, snapshot);
-    const args = buildCodexExecArgs({ jobDir, schemaPath: files.schemaPath, outputPath: files.outputPath });
-    const prompt = readFileSync(files.promptPath, "utf8");
-
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("codex", args, {
-        env: process.env,
-        stdio: ["pipe", "ignore", "pipe"]
-      });
-      let stderr = "";
-
-      child.stderr.on("data", (chunk) => {
-        stderr += String(chunk);
-      });
-      child.on("error", reject);
-      child.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(`codex exec failed with code ${code}: ${stderr.slice(0, 1000)}`));
-      });
-      child.stdin.end(prompt);
-    });
-
-    const output: unknown = JSON.parse(readFileSync(files.outputPath, "utf8"));
-    return analysisOutputSchema.parse(output);
+    return runLlmJob({ jobDir, ...files }, (raw) => analysisOutputSchema.parse(raw));
   }
 }
