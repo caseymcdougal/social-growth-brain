@@ -3570,6 +3570,67 @@ a:focus-visible {
   font-size: 13px;
 }
 
+.direction-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.direction-entry {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--tint-1);
+  padding: 10px var(--pad-cell);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.direction-entry > div {
+  min-width: 0;
+}
+
+.direction-entry p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.direction-entry small {
+  display: block;
+  margin-top: 3px;
+  color: var(--faint);
+}
+
+.direction-delete {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--faint);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.direction-delete:hover:not(:disabled) {
+  border-color: rgba(255, 107, 107, 0.45);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.direction-delete:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
 /* Quiet accent: the bright lime fill is reserved for the one primary CTA.
    This is its lighter echo, so save reads as actionable without competing. */
 .direction-save:not(:disabled) {

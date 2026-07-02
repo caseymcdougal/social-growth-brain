@@ -1,6 +1,6 @@
-import { Check, Compass } from "lucide-react";
+import { Compass, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { CreativeDirection } from "../api";
+import type { CreativeDirectionEntry } from "../api";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -13,30 +13,36 @@ function relativeTime(iso: string): string {
 }
 
 export function CreativeDirectionCard({
-  initial,
-  onSave
+  directions,
+  onAdd,
+  onDelete
 }: {
-  initial: CreativeDirection;
-  onSave: (text: string) => Promise<CreativeDirection>;
+  directions: CreativeDirectionEntry[];
+  onAdd: (text: string) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
 }) {
-  const [text, setText] = useState(initial?.text ?? "");
-  const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
+  const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [savedText, setSavedText] = useState(initial?.text ?? "");
-  const isDirty = text.trim() !== savedText.trim();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const canAdd = text.trim().length > 0;
 
-  async function handleSave() {
+  async function handleAdd() {
+    if (!canAdd) return;
     setSaving(true);
     try {
-      const result = await onSave(text);
-      setUpdatedAt(result?.updatedAt ?? null);
-      setText(result?.text ?? "");
-      setSavedText(result?.text ?? "");
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1400);
+      await onAdd(text);
+      setText("");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    setDeletingId(id);
+    try {
+      await onDelete(id);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -47,28 +53,53 @@ export function CreativeDirectionCard({
           <Compass size={13} aria-hidden="true" /> Creative direction
         </p>
         <h2>Steer what gets generated</h2>
-        <p>Plain-language guidance fed into every idea, topic, and memory run.</p>
+        <p>Plain-language guidance fed into every idea, topic, and memory run. All saved directions apply.</p>
       </div>
       <textarea
         className="direction-input"
         value={text}
         onChange={(event) => setText(event.currentTarget.value)}
         placeholder="e.g. Move away from crypto takes. Lean into build-in-public and tooling."
-        rows={3}
-        aria-label="Creative direction text"
+        rows={2}
+        aria-label="New creative direction"
       />
       <div className="direction-foot">
-        <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt)}` : "Not set"}</span>
+        <span aria-live="polite">
+          {directions.length === 0
+            ? "Not set"
+            : `${directions.length} ${directions.length === 1 ? "direction" : "directions"} active`}
+        </span>
         <button
-          className={saved ? "secondary-button direction-save is-saved" : "secondary-button direction-save"}
+          className="secondary-button direction-save"
           type="button"
-          onClick={() => void handleSave()}
-          disabled={saving || !isDirty}
+          onClick={() => void handleAdd()}
+          disabled={saving || !canAdd}
           aria-busy={saving || undefined}
         >
-          <Check size={16} aria-hidden="true" /> {saving ? "Saving" : saved ? "Saved" : "Save direction"}
+          <Plus size={16} aria-hidden="true" /> {saving ? "Adding" : "Add direction"}
         </button>
       </div>
+      {directions.length > 0 && (
+        <ul className="direction-list" aria-label="Saved directions">
+          {directions.map((entry) => (
+            <li className="direction-entry" key={entry.id}>
+              <div>
+                <p>{entry.text}</p>
+                <small>Added {relativeTime(entry.updatedAt)}</small>
+              </div>
+              <button
+                className="direction-delete"
+                type="button"
+                onClick={() => void handleDelete(entry.id)}
+                disabled={deletingId === entry.id}
+                aria-label={`Delete direction: ${entry.text.slice(0, 40)}`}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

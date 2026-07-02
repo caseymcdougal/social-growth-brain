@@ -15,7 +15,8 @@ import {
   isBootstrappedDashboardStateFromStorage,
   refreshStrategyMemory,
   saveCreativeDirection,
-  type CreativeDirection,
+  deleteCreativeDirection,
+  type CreativeDirectionEntry,
   type DashboardState,
   type StrategyMemoryProposal
 } from "./client/api";
@@ -468,7 +469,7 @@ export function App() {
   const [exploringTopics, setExploringTopics] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-  const [direction, setDirection] = useState<CreativeDirection>(() => bootstrappedDashboard?.direction ?? null);
+  const [directions, setDirections] = useState<CreativeDirectionEntry[]>(() => bootstrappedDashboard?.directions ?? []);
   const [strategyEngineView, setStrategyEngineView] = useState<StrategyEngineView>("experiments");
   const [deferredPanelsReady, setDeferredPanelsReady] = useState(false);
   const [initialDashboardState] = useState<Promise<DashboardState>>(() =>
@@ -678,7 +679,7 @@ export function App() {
       setStrategyMemory(dashboard.strategyMemory.memory);
       setMemoryProposal(dashboard.strategyMemory.proposal);
       setTopicExploration(dashboard.topicExploration);
-      setDirection(dashboard.direction);
+      setDirections(dashboard.directions);
       if (!dashboard.snapshot?.posts.some((post) => post.xPostId === selectedPostId)) {
         setSelectedPostId(null);
       }
@@ -976,11 +977,12 @@ export function App() {
         />
 
         <CreativeDirectionCard
-          initial={direction}
-          onSave={async (text) => {
-            const saved = await saveCreativeDirection(text);
-            setDirection(saved);
-            return saved;
+          directions={directions}
+          onAdd={async (text) => {
+            setDirections(await saveCreativeDirection(text));
+          }}
+          onDelete={async (id) => {
+            setDirections(await deleteCreativeDirection(id));
           }}
         />
 

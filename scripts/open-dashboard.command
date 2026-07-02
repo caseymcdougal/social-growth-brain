@@ -5,14 +5,16 @@ REPO_DIR="/Users/caseymcdougal/dev/personal/social-audit-dashboard"
 API_PORT="4174"
 WEB_PORT="5175"
 DASHBOARD_URL="http://127.0.0.1:${WEB_PORT}/"
-LOG_DIR="${TMPDIR:-/tmp}/social-audit-dashboard"
-LAUNCHD_DIR="$LOG_DIR/launchd"
+LOG_DIR="${HOME}/Library/Logs/social-audit-dashboard"
+# Plists live in ~/Library/LaunchAgents so launchd reloads them at every login (survives reboots).
+LAUNCHD_DIR="${HOME}/Library/LaunchAgents"
 USER_ID="$(id -u)"
 API_LABEL="com.casey.social-audit-dashboard.api"
 WEB_LABEL="com.casey.social-audit-dashboard.web"
 API_PLIST="$LAUNCHD_DIR/${API_LABEL}.plist"
 WEB_PLIST="$LAUNCHD_DIR/${WEB_LABEL}.plist"
-DASHBOARD_PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin"
+NODE_BIN="$(ls -d ${HOME}/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1)"
+DASHBOARD_PATH="${NODE_BIN:+${NODE_BIN}:}/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin"
 
 export PATH="$DASHBOARD_PATH"
 BROWSER_HARNESS_BIN="$(command -v browser-harness || true)"
@@ -69,6 +71,8 @@ write_launchd_plists() {
   </array>
   <key>RunAtLoad</key>
   <true/>
+  <key>KeepAlive</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/api.log</string>
   <key>StandardErrorPath</key>
@@ -100,6 +104,8 @@ PLIST
     <string>preview:web</string>
   </array>
   <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
   <string>${LOG_DIR}/web.log</string>

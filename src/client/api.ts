@@ -22,10 +22,10 @@ export type DashboardState = {
     proposal: StrategyMemoryProposal | null;
   };
   topicExploration: TopicExplorationOutput | null;
-  direction: { text: string; updatedAt: string } | null;
+  directions: CreativeDirectionEntry[];
 };
 
-export type CreativeDirection = { text: string; updatedAt: string } | null;
+export type CreativeDirectionEntry = { id: number; text: string; updatedAt: string };
 
 declare global {
   interface Window {
@@ -58,7 +58,7 @@ function normalizeDashboardState(data: any): DashboardState {
       proposal: data.strategyMemory?.proposal ?? null
     },
     topicExploration: data.topicExploration ?? null,
-    direction: data.direction ?? null
+    directions: Array.isArray(data.directions) ? data.directions : []
   };
   if (typeof window !== "undefined") storeDashboardState(dashboardState);
   return dashboardState;
@@ -230,7 +230,7 @@ export async function exploreNearbyTopics(): Promise<TopicExplorationOutput> {
   return data.exploration;
 }
 
-export async function saveCreativeDirection(text: string): Promise<CreativeDirection> {
+export async function saveCreativeDirection(text: string): Promise<CreativeDirectionEntry[]> {
   const response = await fetch("/api/direction", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -240,5 +240,14 @@ export async function saveCreativeDirection(text: string): Promise<CreativeDirec
   if (!response.ok) {
     throw new Error(data?.errorMessage ?? "Failed to save creative direction");
   }
-  return data.direction ?? null;
+  return Array.isArray(data?.directions) ? data.directions : [];
+}
+
+export async function deleteCreativeDirection(id: number): Promise<CreativeDirectionEntry[]> {
+  const response = await fetch(`/api/direction/${id}`, { method: "DELETE" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to delete creative direction");
+  }
+  return Array.isArray(data?.directions) ? data.directions : [];
 }

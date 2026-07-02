@@ -9,29 +9,40 @@ function freshRepos() {
 }
 
 describe("creative direction", () => {
-  it("returns null when unset", () => {
-    expect(freshRepos().getCreativeDirection()).toBeNull();
-  });
-
-  it("stores and returns latest text", () => {
+  it("returns null and empty list when unset", () => {
     const repos = freshRepos();
-    repos.setCreativeDirection("Lean into build-in-public");
-    const stored = repos.getCreativeDirection();
-    expect(stored?.text).toBe("Lean into build-in-public");
-    expect(typeof stored?.updatedAt).toBe("string");
-  });
-
-  it("latest write wins", () => {
-    const repos = freshRepos();
-    repos.setCreativeDirection("first");
-    repos.setCreativeDirection("second");
-    expect(repos.getCreativeDirection()?.text).toBe("second");
-  });
-
-  it("empty text clears the direction", () => {
-    const repos = freshRepos();
-    repos.setCreativeDirection("something");
-    repos.setCreativeDirection("   ");
     expect(repos.getCreativeDirection()).toBeNull();
+    expect(repos.listCreativeDirections()).toEqual([]);
+  });
+
+  it("adds entries and lists newest first", () => {
+    const repos = freshRepos();
+    repos.addCreativeDirection("first");
+    repos.addCreativeDirection("second");
+    const entries = repos.listCreativeDirections();
+    expect(entries.map((entry) => entry.text)).toEqual(["second", "first"]);
+    expect(typeof entries[0].updatedAt).toBe("string");
+  });
+
+  it("ignores blank text", () => {
+    const repos = freshRepos();
+    expect(repos.addCreativeDirection("   ")).toBeNull();
+    expect(repos.listCreativeDirections()).toEqual([]);
+  });
+
+  it("joins all entries for generation, oldest first", () => {
+    const repos = freshRepos();
+    repos.addCreativeDirection("first");
+    repos.addCreativeDirection("second");
+    expect(repos.getCreativeDirection()?.text).toBe("first\nsecond");
+  });
+
+  it("deletes an entry by id", () => {
+    const repos = freshRepos();
+    const kept = repos.addCreativeDirection("keep");
+    const removed = repos.addCreativeDirection("remove");
+    repos.deleteCreativeDirection(removed!.id);
+    expect(repos.listCreativeDirections().map((entry) => entry.id)).toEqual([kept!.id]);
+    expect(repos.getCreativeDirection()?.text).toBe("keep");
   });
 });

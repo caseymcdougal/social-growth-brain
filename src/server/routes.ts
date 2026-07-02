@@ -63,17 +63,28 @@ export function createServerApp(options: {
       generation: generation ? { posts: generation.posts.slice(0, 1) } : null,
       strategyMemory: { memory: null, proposal: null },
       topicExploration: null,
-      direction: repos.getCreativeDirection()
+      directions: repos.listCreativeDirections()
     });
   });
 
   app.get("/api/direction", (_request, response) => {
-    response.json({ ok: true, direction: repos.getCreativeDirection() });
+    response.json({ ok: true, directions: repos.listCreativeDirections() });
   });
 
   app.post("/api/direction", (request, response) => {
     const text = typeof request.body?.text === "string" ? request.body.text : "";
-    response.json({ ok: true, direction: repos.setCreativeDirection(text) });
+    repos.addCreativeDirection(text);
+    response.json({ ok: true, directions: repos.listCreativeDirections() });
+  });
+
+  app.delete("/api/direction/:id", (request, response) => {
+    const id = Number(request.params.id);
+    if (!Number.isInteger(id)) {
+      response.status(400).json({ ok: false, errorMessage: "Invalid direction id" });
+      return;
+    }
+    repos.deleteCreativeDirection(id);
+    response.json({ ok: true, directions: repos.listCreativeDirections() });
   });
 
   app.get("/api/analysis/latest", (_request, response) => {

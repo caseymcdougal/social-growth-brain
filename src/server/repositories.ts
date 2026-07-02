@@ -496,21 +496,36 @@ export function createRepositories(db: AppDatabase) {
       return topicExplorationOutputSchema.parse(JSON.parse(row.output_json));
     },
 
-    getCreativeDirection(): { text: string; updatedAt: string } | null {
-      const row = db
-        .prepare("SELECT text, updated_at as updatedAt FROM creative_direction ORDER BY id DESC LIMIT 1")
-        .get() as { text: string; updatedAt: string } | undefined;
-      return row ?? null;
+    listCreativeDirections(): Array<{ id: number; text: string; updatedAt: string }> {
+      return db
+        .prepare("SELECT id, text, updated_at as updatedAt FROM creative_direction ORDER BY id DESC")
+        .all() as Array<{ id: number; text: string; updatedAt: string }>;
     },
 
-    setCreativeDirection(text: string): { text: string; updatedAt: string } | null {
-      // ponytail: single-row table, latest-wins via delete-then-insert; fine for one local user.
+    addCreativeDirection(text: string): { id: number; text: string; updatedAt: string } | null {
       const trimmed = text.trim();
-      db.prepare("DELETE FROM creative_direction").run();
       if (!trimmed) return null;
       const updatedAt = new Date().toISOString();
-      db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES (?, ?)").run(trimmed, updatedAt);
-      return { text: trimmed, updatedAt };
+      const result = db
+        .prepare("INSERT INTO creative_direction (text, updated_at) VALUES (?, ?)")
+        .run(trimmed, updatedAt);
+      return { id: Number(result.lastInsertRowid), text: trimmed, updatedAt };
+    },
+
+    deleteCreativeDirection(id: number): void {
+      db.prepare("DELETE FROM creative_direction WHERE id = ?").run(id);
+    },
+
+    getCreativeDirection(): { text: string; updatedAt: string } | null {
+      // Generation consumes every saved direction as one newline-joined brief.
+      const rows = db
+        .prepare("SELECT text, updated_at as updatedAt FROM creative_direction ORDER BY id ASC")
+        .all() as Array<{ text: string; updatedAt: string }>;
+      if (rows.length === 0) return null;
+      return {
+        text: rows.map((row) => row.text).join("\n"),
+        updatedAt: rows.reduce((latest, row) => (row.updatedAt > latest ? row.updatedAt : latest), rows[0].updatedAt)
+      };
     }
   };
 }
