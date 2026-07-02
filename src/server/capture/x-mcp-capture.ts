@@ -80,6 +80,18 @@ function parseJsonText(text: string): unknown {
   }
 }
 
+function toolPayloadOrThrow(result: unknown): unknown {
+  const payload = extractToolPayload(result);
+  if (result && typeof result === "object" && "isError" in result && result.isError) {
+    const detail =
+      payload && typeof payload === "object" && "detail" in payload
+        ? asString((payload as { detail?: unknown }).detail)
+        : "";
+    throw new Error(detail || `X MCP tool error: ${JSON.stringify(payload).slice(0, 200)}`);
+  }
+  return payload;
+}
+
 function extractToolPayload(result: unknown): unknown {
   if (!result || typeof result !== "object") return result;
   if ("structuredContent" in result && result.structuredContent) return result.structuredContent;
@@ -138,22 +150,22 @@ export class XMcpCaptureRunner implements CaptureRunner {
     const client = this.clientFactory();
     try {
       await client.connect();
-      const userPayload = extractToolPayload(
-        await client.callTool("getUsersByUsername", {
+      const userPayload = toolPayloadOrThrow(
+        await client.callTool("get_users_by_username", {
           username: safeHandle,
-          "user.fields": [...USER_FIELDS]
+          "user.fields": USER_FIELDS.join(",")
         })
       );
       const user = firstDataObject(userPayload);
       const userId = asString(user?.id);
       if (!user || !userId) throw new CaptureError("profile_not_found", `X MCP could not resolve @${safeHandle}`);
 
-      const postsPayload = extractToolPayload(
-        await client.callTool("getUsersPosts", {
+      const postsPayload = toolPayloadOrThrow(
+        await client.callTool("get_users_posts", {
           id: userId,
           max_results: 25,
-          exclude: ["retweets", "replies"],
-          "tweet.fields": [...TWEET_FIELDS]
+          exclude: "retweets,replies",
+          "post.fields": TWEET_FIELDS.join(",")
         })
       );
       const username = asString(user.username) || safeHandle;

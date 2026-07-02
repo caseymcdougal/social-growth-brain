@@ -15,7 +15,7 @@ describe("XMcpCaptureRunner", () => {
       close: vi.fn(async () => undefined),
       callTool: vi.fn(async (name, args) => {
         calls.push({ name, args });
-        if (name === "getUsersByUsername") {
+        if (name === "get_users_by_username") {
           return mcpResult({
             data: {
               id: "123",
@@ -62,19 +62,19 @@ describe("XMcpCaptureRunner", () => {
     expect(client.connect).toHaveBeenCalledOnce();
     expect(client.close).toHaveBeenCalledOnce();
     expect(calls[0]).toMatchObject({
-      name: "getUsersByUsername",
+      name: "get_users_by_username",
       args: {
         username: "caseymcdougal",
-        "user.fields": expect.arrayContaining(["description", "public_metrics"])
+        "user.fields": expect.stringContaining("public_metrics")
       }
     });
     expect(calls[1]).toMatchObject({
-      name: "getUsersPosts",
+      name: "get_users_posts",
       args: {
         id: "123",
         max_results: 25,
-        exclude: ["retweets", "replies"],
-        "tweet.fields": expect.arrayContaining(["created_at", "public_metrics"])
+        exclude: "retweets,replies",
+        "post.fields": expect.stringContaining("public_metrics")
       }
     });
     expect(snapshot.profile).toMatchObject({
