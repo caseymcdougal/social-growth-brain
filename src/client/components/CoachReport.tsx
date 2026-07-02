@@ -112,7 +112,7 @@ export function CoachReport({
       {deferred ? (
         coachDetailsBody
       ) : (
-        <details className="coach-details" aria-label="Full coach read">
+        <details className="disclosure coach-details" aria-label="Full coach read">
           <summary>
             <span>Full coach read</span>
             <strong>{detailCount} audit notes</strong>
@@ -126,7 +126,7 @@ export function CoachReport({
 
   if (deferred) {
     return (
-      <details className="panel coach-report coach-context-disclosure" aria-label="Strategy context">
+      <details className="panel disclosure disclosure-panel coach-report coach-context-disclosure" aria-label="Strategy context">
         <summary>
           <span>Strategy context</span>
           <strong>Latest audit read</strong>

@@ -1027,7 +1027,7 @@ export function App() {
         {generation && <OpportunityDesk brief={opportunityBrief} deferred />}
         {generation && deferredCoachReport}
 
-        <details className="evidence-details-panel" aria-label="Evidence details" open={evidenceDetailsOpen}>
+        <details className="disclosure disclosure-panel evidence-details-panel" aria-label="Evidence details" open={evidenceDetailsOpen}>
           <summary>
             <span>Evidence details</span>
             <strong>

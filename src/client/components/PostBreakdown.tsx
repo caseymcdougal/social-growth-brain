@@ -101,7 +101,7 @@ export function PostBreakdown({
         {postAnalysis && (
           <div className="post-analysis">
             <strong>{postAnalysis.performance_read}</strong>
-            <details className="post-analysis-details" aria-label={`Post analysis details for post #${rank}`}>
+            <details className="disclosure disclosure-compact post-analysis-details" aria-label={`Post analysis details for post #${rank}`}>
               <summary>
                 <span>Analysis details</span>
                 <strong>Rewrite and diagnosis</strong>
@@ -165,7 +165,7 @@ export function PostBreakdown({
         {visibleRankedPosts.map((rankedPost) => renderPostCard(rankedPost))}
       </div>
       {longTailPosts.length > 0 && (
-        <details className="full-review-library" aria-label="Full ranked review">
+        <details className="disclosure full-review-library" aria-label="Full ranked review">
           <summary>
             <span>Full ranked review</span>
             <strong>
@@ -182,7 +182,7 @@ export function PostBreakdown({
   if (deferred && rankedPosts.length > 0) {
     const rankedPostLabel = rankedPosts.length === 1 ? "ranked public post" : "ranked public posts";
     return (
-      <details className="panel post-breakdown source-evidence-disclosure" aria-label="Source evidence">
+      <details className="panel disclosure disclosure-panel post-breakdown source-evidence-disclosure" aria-label="Source evidence">
         <summary>
           <span>Source evidence</span>
           <strong>

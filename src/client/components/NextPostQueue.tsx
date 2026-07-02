@@ -195,7 +195,7 @@ export function NextPostQueue({
           <strong>{slot.title}</strong>
           <p className="production-hook">{slot.hook}</p>
           <p className="production-draft">{slot.draft}</p>
-          <details className="draft-support" aria-label={`Draft support for ${slot.title}`}>
+          <details className="disclosure disclosure-compact draft-support" aria-label={`Draft support for ${slot.title}`}>
             <summary>
               <span>Draft support</span>
               <strong>
@@ -290,7 +290,7 @@ export function NextPostQueue({
 
   const postingBrief = analysis ? (
     generation && !selectedPostBrief ? (
-      <details className="posting-brief-disclosure" aria-label="Recommended posting brief">
+      <details className="disclosure posting-brief-disclosure" aria-label="Recommended posting brief">
         <summary>
           <span>Posting brief</span>
           <strong>{leadAngle}</strong>
@@ -329,7 +329,7 @@ export function NextPostQueue({
           {primarySlot && renderProductionSlot(primarySlot, { position: 1, timing: "Next post" })}
         </ol>
         {workflowHasActivity && (
-        <details className="production-workflow-panel" aria-label="Production workflow tracker" open={workflowTrackerOpen}>
+        <details className="disclosure disclosure-flush production-workflow-panel" aria-label="Production workflow tracker" open={workflowTrackerOpen}>
           <summary>
             <span>Workflow tracker</span>
             <strong>{workflowTrackerLabel}</strong>
@@ -374,7 +374,7 @@ export function NextPostQueue({
         </details>
         )}
         {backlogSlots.length > 0 && (
-          <details className="production-backlog" aria-label="Queue backlog">
+          <details className="disclosure disclosure-flush production-backlog" aria-label="Queue backlog">
             <summary>
               <span>Queue backlog</span>
               <strong>{backlogLabel}</strong>
@@ -502,7 +502,7 @@ export function NextPostQueue({
       )}
 
       {analysis && !generation && (
-        <details className="draft-library idea-backlog" aria-label="Audit idea backlog">
+        <details className="disclosure draft-library idea-backlog" aria-label="Audit idea backlog">
           <summary>
             <span>Idea backlog</span>
             <strong>{auditIdeaLabel}</strong>
@@ -525,7 +525,7 @@ export function NextPostQueue({
       )}
 
       {shouldShowDraftLibrary && generation && (
-        <details className="draft-library" aria-label="Draft library">
+        <details className="disclosure draft-library" aria-label="Draft library">
           <summary>
             <span>Draft library</span>
             <strong>{generatedDraftLabel}</strong>

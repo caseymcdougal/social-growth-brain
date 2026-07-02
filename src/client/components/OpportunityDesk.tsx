@@ -66,7 +66,7 @@ export function OpportunityDesk({ brief, deferred = false }: { brief: Opportunit
 
   if (deferred) {
     return (
-      <details className="panel opportunity-desk opportunity-disclosure" aria-label="Decision support">
+      <details className="panel disclosure disclosure-panel opportunity-desk opportunity-disclosure" aria-label="Decision support">
         <summary>
           <span>Decision support</span>
           <strong>{brief.priorityCards.length} priority signals</strong>
