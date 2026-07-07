@@ -119,8 +119,8 @@ describe("creator scorecard", () => {
     expect(scorecard.summary).toBe("You're on a good roll — keep doing what's working.");
     expect(scorecard.primaryConstraint.label).toBe("Ready to post");
     expect(scorecard.dimensions.map((dimension) => dimension.label)).toEqual([
-      "Post data",
-      "Growth trend",
+      "How well we can see your posts",
+      "Your momentum",
       "Your strategy",
       "Ready to post"
     ]);
@@ -138,7 +138,7 @@ describe("creator scorecard", () => {
 
     expect(scorecard.overallScore).toBe(19);
     expect(scorecard.statusLabel).toBe("Just getting started");
-    expect(scorecard.primaryConstraint.label).toBe("Post data");
+    expect(scorecard.primaryConstraint.label).toBe("How well we can see your posts");
     expect(scorecard.primaryConstraint.nextAction).toBe("Scan or paste your X profile so we can see how your posts are doing.");
   });
 
@@ -164,7 +164,7 @@ describe("creator scorecard", () => {
     });
 
     expect(scorecard.statusLabel).toBe("On track");
-    expect(scorecard.primaryConstraint.label).toBe("Growth trend");
+    expect(scorecard.primaryConstraint.label).toBe("Your momentum");
     expect(scorecard.primaryConstraint.statusLabel).toBe("Down");
     expect(scorecard.primaryConstraint.nextAction).toContain("weaker scan");
   });
@@ -182,8 +182,8 @@ describe("creator scorecard", () => {
     const copied = formatCreatorScorecardForClipboard(scorecard);
 
     expect(copied).toContain("Creator scorecard: 19/100 - Just getting started");
-    expect(copied).toContain("What to fix first: Post data");
-    expect(copied).toContain("- Post data [No posts yet] 10/100");
+    expect(copied).toContain("What to fix first: How well we can see your posts");
+    expect(copied).toContain("- How well we can see your posts [No posts yet] 10/100");
     expect(copied).toContain("Next: Scan or paste your X profile so we can see how your posts are doing.");
   });
 });

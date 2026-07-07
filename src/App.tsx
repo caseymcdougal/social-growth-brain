@@ -1,4 +1,3 @@
-import { Check, Copy, FileText, ListChecks, LockKeyhole, RefreshCcw, Sparkles, Upload, Wand2 } from "lucide-react";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   applyStrategyMemoryProposal,
@@ -20,26 +19,31 @@ import {
   type DashboardState,
   type StrategyMemoryProposal
 } from "./client/api";
-import { CaptureBar } from "./client/components/CaptureBar";
-import { CreativeDirectionCard } from "./client/components/CreativeDirectionCard";
+import { ActionProgressPanel, getActionState, type ActionProgressItem } from "./client/components/ActionProgressPanel";
+import { AuditCommandCenter } from "./client/components/AuditCommandCenter";
+import { AuditCompleteBanner } from "./client/components/AuditCompleteBanner";
 import { CoachReport } from "./client/components/CoachReport";
+import { CreativeDirectionCard } from "./client/components/CreativeDirectionCard";
+import { NextMoveHero } from "./client/components/NextMoveHero";
 import { NextPostQueue } from "./client/components/NextPostQueue";
-import { OpportunityDesk } from "./client/components/OpportunityDesk";
-import { ScanHistoryPanel } from "./client/components/ScanHistoryPanel";
+import { PreDraftBrief } from "./client/components/PreDraftBrief";
+import { RecoveryNoticePanel } from "./client/components/RecoveryNoticePanel";
+import { ReferenceShelf } from "./client/components/ReferenceShelf";
+import { ScoreStrip } from "./client/components/ScoreStrip";
+import { WorkspaceSidebar } from "./client/components/WorkspaceSidebar";
+import { PhaseLayout } from "./client/layout/PhaseLayout";
+import { scrollToSection } from "./client/utils/scroll-to-section";
+import { getCurrentStep } from "./client/utils/workflow-steps";
 import type { AnalysisOutput, AnalysisSummary } from "./shared/analysis-schema";
-import {
-  buildCreatorScorecard,
-  formatCreatorScorecardForClipboard,
-  type CreatorScorecard,
-  type CreatorScorecardDimensionKey
-} from "./shared/creator-scorecard";
+import { buildCreatorScorecard } from "./shared/creator-scorecard";
 import type { GenerationOutput } from "./shared/generation-schema";
-import { buildOpportunityBrief, type OpportunityBrief } from "./shared/opportunities";
+import { buildOpportunityBrief } from "./shared/opportunities";
 import { buildSelectedPostLabBrief, type PostAnalysis, type SelectedPostLabBrief } from "./shared/post-lab";
 import { rankPostsByVisibleSignal, summarizeMetricCompleteness } from "./shared/performance";
 import { buildScanHistoryBrief } from "./shared/scan-history";
 import type { StrategyMemory, TopicExplorationOutput } from "./shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "./shared/types";
+import { getWorkflowPhase } from "./shared/workflow-phase";
 
 const DeferredManualImportPanel = lazy(() =>
   import("./client/components/ManualImportPanel").then((module) => ({ default: module.ManualImportPanel }))
@@ -57,414 +61,7 @@ const DeferredTopicExplorer = lazy(() =>
   import("./client/components/TopicExplorer").then((module) => ({ default: module.TopicExplorer }))
 );
 
-const auditSteps = [
-  { key: "scan", label: "See your posts", detail: "How your recent posts did", target: "command-center-title" },
-  { key: "rank", label: "Find what worked", detail: "What resonated most", target: "post-breakdown-title" },
-  { key: "diagnose", label: "Understand why", detail: "The pattern behind your best posts", target: "coach-report-title" },
-  { key: "write", label: "Write your next post", detail: "Draft something that fits", target: "next-posts-title" }
-] as const;
-
-function scrollToSection(id: string) {
-  const target = document.getElementById(id);
-  target?.scrollIntoView({ block: "start", behavior: "smooth" });
-}
-
-type AuditStepKey = (typeof auditSteps)[number]["key"];
-type StepState = "idle" | "current" | "complete";
-type ActionProgressState = "locked" | "ready" | "running" | "complete" | "issue";
 type StrategyEngineView = "experiments" | "memory" | "topics";
-type ActionProgressItem = {
-  label: string;
-  detail: string;
-  state: ActionProgressState;
-};
-type RecoveryNotice = {
-  kind: "analysis" | "generation" | "memory" | "topic";
-  message: string;
-};
-
-const stepOrder: AuditStepKey[] = ["scan", "rank", "diagnose", "write"];
-const scorecardDimensionHints: Record<CreatorScorecardDimensionKey, string> = {
-  evidence: "How complete your post data is — better data means better advice.",
-  momentum: "Whether your posts are getting more traction over time.",
-  strategy: "Whether you've turned patterns into a repeatable plan.",
-  production: "Whether you have drafts ready to post."
-};
-const actionProgressValue: Record<ActionProgressState, number> = {
-  locked: 8,
-  ready: 28,
-  running: 68,
-  complete: 100,
-  issue: 100
-};
-const actionProgressLabel: Record<ActionProgressState, string> = {
-  locked: "Waiting",
-  ready: "Ready",
-  running: "Working",
-  complete: "Done",
-  issue: "Needs a retry"
-};
-
-function getCurrentStep(snapshot: CapturedAccountSnapshot | null, analysis: AnalysisSummary | null, generation: GenerationOutput | null) {
-  if (generation) return "write";
-  if (analysis) return "write";
-  if (snapshot) return "diagnose";
-  return "scan";
-}
-
-function getStepState(step: AuditStepKey, currentStep: AuditStepKey, generation: GenerationOutput | null): StepState {
-  if (generation) return "complete";
-  const stepIndex = stepOrder.indexOf(step);
-  const currentIndex = stepOrder.indexOf(currentStep);
-  if (stepIndex < currentIndex) return "complete";
-  if (stepIndex === currentIndex) return "current";
-  return "idle";
-}
-
-function getActionState({
-  blocked,
-  complete,
-  error,
-  ready,
-  running
-}: {
-  blocked?: boolean;
-  complete?: boolean;
-  error?: boolean;
-  ready?: boolean;
-  running?: boolean;
-}): ActionProgressState {
-  if (running) return "running";
-  if (error) return "issue";
-  if (complete) return "complete";
-  if (blocked) return "locked";
-  if (ready) return "ready";
-  return "locked";
-}
-
-function ActionProgressPanel({ actions }: { actions: ActionProgressItem[] }) {
-  const runningCount = actions.filter((action) => action.state === "running").length;
-  const issueCount = actions.filter((action) => action.state === "issue").length;
-  const completeCount = actions.filter((action) => action.state === "complete").length;
-  const readyCount = actions.filter((action) => action.state === "ready").length;
-  const lockedCount = actions.filter((action) => action.state === "locked").length;
-  const runningAction = actions.find((action) => action.state === "running") ?? null;
-  const issueAction = actions.find((action) => action.state === "issue") ?? null;
-
-  // One plain sentence is all a beginner needs by default. The full per-step
-  // breakdown lives in the disclosure below, and only opens when work is
-  // actually happening or something needs a retry.
-  const statusLine = runningAction
-    ? `${runningAction.label}…`
-    : issueAction
-      ? `${issueAction.label} needs a retry`
-      : issueCount
-        ? "One step needs a retry"
-        : completeCount && !readyCount && !lockedCount
-          ? "All caught up"
-          : "Nothing running right now";
-  const statusLabel = runningCount
-    ? `${runningCount} step running`
-    : issueCount
-      ? `${issueCount} needs a retry`
-      : "Idle";
-  const stepsOpen = Boolean(runningCount || issueCount);
-  const stepsSummary = `${completeCount} done · ${readyCount} ready · ${lockedCount} waiting`;
-
-  return (
-    <section className="action-progress-panel" data-steps-open={stepsOpen ? "true" : "false"} aria-label="What's happening" aria-live="polite">
-      <div className="action-progress-head">
-        <div>
-          <p className="eyebrow">Behind the scenes</p>
-          <h2>What's happening</h2>
-          <p className="action-progress-statusline">{statusLine}</p>
-        </div>
-        <span className="status-chip">{statusLabel}</span>
-      </div>
-      <details className="disclosure disclosure-compact action-progress-details" aria-label="Step-by-step progress" open={stepsOpen}>
-        <summary>
-          <span>See each step</span>
-          <strong>{stepsSummary}</strong>
-          <small>Open to watch every step load.</small>
-        </summary>
-        <ol className="action-progress-list">
-          {actions.map((action) => {
-            const value = actionProgressValue[action.state];
-            return (
-              <li className="action-progress-row" data-state={action.state} key={action.label}>
-                <div>
-                  <strong>{action.label}</strong>
-                  <small>{action.detail}</small>
-                </div>
-                <span className="action-state-label">{actionProgressLabel[action.state]}</span>
-                <span
-                  aria-label={`${action.label} progress`}
-                  aria-valuemax={100}
-                  aria-valuemin={0}
-                  aria-valuenow={value}
-                  className="action-meter"
-                  role="progressbar"
-                >
-                  <span style={{ width: `${value}%` }} />
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </details>
-    </section>
-  );
-}
-
-const recoveryNoticeCopy: Record<RecoveryNotice["kind"], { title: string; nextStep: string }> = {
-  analysis: {
-    title: "The audit didn't finish",
-    nextStep: "Your posts are still loaded — try running the audit again. If it keeps failing, paste a fresh snapshot first."
-  },
-  generation: {
-    title: "We couldn't write your drafts",
-    nextStep: "Your audit is still here — try generating ideas again. If that keeps failing, use the drafts already on screen."
-  },
-  memory: {
-    title: "Memory didn't update",
-    nextStep: "Your saved context is fine — try the memory update again once the audit is stable."
-  },
-  topic: {
-    title: "Topic search didn't finish",
-    nextStep: "Your audit is fine — try finding related topics again later. Your drafts and signals still work."
-  }
-};
-
-function RecoveryNoticePanel({ kind, message }: RecoveryNotice) {
-  const copy = recoveryNoticeCopy[kind];
-  return (
-    <section className="panel error-panel" role="alert">
-      <div>
-        <p className="eyebrow">Let's fix this</p>
-        <h2>{copy.title}</h2>
-        <p>{message}</p>
-      </div>
-      <div className="recovery-next-step">
-        <span>What to do next</span>
-        <p>{copy.nextStep}</p>
-      </div>
-    </section>
-  );
-}
-
-function AuditCommandCenter({
-  activeAction,
-  analyzing,
-  capturing,
-  coveragePercent,
-  draftCount,
-  generating,
-  isGenerated,
-  isBusy,
-  onAnalyze,
-  onCapture,
-  onGenerateToday,
-  onOpenImport,
-  onReviewDraftQueue,
-  opportunityBrief,
-  postCount,
-  scorecard
-}: {
-  activeAction: ActionProgressItem | null;
-  analyzing: boolean;
-  capturing: boolean;
-  coveragePercent: number;
-  draftCount: number;
-  generating: boolean;
-  isGenerated: boolean;
-  isBusy: boolean;
-  onAnalyze: () => void;
-  onCapture: () => void;
-  onGenerateToday: () => void;
-  onOpenImport: () => void;
-  onReviewDraftQueue: () => void;
-  opportunityBrief: OpportunityBrief;
-  postCount: number;
-  scorecard: CreatorScorecard;
-}) {
-  const [scorecardCopied, setScorecardCopied] = useState(false);
-  const [scorecardCopyFailed, setScorecardCopyFailed] = useState(false);
-  const bestOpportunity = opportunityBrief.priorityCards[0] ?? null;
-  const sourcePostLabel = `${postCount} ${postCount === 1 ? "post" : "posts"}`;
-  const draftLabel = `${draftCount} ${draftCount === 1 ? "draft" : "drafts"}`;
-  const stagedDraftLabel = `${draftLabel} staged`;
-  const readinessLabel = activeAction
-    ? activeAction.label
-    : isGenerated
-      ? `${draftLabel} · ${coveragePercent}% of metrics captured`
-      : `${sourcePostLabel} · ${coveragePercent}% of metrics captured`;
-  const commandSignals = [
-    {
-      label: "Your account health",
-      title: `${scorecard.statusLabel} · ${scorecard.overallScore}`,
-      detail: `${sourcePostLabel} · ${coveragePercent}% of metrics captured`
-    },
-    {
-      label: "What to fix",
-      title: scorecard.primaryConstraint.label,
-      detail: scorecard.primaryConstraint.nextAction
-    },
-    {
-      label: "Your best next post",
-      title: bestOpportunity?.title ?? "Add your first posts",
-      detail: bestOpportunity?.detail ?? "Scan your account so the dashboard can show you what to post next."
-    }
-  ];
-
-  async function copyScorecardBrief() {
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(formatCreatorScorecardForClipboard(scorecard));
-      setScorecardCopyFailed(false);
-      setScorecardCopied(true);
-      window.setTimeout(() => setScorecardCopied(false), 1400);
-    } catch {
-      setScorecardCopied(false);
-      setScorecardCopyFailed(true);
-      window.setTimeout(() => setScorecardCopyFailed(false), 1800);
-    }
-  }
-
-  return (
-    <section
-      className={isGenerated ? "panel command-center-panel is-generated" : "panel command-center-panel"}
-      data-mode={isGenerated ? "draft" : "audit"}
-      aria-label="Audit command center"
-      aria-labelledby="command-center-title"
-    >
-      <div className="command-center-lead">
-        <div>
-          <p className="eyebrow">{isGenerated ? "Ready to write" : "How your account is doing"}</p>
-          <h2 id="command-center-title">{isGenerated ? "Your next post, ready to go" : "Your account at a glance"}</h2>
-          <p>{scorecard.summary}</p>
-        </div>
-        <span className="status-chip">{readinessLabel}</span>
-      </div>
-
-      {isGenerated ? (
-        <div className="command-center-handoff" aria-label="Draft handoff priorities">
-          <article className="command-center-primary-action">
-            <span>Your drafts</span>
-            <strong>{stagedDraftLabel}</strong>
-            <p>Pick one, copy it into X, or write fresh ideas.</p>
-          </article>
-          <div className="command-center-actions">
-            <button className="primary-button" type="button" disabled={isBusy} onClick={onReviewDraftQueue}>
-              <ListChecks size={16} aria-hidden="true" /> See my drafts
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={isBusy}
-              onClick={onGenerateToday}
-              aria-busy={generating || undefined}
-            >
-              <Sparkles size={16} aria-hidden="true" /> {generating ? "Writing…" : "Write new ideas"}
-            </button>
-            <details className="capture-maintenance command-center-maintenance" aria-label="More options">
-              <summary>
-                <span>More options</span>
-              </summary>
-              <div className="capture-maintenance-actions">
-                <button
-                  className="secondary-button"
-                  type="button"
-                  disabled={isBusy}
-                  onClick={onAnalyze}
-                  aria-busy={analyzing || undefined}
-                >
-                  <Wand2 size={16} aria-hidden="true" /> {analyzing ? "Analyzing…" : "Run audit again"}
-                </button>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={onCapture}
-                  disabled={isBusy}
-                  aria-busy={capturing || undefined}
-                >
-                  <RefreshCcw size={16} aria-hidden="true" /> {capturing ? "Scanning…" : "Scan again"}
-                </button>
-                <button className="secondary-button" type="button" onClick={onOpenImport} disabled={isBusy}>
-                  <Upload size={16} aria-hidden="true" /> Paste snapshot
-                </button>
-              </div>
-            </details>
-          </div>
-          <div className="command-center-signals" aria-label="Command signals">
-            {commandSignals.map((signal) => (
-              <article className="command-center-signal" key={signal.label}>
-                <span>{signal.label}</span>
-                <strong>{signal.title}</strong>
-                <p>{signal.detail}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="command-center-grid">
-          <article className="command-center-card is-primary">
-            <span>Your account health</span>
-            <div className="score-hero">
-              <strong className="score-value">{scorecard.overallScore}</strong>
-              <span className="score-status">{scorecard.statusLabel}</span>
-            </div>
-            <p>{scorecard.primaryConstraint.detail}</p>
-          </article>
-          <article className="command-center-card">
-            <span>Your next move</span>
-            <strong>{opportunityBrief.command.title}</strong>
-            <p>{opportunityBrief.command.detail}</p>
-          </article>
-          <article className="command-center-card">
-            <span>What to fix</span>
-            <strong>{scorecard.primaryConstraint.label}</strong>
-            <p>{scorecard.primaryConstraint.nextAction}</p>
-          </article>
-          <article className="command-center-card">
-            <span>Your best next post</span>
-            <strong>{bestOpportunity?.title ?? "Add your first posts"}</strong>
-            <p>{bestOpportunity?.detail ?? "Scan your account so the dashboard can show you what to post next."}</p>
-          </article>
-        </div>
-      )}
-
-      <section className="scorecard-breakdown-inline command-score-breakdown" aria-label="Score breakdown">
-        <div className="scorecard-inline-head">
-          <span>What makes up your score</span>
-          <strong>{scorecard.dimensions.length} things we measure</strong>
-        </div>
-
-        <div className="scorecard-breakdown-body">
-          <div className="scorecard-dimensions" aria-label="Creator scorecard dimensions">
-            {scorecard.dimensions.map((dimension) => (
-              <article data-key={dimension.key} key={dimension.key}>
-                <div className="scorecard-dimension-top">
-                  <span>{dimension.label}</span>
-                  <strong>{dimension.score}</strong>
-                </div>
-                <div className="scorecard-meter" aria-hidden="true">
-                  <span style={{ width: `${dimension.score}%` }} />
-                </div>
-                <p>{dimension.statusLabel}</p>
-                <small>{dimension.detail}</small>
-                <small className="scorecard-dimension-hint">{scorecardDimensionHints[dimension.key]}</small>
-              </article>
-            ))}
-          </div>
-          <button className="copy-button scorecard-copy" type="button" onClick={() => void copyScorecardBrief()}>
-            {scorecardCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-            {scorecardCopied ? "Copied" : scorecardCopyFailed ? "Copy unavailable" : "Copy my summary"}
-          </button>
-        </div>
-      </section>
-    </section>
-  );
-}
 
 export function App() {
   const [bootstrappedDashboard] = useState<DashboardState | null>(() => getBootstrappedDashboardState());
@@ -503,9 +100,12 @@ export function App() {
   const [directions, setDirections] = useState<CreativeDirectionEntry[]>(() => bootstrappedDashboard?.directions ?? []);
   const [strategyEngineView, setStrategyEngineView] = useState<StrategyEngineView>("experiments");
   const [deferredPanelsReady, setDeferredPanelsReady] = useState(false);
+  const [dockSheetOpen, setDockSheetOpen] = useState(false);
   const [initialDashboardState] = useState<Promise<DashboardState>>(() =>
     bootstrappedDashboard ? Promise.resolve(bootstrappedDashboard) : getDashboardState({ force: true })
   );
+
+  const phase = getWorkflowPhase(snapshot, analysis, generation);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
   const posts = useMemo(() => snapshot?.posts ?? [], [snapshot]);
@@ -547,6 +147,7 @@ export function App() {
   const coveragePercent = Math.round(metricSummary.completenessRatio * 100);
   const metricHealth =
     coveragePercent >= 85 ? "Strong read" : coveragePercent >= 55 ? "Partial read" : "Not enough data yet";
+
   const actionProgressItems = useMemo<ActionProgressItem[]>(
     () => [
       {
@@ -648,6 +249,7 @@ export function App() {
       updatingMemory
     ]
   );
+
   const activeAction = actionProgressItems.find((action) => action.state === "running") ?? null;
   const isDashboardActionBusy = loading || capturing || analyzing || generating;
   const evidenceDetailsOpen = Boolean(activeAction || loadError || captureError);
@@ -670,26 +272,27 @@ export function App() {
                 ? "Memory saved"
                 : analysis
                   ? "3 deeper tools ready"
-                  : "Run an audit first";
+                  : "Find patterns first";
+
   const strategyEngineViews = useMemo(
     () =>
       [
         {
-          key: "experiments",
+          key: "experiments" as const,
           label: "Experiments",
-          detail: strategyMemory ? "Test your active bets" : analysis ? "Track what to try" : "Run an audit first"
+          detail: strategyMemory ? "Test your active bets" : analysis ? "Track what to try" : "Find patterns first"
         },
         {
-          key: "memory",
+          key: "memory" as const,
           label: "Memory",
-          detail: memoryProposal ? "Suggestion ready" : strategyMemory ? "Saved" : analysis ? "Ready to update" : "Run an audit first"
+          detail: memoryProposal ? "Suggestion ready" : strategyMemory ? "Saved" : analysis ? "Ready to update" : "Find patterns first"
         },
         {
-          key: "topics",
+          key: "topics" as const,
           label: "Topics",
-          detail: topicExploration ? `${topicExploration.topics.length} related topics` : analysis ? "Find related topics" : "Run an audit first"
+          detail: topicExploration ? `${topicExploration.topics.length} related topics` : analysis ? "Find related topics" : "Find patterns first"
         }
-      ] satisfies Array<{ key: StrategyEngineView; label: string; detail: string }>,
+      ],
     [analysis, memoryProposal, strategyMemory, topicExploration]
   );
 
@@ -838,6 +441,7 @@ export function App() {
       const latestAnalysis = await analyzeLatestSnapshot();
       setAnalysis(latestAnalysis);
       setFullAnalysis(latestAnalysis);
+      window.setTimeout(() => scrollToSection("coach-report-title", { expand: true }), 400);
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "Analysis failed");
     } finally {
@@ -850,6 +454,7 @@ export function App() {
     setGenerationError(null);
     try {
       setGeneration(await generateTodaysIdeas());
+      window.setTimeout(() => scrollToSection("next-posts-title", { expand: true }), 400);
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
     } finally {
@@ -858,10 +463,7 @@ export function App() {
   }
 
   function handleReviewDraftQueue() {
-    const target = document.getElementById("next-posts-title") ?? document.querySelector(".next-posts");
-    if (target && "scrollIntoView" in target && typeof target.scrollIntoView === "function") {
-      target.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
+    scrollToSection("next-posts-title", { expand: true });
   }
 
   async function handleRefreshMemory() {
@@ -913,100 +515,93 @@ export function App() {
     });
   }
 
-  const nextPostWorkspace = (
-    <NextPostQueue
+  const hero = (
+    <NextMoveHero
+      snapshot={snapshot}
+      metricSummary={metricSummary}
+      scorecard={creatorScorecard}
+      loading={loading}
+      capturing={capturing}
+      analyzing={analyzing}
+      generating={generating}
+      hasAnalysis={Boolean(analysis)}
       analysis={analysis}
-      capturedPosts={posts}
       generation={generation}
-      selectedPostBrief={selectedPostBrief}
+      error={loadError ?? captureError}
+      status={capturing ? captureStatus : null}
+      onAnalyze={() => void handleAnalyze()}
+      onCapture={() => void handleCapture()}
+      onGenerateToday={() => void handleGenerateToday()}
+      onOpenImport={() => setImportOpen(true)}
     />
   );
-  const coachReport = <CoachReport analysis={analysis} postCount={postCount} />;
-  const deferredCoachReport = <CoachReport analysis={analysis} postCount={postCount} deferred />;
-  const pairedPostWorkspace = (
-    <div className="dashboard-grid">
-      {nextPostWorkspace}
-      {coachReport}
-    </div>
-  );
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="Audit workflow">
-        <div className="brand-lockup">
-          <div className="brand-mark">
-            <FileText size={18} aria-hidden="true" />
-          </div>
-          <div>
-            <strong>Social Audit</strong>
-            <span>Casey / X</span>
-          </div>
+  const commandCenter =
+    phase === "drafted" ? (
+      <AuditCommandCenter
+        activeAction={activeAction}
+        analyzing={analyzing}
+        capturing={capturing}
+        coveragePercent={coveragePercent}
+        draftCount={generation?.posts.length ?? 0}
+        generating={generating}
+        isGenerated
+        isBusy={isDashboardActionBusy}
+        onAnalyze={() => void handleAnalyze()}
+        onCapture={() => void handleCapture()}
+        onGenerateToday={() => void handleGenerateToday()}
+        onOpenImport={() => setImportOpen(true)}
+        onReviewDraftQueue={handleReviewDraftQueue}
+        opportunityBrief={opportunityBrief}
+        postCount={postCount}
+        scorecard={creatorScorecard}
+      />
+    ) : null;
+
+  const scannedPreview =
+    deferredPanelsReady && rankedPosts.length > 0 ? (
+      <Suspense fallback={null}>
+        <DeferredPostBreakdown rankedPosts={rankedPosts} analysis={null} preview />
+      </Suspense>
+    ) : null;
+
+  const auditedInsightGrid =
+    analysis && deferredPanelsReady ? (
+      <>
+        <div className="dashboard-grid audited-insight-grid">
+          <Suspense fallback={null}>
+            <DeferredPostBreakdown
+              rankedPosts={rankedPosts}
+              analysis={fullAnalysis}
+              selectedPostId={selectedPostId}
+              onSelectPost={setSelectedPostId}
+            />
+          </Suspense>
+          <PreDraftBrief analysis={analysis} />
         </div>
-        <ol className="step-rail" aria-label="Audit sequence">
-          {auditSteps.map((item, index) => {
-            const stepState = getStepState(item.key, currentStep, generation);
-            return (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  aria-current={stepState === "current" ? "step" : undefined}
-                  className="step-row"
-                  data-state={stepState}
-                  onClick={() => scrollToSection(item.target)}
-                >
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <small>{item.detail}</small>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        <div className="privacy-note">
-          <LockKeyhole size={16} aria-hidden="true" />
-          <div>
-            <strong>Runs on your Mac</strong>
-            <span>Reads public X data only. Nothing gets posted for you.</span>
-          </div>
-        </div>
-      </aside>
+        {selectedPostBrief && (
+          <NextPostQueue
+            analysis={analysis}
+            capturedPosts={posts}
+            generation={null}
+            selectedPostBrief={selectedPostBrief}
+          />
+        )}
+      </>
+    ) : null;
 
-      <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Your X growth workspace</p>
-            <h1>Social Audit Studio</h1>
-            <p className="topbar-copy">
-              See how your posts are doing, learn what's working, and write your next post — all from your public X profile.
-            </p>
-          </div>
-          <div className={activeAction ? "run-status is-running" : "run-status"} aria-live="polite">
-            <span className={activeAction ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
-            {activeAction ? `${activeAction.label}…` : snapshot ? `${postCount} ${postLabel} loaded` : "No posts yet"}
-          </div>
-        </header>
+  const strategyEngineSection = deferredPanelsReady ? (
+    <details className="strategy-engine-section" aria-label="Advanced tools" open={strategyEngineDetailsOpen}>
+      <summary className="strategy-engine-summary">
+        <span>
+          <span className="eyebrow">Advanced</span>
+          <strong>Strategy tools</strong>
+          <small>Test ideas, save memory, and explore related topics when you're ready.</small>
+        </span>
+        <strong>{strategyEngineStatus}</strong>
+      </summary>
 
-        <AuditCommandCenter
-          activeAction={activeAction}
-          analyzing={analyzing}
-          capturing={capturing}
-          coveragePercent={coveragePercent}
-          draftCount={generation?.posts.length ?? 0}
-          generating={generating}
-          isGenerated={Boolean(generation)}
-          isBusy={isDashboardActionBusy}
-          onAnalyze={() => void handleAnalyze()}
-          onCapture={() => void handleCapture()}
-          onGenerateToday={() => void handleGenerateToday()}
-          onOpenImport={() => setImportOpen(true)}
-          onReviewDraftQueue={handleReviewDraftQueue}
-          opportunityBrief={opportunityBrief}
-          postCount={postCount}
-          scorecard={creatorScorecard}
-        />
-
+      <div className="strategy-engine-body">
         <CreativeDirectionCard
           directions={directions}
           onAdd={async (text) => {
@@ -1016,165 +611,141 @@ export function App() {
             setDirections(await deleteCreativeDirection(id));
           }}
         />
-
-        <CaptureBar
-          snapshot={snapshot}
-          metricSummary={metricSummary}
-          loading={loading}
-          capturing={capturing}
-          analyzing={analyzing}
-          generating={generating}
-          hasAnalysis={Boolean(analysis)}
-          analysis={analysis}
-          generation={generation}
-          error={loadError ?? captureError}
-          status={capturing ? captureStatus : null}
-          onAnalyze={() => void handleAnalyze()}
-          onCapture={() => void handleCapture()}
-          onGenerateToday={() => void handleGenerateToday()}
-          onOpenImport={() => setImportOpen(true)}
-        />
-
-        {analysisError && <RecoveryNoticePanel kind="analysis" message={analysisError} />}
-        {generationError && <RecoveryNoticePanel kind="generation" message={generationError} />}
-        {memoryError && <RecoveryNoticePanel kind="memory" message={memoryError} />}
-        {topicError && <RecoveryNoticePanel kind="topic" message={topicError} />}
-
-        {generation ? pairedPostWorkspace : (
-          <>
-            <OpportunityDesk brief={opportunityBrief} />
-            {pairedPostWorkspace}
-          </>
-        )}
-
-        <section className="reference-shelf" aria-label="Reference panels">
-        <div className="reference-shelf-head">
-          <p className="eyebrow">Reference</p>
-          <span>Dig deeper when you're curious about the numbers.</span>
+        <div className="strategy-engine-tabs" role="tablist" aria-label="Strategy engine views">
+          {strategyEngineViews.map((view) => {
+            const selected = strategyEngineView === view.key;
+            return (
+              <button
+                aria-controls={`strategy-engine-panel-${view.key}`}
+                aria-selected={selected}
+                className="strategy-engine-tab"
+                id={`strategy-engine-tab-${view.key}`}
+                key={view.key}
+                onClick={() => handleStrategyEngineTabChange(view.key)}
+                role="tab"
+                type="button"
+              >
+                <span>{view.label}</span>
+                <small>{view.detail}</small>
+              </button>
+            );
+          })}
         </div>
 
-        {generation && <OpportunityDesk brief={opportunityBrief} deferred />}
-        {generation && deferredCoachReport}
-
-        <details className="disclosure disclosure-panel evidence-details-panel" aria-label="About your data" open={evidenceDetailsOpen}>
-          <summary>
-            <span>About your data</span>
-            <strong>
-              {metricHealth} · {coveragePercent}% of metrics captured
-            </strong>
-            <small>{scanHistoryBrief.summary}</small>
-          </summary>
-          <div className="operations-grid" aria-label="Scan history and data quality">
-            <ScanHistoryPanel history={history} />
-            <section className="panel signal-panel" aria-label="Data quality">
-              <p className="eyebrow">Data quality</p>
-              <h2>{metricHealth}</h2>
-              <div className="signal-meter" aria-hidden="true">
-                <span style={{ width: `${coveragePercent}%` }} />
-              </div>
-              <dl className="signal-list">
-                <div>
-                  <dt>Metrics captured</dt>
-                  <dd>
-                    {coveragePercent}% · {metricSummary.capturedFields}/{metricSummary.totalFields || 0}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Posts with metrics</dt>
-                  <dd>
-                    {metricSummary.postsWithAnyMetrics}/{postCount}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Your top post</dt>
-                  <dd>{topPost ? topPost.text.slice(0, 42) : "Scan to see"}</dd>
-                </div>
-              </dl>
-            </section>
-            <ActionProgressPanel actions={actionProgressItems} />
-          </div>
-        </details>
-
-        {deferredPanelsReady && (
-          <Suspense fallback={null}>
-            <details
-              className="strategy-engine-section"
-              aria-label="Go deeper"
-              open={strategyEngineDetailsOpen}
-            >
-              <summary className="strategy-engine-summary">
-                <span>
-                  <span className="eyebrow">Go deeper</span>
-                  <strong>Advanced tools</strong>
-                  <small>Once you're comfortable with the basics, these help you test ideas and remember what works.</small>
-                </span>
-                <strong>{strategyEngineStatus}</strong>
-              </summary>
-
-              <div className="strategy-engine-body">
-                <div className="strategy-engine-tabs" role="tablist" aria-label="Strategy engine views">
-                  {strategyEngineViews.map((view) => {
-                    const selected = strategyEngineView === view.key;
-                    return (
-                      <button
-                        aria-controls={`strategy-engine-panel-${view.key}`}
-                        aria-selected={selected}
-                        className="strategy-engine-tab"
-                        id={`strategy-engine-tab-${view.key}`}
-                        key={view.key}
-                        onClick={() => handleStrategyEngineTabChange(view.key)}
-                        role="tab"
-                        type="button"
-                      >
-                        <span>{view.label}</span>
-                        <small>{view.detail}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  aria-labelledby={`strategy-engine-tab-${strategyEngineView}`}
-                  className="strategy-engine-panel-slot"
-                  id={`strategy-engine-panel-${strategyEngineView}`}
-                  role="tabpanel"
-                >
-                  {strategyEngineView === "experiments" && (
-                    <DeferredExperimentLedgerPanel analysis={analysis} memory={strategyMemory} scanHistory={scanHistoryBrief} />
-                  )}
-                  {strategyEngineView === "memory" && (
-                    <DeferredStrategyMemoryPanel
-                      analysis={analysis}
-                      memory={strategyMemory}
-                      proposal={memoryProposal}
-                      updating={updatingMemory}
-                      applying={applyingMemory}
-                      onRefresh={() => void handleRefreshMemory()}
-                      onApply={(proposalId) => void handleApplyMemory(proposalId)}
-                    />
-                  )}
-                  {strategyEngineView === "topics" && (
-                    <DeferredTopicExplorer
-                      analysis={analysis}
-                      exploration={topicExploration}
-                      exploring={exploringTopics}
-                      onExplore={() => void handleExploreTopics()}
-                    />
-                  )}
-                </div>
-              </div>
-            </details>
-
-            <DeferredPostBreakdown
-              rankedPosts={rankedPosts}
-              analysis={fullAnalysis}
-              deferred={Boolean(generation)}
-              selectedPostId={selectedPostId}
-              onSelectPost={setSelectedPostId}
+        <div
+          aria-labelledby={`strategy-engine-tab-${strategyEngineView}`}
+          className="strategy-engine-panel-slot"
+          id={`strategy-engine-panel-${strategyEngineView}`}
+          role="tabpanel"
+        >
+          {strategyEngineView === "experiments" && (
+            <DeferredExperimentLedgerPanel analysis={analysis} memory={strategyMemory} scanHistory={scanHistoryBrief} />
+          )}
+          {strategyEngineView === "memory" && (
+            <DeferredStrategyMemoryPanel
+              analysis={analysis}
+              memory={strategyMemory}
+              proposal={memoryProposal}
+              updating={updatingMemory}
+              applying={applyingMemory}
+              onRefresh={() => void handleRefreshMemory()}
+              onApply={(proposalId) => void handleApplyMemory(proposalId)}
             />
-          </Suspense>
-        )}
-        </section>
+          )}
+          {strategyEngineView === "topics" && (
+            <DeferredTopicExplorer
+              analysis={analysis}
+              exploration={topicExploration}
+              exploring={exploringTopics}
+              onExplore={() => void handleExploreTopics()}
+            />
+          )}
+        </div>
+      </div>
+    </details>
+  ) : null;
+
+  const postBreakdownDeferred =
+    deferredPanelsReady && phase === "drafted" ? (
+      <DeferredPostBreakdown
+        rankedPosts={rankedPosts}
+        analysis={fullAnalysis}
+        deferred
+        selectedPostId={selectedPostId}
+        onSelectPost={setSelectedPostId}
+      />
+    ) : null;
+
+  return (
+    <div className="app-shell">
+      <WorkspaceSidebar
+        currentStep={currentStep}
+        generation={generation}
+        dockSheetOpen={dockSheetOpen}
+        onToggleDockSheet={() => setDockSheetOpen((open) => !open)}
+      />
+
+      <main className="workspace" data-phase={phase}>
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Casey on X</p>
+            <h1>
+              Social Audit <span className="title-accent">Studio</span>
+            </h1>
+            <p className="topbar-copy">Scan your posts, read the pattern, write the next one.</p>
+          </div>
+          <div className={activeAction ? "run-status is-running" : "run-status"} aria-live="polite">
+            <span className={activeAction ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
+            {activeAction ? `${activeAction.label}…` : snapshot ? `${postCount} ${postLabel} loaded` : "No posts yet"}
+          </div>
+        </header>
+
+        <PhaseLayout
+          phase={phase}
+          hero={hero}
+          commandCenter={commandCenter}
+          auditBanner={analysis ? <AuditCompleteBanner analysis={analysis} scorecard={creatorScorecard} /> : null}
+          scoreStrip={analysis ? <ScoreStrip scorecard={creatorScorecard} /> : null}
+          scannedPreview={scannedPreview}
+          auditedCoach={analysis ? <CoachReport analysis={analysis} postCount={postCount} /> : null}
+          auditedInsightGrid={auditedInsightGrid}
+          draftedWorkspace={
+            <NextPostQueue
+              analysis={analysis}
+              capturedPosts={posts}
+              generation={generation}
+              selectedPostBrief={selectedPostBrief}
+            />
+          }
+          referenceShelf={
+            <ReferenceShelf
+              phase={phase}
+              postCount={postCount}
+              topPostText={topPost ? topPost.text.slice(0, 42) : null}
+              metricHealth={metricHealth}
+              coveragePercent={coveragePercent}
+              metricSummary={metricSummary}
+              scanHistoryBrief={scanHistoryBrief}
+              history={history}
+              opportunityBrief={opportunityBrief}
+              evidenceDetailsOpen={evidenceDetailsOpen}
+              deferredCoachReport={
+                analysis ? <CoachReport analysis={analysis} postCount={postCount} deferred /> : null
+              }
+              strategyEngineSection={strategyEngineSection}
+              postBreakdownPanel={postBreakdownDeferred}
+              actionProgressItems={actionProgressItems}
+            />
+          }
+          recoveryNotices={
+            <>
+              {analysisError && <RecoveryNoticePanel kind="analysis" message={analysisError} />}
+              {generationError && <RecoveryNoticePanel kind="generation" message={generationError} />}
+              {memoryError && <RecoveryNoticePanel kind="memory" message={memoryError} />}
+              {topicError && <RecoveryNoticePanel kind="topic" message={topicError} />}
+            </>
+          }
+        />
       </main>
 
       {importOpen && (

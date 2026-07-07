@@ -43,7 +43,7 @@ function buildEvidenceDimension({
   if (!snapshot) {
     return {
       key: "evidence",
-      label: "Post data",
+      label: "How well we can see your posts",
       score: 10,
       statusLabel: "No posts yet",
       detail: "No posts are loaded yet.",
@@ -57,7 +57,7 @@ function buildEvidenceDimension({
 
   return {
     key: "evidence",
-    label: "Post data",
+    label: "How well we can see your posts",
     score,
     statusLabel,
     detail: `${percent}% of metrics captured across ${metricSummary.postsWithAnyMetrics}/${snapshot.posts.length} posts.`,
@@ -72,7 +72,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.status === "empty") {
     return {
       key: "momentum",
-      label: "Growth trend",
+      label: "Your momentum",
       score: 15,
       statusLabel: "No trend",
       detail: "No scan history is available yet.",
@@ -83,7 +83,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.status === "single-scan") {
     return {
       key: "momentum",
-      label: "Growth trend",
+      label: "Your momentum",
       score: 45,
       statusLabel: "Baseline only",
       detail: "One scan is captured, but movement is not measurable yet.",
@@ -94,7 +94,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal > 50) {
     return {
       key: "momentum",
-      label: "Growth trend",
+      label: "Your momentum",
       score: 92,
       statusLabel: "Accelerating",
       detail: `Median visible signal is up by ${scanHistory.deltas.medianSignal} since the previous scan.`,
@@ -105,7 +105,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal > 0) {
     return {
       key: "momentum",
-      label: "Growth trend",
+      label: "Your momentum",
       score: 78,
       statusLabel: "Up",
       detail: `Median visible signal is up by ${scanHistory.deltas.medianSignal} since the previous scan.`,
@@ -116,7 +116,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
   if (scanHistory.deltas.medianSignal < 0) {
     return {
       key: "momentum",
-      label: "Growth trend",
+      label: "Your momentum",
       score: 35,
       statusLabel: "Down",
       detail: `Median visible signal is down by ${Math.abs(scanHistory.deltas.medianSignal)} since the previous scan.`,
@@ -126,7 +126,7 @@ function buildMomentumDimension(scanHistory: ScanHistoryBrief): CreatorScorecard
 
   return {
     key: "momentum",
-    label: "Growth trend",
+    label: "Your momentum",
     score: 60,
     statusLabel: "Flat",
     detail: "Your posts are getting about the same traction as last scan.",

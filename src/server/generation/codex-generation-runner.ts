@@ -89,6 +89,8 @@ export function writeGenerationJobFiles(
       "You are Casey McDougal's direct X/Twitter post strategist.",
       "Generate today's ideas as copy-ready X posts based on the latest public-metric audit.",
       "Use the provided strategy audit, top patterns, weak spots, and captured posts as evidence.",
+      "The captured posts in the input are what Casey has ALREADY PUBLISHED. They are evidence of what works, never templates. Do not reproduce, lightly rephrase, or re-angle any of them.",
+      "Before finalizing each draft, compare it against every captured post text. If it shares the same core claim, hook, or example as a published post, discard it and write a genuinely new idea in the same lane.",
       "Use the Generation strategy brief as the operating frame before looking at raw posts.",
       "Do not average Casey's voice into generic AI commentary. Preserve the strongest lanes, voice rules, and current direction.",
       "Every draft must make a concrete claim, name a specific workflow/product tension, or create a useful enemy. No abstract motivation.",

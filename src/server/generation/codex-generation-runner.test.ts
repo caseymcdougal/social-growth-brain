@@ -60,6 +60,14 @@ describe("generation prompt direction", () => {
     expect(input).toContain("Move away from crypto");
   });
 
+  it("forbids reproducing already-published posts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gen-"));
+    writeGenerationJobFiles(dir, { snapshot, analysis, mode: "today", direction: null });
+    const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
+    expect(prompt).toContain("ALREADY PUBLISHED");
+    expect(prompt.toLowerCase()).toContain("do not reproduce");
+  });
+
   it("omits direction block when null", () => {
     const dir = mkdtempSync(join(tmpdir(), "gen-"));
     writeGenerationJobFiles(dir, { snapshot, analysis, mode: "today", direction: null });

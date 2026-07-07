@@ -8,7 +8,6 @@ import {
   ListPlus,
   PenLine,
   RotateCcw,
-  Sparkles,
   Target
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -34,7 +33,7 @@ import { formatPostingWindow } from "../postingWindow";
 
 const queue = [
   { icon: Target, label: "Audit", value: "Run strategy audit" },
-  { icon: Sparkles, label: "Generate", value: "Today's ideas" },
+  { icon: PenLine, label: "Generate", value: "Today's ideas" },
   { icon: Copy, label: "Export", value: "Copy drafts into X" }
 ];
 
@@ -193,6 +192,7 @@ export function NextPostQueue({
             <span>{workflowLabel(workflowStatus)}</span>
           </div>
           <strong>{slot.title}</strong>
+          {slot.sourceSignal && <p className="draft-based-on">Based on: {slot.sourceSignal}</p>}
           <p className="production-hook">{slot.hook}</p>
           <p className="production-draft">{slot.draft}</p>
           <details className="disclosure disclosure-compact draft-support" aria-label={`Draft support for ${slot.title}`}>
@@ -304,12 +304,12 @@ export function NextPostQueue({
   ) : null;
 
   const productionQueue =
-    productionPlan.slots.length > 0 ? (
-      <section className="production-queue" aria-label="Post production queue">
+    generation && productionPlan.slots.length > 0 ? (
+      <section className="production-queue" aria-label="Today's drafts">
         <div className="production-queue-head">
           <div>
-            <p className="eyebrow">Production Plan</p>
-            <h3>Production queue</h3>
+            <p className="eyebrow">Today's drafts</p>
+            <h3>Draft queue</h3>
             <p>{productionPlan.summary}</p>
           </div>
           <button
@@ -329,9 +329,9 @@ export function NextPostQueue({
           {primarySlot && renderProductionSlot(primarySlot, { position: 1, timing: "Next post" })}
         </ol>
         {workflowHasActivity && (
-        <details className="disclosure disclosure-flush production-workflow-panel" aria-label="Production workflow tracker" open={workflowTrackerOpen}>
+        <details className="disclosure disclosure-flush production-workflow-panel" aria-label="Draft status" open={workflowTrackerOpen}>
           <summary>
-            <span>Workflow tracker</span>
+            <span>Draft status</span>
             <strong>{workflowTrackerLabel}</strong>
             <small>{workflowTrackerGuidance}</small>
           </summary>
@@ -544,9 +544,9 @@ export function NextPostQueue({
                   <PenLine size={17} aria-hidden="true" />
                   <div>
                     <span>{index === 0 ? `Recommended · ${post.title}` : post.title}</span>
+                    {post.source_signal && <p className="draft-based-on">Based on: {post.source_signal}</p>}
                     <p className="idea-hook">{post.hook}</p>
                     <small>{post.angle}</small>
-                    <p className="source-signal">{post.source_signal}</p>
                     <p className="idea-draft">{post.draft}</p>
                     <small>{post.why_this}</small>
                     <button className="copy-button" type="button" onClick={() => void copyText(copyId, post.draft)}>

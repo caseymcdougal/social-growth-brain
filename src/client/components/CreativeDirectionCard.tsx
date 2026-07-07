@@ -47,7 +47,7 @@ export function CreativeDirectionCard({
   }
 
   return (
-    <section className="panel direction-card" aria-label="Creative direction">
+    <section className="panel direction-card direction-card-embedded" aria-label="Creative direction">
       <div className="direction-head">
         <p className="eyebrow">
           <Compass size={13} aria-hidden="true" /> Creative direction

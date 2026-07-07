@@ -13,19 +13,22 @@ export function PostBreakdown({
   rankedPosts,
   analysis,
   deferred = false,
+  preview = false,
   selectedPostId = null,
   onSelectPost
 }: {
   rankedPosts: RankedPost[];
   analysis: AnalysisOutput | null;
   deferred?: boolean;
+  preview?: boolean;
   selectedPostId?: string | null;
   onSelectPost?: (postId: string) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [copyFailed, setCopyFailed] = useState<string | null>(null);
   const analysisByPostId = new Map(analysis?.post_analyses.map((item) => [item.post_id, item]) ?? []);
-  const topRankedPosts = rankedPosts.slice(0, DEFAULT_VISIBLE_POST_COUNT);
+  const visibleCount = preview ? DEFAULT_VISIBLE_POST_COUNT : DEFAULT_VISIBLE_POST_COUNT;
+  const topRankedPosts = rankedPosts.slice(0, visibleCount);
   const selectedLongTailPost = selectedPostId
     ? rankedPosts.find(
         (rankedPost) =>
@@ -146,8 +149,8 @@ export function PostBreakdown({
     <>
       <div className="section-head">
         <div>
-          <p className="eyebrow">Ranked review</p>
-          <h2 id="post-breakdown-title">{rankedPosts.length ? "Top public posts" : "No posts loaded"}</h2>
+          <p className="eyebrow">{preview ? "See your posts" : "Find what worked"}</p>
+          <h2 id="post-breakdown-title">{rankedPosts.length ? (preview ? "Your recent posts" : "What resonated most") : "No posts loaded"}</h2>
           {rankedPosts.length > 0 && (
             <p className="post-breakdown-lead">
               Showing the strongest decision posts first. Open the full review for the rest of the captured sample.
@@ -179,12 +182,20 @@ export function PostBreakdown({
     </>
   );
 
-  if (deferred && rankedPosts.length > 0) {
-    const rankedPostLabel = rankedPosts.length === 1 ? "ranked public post" : "ranked public posts";
+  if (preview) {
     return (
-      <details className="panel disclosure disclosure-panel post-breakdown source-evidence-disclosure" aria-label="Source evidence">
+      <section className="panel post-breakdown post-breakdown-preview" aria-labelledby="post-breakdown-title">
+        {postBreakdownContent}
+      </section>
+    );
+  }
+
+  if (deferred && rankedPosts.length > 0) {
+    const rankedPostLabel = rankedPosts.length === 1 ? "ranked post" : "ranked posts";
+    return (
+      <details className="panel disclosure disclosure-panel post-breakdown source-evidence-disclosure" aria-label="Your posts ranked">
         <summary>
-          <span>Source evidence</span>
+          <span>Your posts ranked</span>
           <strong>
             {rankedPosts.length} {rankedPostLabel}
           </strong>

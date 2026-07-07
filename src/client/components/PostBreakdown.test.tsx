@@ -90,7 +90,7 @@ test("keeps ranked rewrite copy stable when clipboard permission is denied", asy
 test("keeps the ranked long tail behind a closed full-review disclosure", () => {
   render(<PostBreakdown rankedPosts={rankedReviewPosts} analysis={null} />);
 
-  expect(screen.getByRole("heading", { name: "Top public posts" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "What resonated most" })).toBeInTheDocument();
   expect(screen.getByText("6 ranked")).toBeInTheDocument();
   expect(screen.getByText(/Showing the strongest decision posts first/i)).toBeInTheDocument();
   expect(screen.getByText("Visible decision post 1")).toBeInTheDocument();
@@ -109,11 +109,11 @@ test("keeps the ranked long tail behind a closed full-review disclosure", () => 
 test("can keep ranked evidence behind a closed source-evidence disclosure", () => {
   render(<PostBreakdown rankedPosts={rankedReviewPosts} analysis={null} deferred />);
 
-  const sourceEvidence = screen.getByLabelText("Source evidence");
+  const sourceEvidence = screen.getByLabelText("Your posts ranked");
   expect(sourceEvidence.tagName).toBe("DETAILS");
   expect(sourceEvidence).not.toHaveAttribute("open");
-  expect(within(sourceEvidence).getByText("6 ranked public posts")).toBeInTheDocument();
-  expect(within(sourceEvidence).getByRole("heading", { name: "Top public posts" })).toBeInTheDocument();
+  expect(within(sourceEvidence).getByText("6 ranked posts")).toBeInTheDocument();
+  expect(within(sourceEvidence).getByRole("heading", { name: "What resonated most" })).toBeInTheDocument();
   expect(within(sourceEvidence).getByText("Visible decision post 1")).toBeInTheDocument();
   expect(within(sourceEvidence).getByLabelText("Full ranked review")).not.toHaveAttribute("open");
 });
