@@ -10,6 +10,7 @@ import {
   type TopicExplorationOutput
 } from "../shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot, CaptureSource } from "../shared/types";
+import { voiceProfileSchema, type VoiceProfile } from "../shared/voice-profile";
 
 interface StoredProfile {
   id: number;
@@ -514,6 +515,33 @@ export function createRepositories(db: AppDatabase) {
 
     deleteCreativeDirection(id: number): void {
       db.prepare("DELETE FROM creative_direction WHERE id = ?").run(id);
+    },
+
+    saveVoiceProfile(input: { profileSnapshotId: number; jobDir: string; profile: VoiceProfile }): number {
+      const createdAt = new Date().toISOString();
+      const result = db
+        .prepare("INSERT INTO voice_profiles (profile_snapshot_id, profile_json, created_at, job_dir) VALUES (?, ?, ?, ?)")
+        .run(input.profileSnapshotId, JSON.stringify(input.profile), createdAt, input.jobDir);
+      return Number(result.lastInsertRowid);
+    },
+
+    getLatestVoiceProfile(): { profile: VoiceProfile; derivedAt: string } | null {
+      const row = db
+        .prepare("SELECT profile_json, created_at FROM voice_profiles ORDER BY created_at DESC, id DESC LIMIT 1")
+        .get() as { profile_json: string; created_at: string } | undefined;
+      if (!row) return null;
+      return { profile: voiceProfileSchema.parse(JSON.parse(row.profile_json)), derivedAt: row.created_at };
+    },
+
+    getVoiceOverrides(): string {
+      const row = db.prepare("SELECT text FROM voice_overrides WHERE id = 1").get() as { text: string } | undefined;
+      return row?.text ?? "";
+    },
+
+    setVoiceOverrides(text: string): void {
+      db.prepare(
+        "INSERT INTO voice_overrides (id, text, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at"
+      ).run(text.trim(), new Date().toISOString());
     },
 
     getCreativeDirection(): { text: string; updatedAt: string } | null {

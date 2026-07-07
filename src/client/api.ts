@@ -230,6 +230,41 @@ export async function exploreNearbyTopics(): Promise<TopicExplorationOutput> {
   return data.exploration;
 }
 
+export type VoiceProfileState = {
+  profile: import("../shared/voice-profile").VoiceProfile | null;
+  derivedAt: string | null;
+  overrides: string;
+};
+
+export async function getVoiceProfile(): Promise<VoiceProfileState> {
+  const response = await fetch("/api/voice/latest");
+  if (!response.ok) throw new Error("Failed to load voice profile");
+  const data = await response.json();
+  return { profile: data.profile ?? null, derivedAt: data.derivedAt ?? null, overrides: data.overrides ?? "" };
+}
+
+export async function refreshVoiceProfile(): Promise<VoiceProfileState> {
+  const response = await fetch("/api/voice/refresh", { method: "POST" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Voice derivation failed");
+  }
+  return { profile: data.profile ?? null, derivedAt: data.derivedAt ?? null, overrides: data.overrides ?? "" };
+}
+
+export async function saveVoiceOverrides(text: string): Promise<string> {
+  const response = await fetch("/api/voice/overrides", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to save voice notes");
+  }
+  return data.overrides ?? "";
+}
+
 export async function saveCreativeDirection(text: string): Promise<CreativeDirectionEntry[]> {
   const response = await fetch("/api/direction", {
     method: "POST",

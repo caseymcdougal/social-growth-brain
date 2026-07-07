@@ -57,11 +57,14 @@ const DeferredStrategyMemoryPanel = lazy(() =>
 const DeferredExperimentLedgerPanel = lazy(() =>
   import("./client/components/ExperimentLedgerPanel").then((module) => ({ default: module.ExperimentLedgerPanel }))
 );
+const DeferredVoiceProfilePanel = lazy(() =>
+  import("./client/components/VoiceProfilePanel").then((module) => ({ default: module.VoiceProfilePanel }))
+);
 const DeferredTopicExplorer = lazy(() =>
   import("./client/components/TopicExplorer").then((module) => ({ default: module.TopicExplorer }))
 );
 
-type StrategyEngineView = "experiments" | "memory" | "topics";
+type StrategyEngineView = "experiments" | "memory" | "voice" | "topics";
 
 export function App() {
   const [bootstrappedDashboard] = useState<DashboardState | null>(() => getBootstrappedDashboardState());
@@ -271,7 +274,7 @@ export function App() {
               : strategyMemory
                 ? "Memory saved"
                 : analysis
-                  ? "3 deeper tools ready"
+                  ? "4 deeper tools ready"
                   : "Find patterns first";
 
   const strategyEngineViews = useMemo(
@@ -286,6 +289,11 @@ export function App() {
           key: "memory" as const,
           label: "Memory",
           detail: memoryProposal ? "Suggestion ready" : strategyMemory ? "Saved" : analysis ? "Ready to update" : "Find patterns first"
+        },
+        {
+          key: "voice" as const,
+          label: "Voice",
+          detail: snapshot ? "How you write" : "Scan posts first"
         },
         {
           key: "topics" as const,
@@ -651,6 +659,9 @@ export function App() {
               onRefresh={() => void handleRefreshMemory()}
               onApply={(proposalId) => void handleApplyMemory(proposalId)}
             />
+          )}
+          {strategyEngineView === "voice" && (
+            <DeferredVoiceProfilePanel hasSnapshot={Boolean(snapshot)} />
           )}
           {strategyEngineView === "topics" && (
             <DeferredTopicExplorer

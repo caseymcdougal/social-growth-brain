@@ -81,4 +81,25 @@ describe("generation prompt direction", () => {
     const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
     expect(prompt.toLowerCase()).not.toContain("creative direction");
   });
+
+  it("injects the voice block when provided", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gen-"));
+    writeGenerationJobFiles(dir, {
+      snapshot,
+      analysis,
+      mode: "today",
+      direction: null,
+      voiceBlock: "Casey's voice profile: mostly lowercase, no hashtags."
+    });
+    const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
+    expect(prompt).toContain("Casey's voice profile: mostly lowercase, no hashtags.");
+    expect(prompt.toLowerCase()).toContain("follow the voice profile");
+  });
+
+  it("omits the voice block when absent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gen-"));
+    writeGenerationJobFiles(dir, { snapshot, analysis, mode: "today", direction: null });
+    const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
+    expect(prompt.toLowerCase()).not.toContain("follow the voice profile");
+  });
 });

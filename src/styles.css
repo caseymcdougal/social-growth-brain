@@ -2854,6 +2854,87 @@ h3 {
   line-height: 1.35;
 }
 
+.voice-summary {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.voice-rule-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.voice-rule-list li {
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.voice-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  line-height: 1.45;
+}
+
+.voice-overrides {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+}
+
+.voice-overrides label {
+  display: grid;
+  gap: 4px;
+}
+
+.voice-overrides label span {
+  color: var(--faint);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.voice-overrides label small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.voice-overrides textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 68px;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  background: var(--tint-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  line-height: 1.45;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.voice-overrides textarea::placeholder {
+  color: var(--faint);
+}
+
+.voice-overrides textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.voice-overrides button {
+  justify-self: start;
+}
+
 .proposal-list,
 .topic-list {
   margin-top: 16px;

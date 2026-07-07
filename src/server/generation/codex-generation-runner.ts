@@ -60,6 +60,7 @@ export function writeGenerationJobFiles(
     mode: "today";
     strategyMemory?: StrategyMemory | null;
     direction?: string | null;
+    voiceBlock?: string;
   }
 ) {
   mkdirSync(jobDir, { recursive: true });
@@ -97,6 +98,7 @@ export function writeGenerationJobFiles(
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
       "Each draft should have a specific angle, a strong hook, and a clear reason tied to the audit.",
+      ...(input.voiceBlock ? [input.voiceBlock, "Every hook and draft must follow the voice profile above. The style excerpts show the sound only — reusing their content counts as duplication."] : []),
       ...(direction ? [`Casey's current creative direction (follow it): ${direction}`] : []),
       "Return JSON only. Do not include markdown.",
       "",
@@ -118,6 +120,7 @@ export class CodexGenerationRunner implements GenerationRunner {
     analysis: AnalysisOutput;
     strategyMemory?: StrategyMemory | null;
     direction?: string | null;
+    voiceBlock?: string;
     jobDir: string;
   }): Promise<GenerationOutput> {
     const files = writeGenerationJobFiles(input.jobDir, {
@@ -125,7 +128,8 @@ export class CodexGenerationRunner implements GenerationRunner {
       analysis: input.analysis,
       mode: "today",
       strategyMemory: input.strategyMemory ?? null,
-      direction: input.direction ?? null
+      direction: input.direction ?? null,
+      voiceBlock: input.voiceBlock
     });
     return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => generationOutputSchema.parse(raw));
   }

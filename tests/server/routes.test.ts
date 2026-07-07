@@ -12,6 +12,24 @@ import { createServerApp } from "../../src/server/routes";
 import type { StrategyIntelligenceRunner } from "../../src/server/strategy/strategy-intelligence-runner";
 import analysisFixture from "../fixtures/analysis-valid.json";
 
+const voiceProfileFixture = {
+  summary: "Lowercase, terse build-log voice.",
+  casing_and_punctuation: ["mostly lowercase"],
+  sentence_rhythm: ["short declaratives"],
+  vocabulary: ["build mode"],
+  hook_moves: ["opens with a concrete action"],
+  banned_moves: ["no hashtags"],
+  style_excerpts: ["went from serving tables to shipping software"]
+};
+
+// Inject a stub voice runner so the auto-refresh after import/capture never spawns a real LLM subprocess.
+function makeApp(options: Parameters<typeof createServerApp>[0]) {
+  return createServerApp({
+    voiceRunner: { deriveProfile: vi.fn(async () => voiceProfileFixture) },
+    ...options
+  });
+}
+
 const servers: { close: () => void }[] = [];
 
 afterEach(() => {
@@ -31,7 +49,7 @@ function listen(app: ReturnType<typeof createServerApp>): Promise<string> {
 describe("server routes", () => {
   it("reports API health", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
 
     const response = await fetch(`${baseUrl}/api/health`);
     const body = await response.json();
@@ -42,7 +60,7 @@ describe("server routes", () => {
 
   it("imports a manual snapshot and returns latest snapshot", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     const importResponse = await fetch(`${baseUrl}/api/import`, {
@@ -60,7 +78,7 @@ describe("server routes", () => {
 
   it("returns validation errors for invalid manual imports", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
 
     const response = await fetch(`${baseUrl}/api/import`, {
       method: "POST",
@@ -78,7 +96,7 @@ describe("server routes", () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
     const output = analysisOutputSchema.parse(analysisFixture);
     const aiRunner = { analyze: vi.fn(async () => output) };
-    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const baseUrl = await listen(makeApp({ dataDir: dir, aiRunner }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -100,7 +118,7 @@ describe("server routes", () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
     const output = analysisOutputSchema.parse(analysisFixture);
     const aiRunner = { analyze: vi.fn(async () => output) };
-    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const baseUrl = await listen(makeApp({ dataDir: dir, aiRunner }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -123,7 +141,7 @@ describe("server routes", () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
     const output = analysisOutputSchema.parse(analysisFixture);
     const aiRunner = { analyze: vi.fn(async () => output) };
-    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner }));
+    const baseUrl = await listen(makeApp({ dataDir: dir, aiRunner }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -146,7 +164,7 @@ describe("server routes", () => {
 
   it("returns recent scan history in dashboard startup state", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
     const olderFixture = {
       ...fixture,
@@ -200,7 +218,7 @@ describe("server routes", () => {
 
   it("requires a successful audit before generating today's ideas", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -235,7 +253,7 @@ describe("server routes", () => {
     });
     const aiRunner = { analyze: vi.fn(async () => output) };
     const generationRunner = { generateToday: vi.fn(async () => generation) };
-    const baseUrl = await listen(createServerApp({ dataDir: dir, aiRunner, generationRunner }));
+    const baseUrl = await listen(makeApp({ dataDir: dir, aiRunner, generationRunner }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -269,7 +287,7 @@ describe("server routes", () => {
       ]
     });
     const baseUrl = await listen(
-      createServerApp({
+      makeApp({
         dataDir: dir,
         aiRunner: { analyze: vi.fn(async () => output) },
         generationRunner: { generateToday: vi.fn(async () => generation) }
@@ -294,7 +312,7 @@ describe("server routes", () => {
 
   it("requires a successful audit before refreshing strategy memory", async () => {
     const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
-    const baseUrl = await listen(createServerApp({ dataDir: dir }));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
     const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
 
     await fetch(`${baseUrl}/api/import`, {
@@ -343,7 +361,7 @@ describe("server routes", () => {
       exploreTopics: vi.fn()
     };
     const baseUrl = await listen(
-      createServerApp({
+      makeApp({
         dataDir: dir,
         aiRunner: { analyze: vi.fn(async () => output) },
         strategyRunner
@@ -433,7 +451,7 @@ describe("server routes", () => {
       exploreTopics
     };
     const baseUrl = await listen(
-      createServerApp({
+      makeApp({
         dataDir: dir,
         aiRunner: { analyze: vi.fn(async () => output) },
         strategyRunner
@@ -467,5 +485,53 @@ describe("server routes", () => {
 
     const latestTopics = await (await fetch(`${baseUrl}/api/topics/latest`)).json();
     expect(latestTopics.exploration.topics[0].draft).toContain("scoreboard");
+  });
+
+  it("derives, stores, and injects the voice profile into analysis", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const output = analysisOutputSchema.parse(analysisFixture);
+    const analyze = vi.fn(async (_snapshot: unknown, _jobDir: string, _voiceBlock?: string) => output);
+    const baseUrl = await listen(makeApp({ dataDir: dir, aiRunner: { analyze } }));
+    const fixture = JSON.parse(readFileSync("tests/fixtures/manual-import-valid.json", "utf8"));
+
+    await fetch(`${baseUrl}/api/import`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture)
+    });
+
+    const refreshBody = await (await fetch(`${baseUrl}/api/voice/refresh`, { method: "POST" })).json();
+    expect(refreshBody.ok).toBe(true);
+    expect(refreshBody.profile.summary).toContain("build-log");
+
+    const latestBody = await (await fetch(`${baseUrl}/api/voice/latest`)).json();
+    expect(latestBody.profile.banned_moves).toContain("no hashtags");
+    expect(latestBody.derivedAt).toBeTruthy();
+
+    const overridesBody = await (
+      await fetch(`${baseUrl}/api/voice/overrides`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: "never use em dashes" })
+      })
+    ).json();
+    expect(overridesBody.overrides).toBe("never use em dashes");
+
+    await fetch(`${baseUrl}/api/analyze`, { method: "POST" });
+    expect(analyze).toHaveBeenCalledOnce();
+    const voiceBlock = analyze.mock.calls[0]?.[2] ?? "";
+    expect(voiceBlock).toContain("no hashtags");
+    expect(voiceBlock).toContain("never use em dashes");
+  });
+
+  it("returns 409 when deriving a voice profile with no snapshot", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+    const baseUrl = await listen(makeApp({ dataDir: dir }));
+
+    const response = await fetch(`${baseUrl}/api/voice/refresh`, { method: "POST" });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.errorStage).toBe("no_snapshot");
   });
 });

@@ -14,6 +14,8 @@ import { createJobDir } from "./jobs";
 import { createRepositories } from "./repositories";
 import { CodexStrategyIntelligenceRunner } from "./strategy/codex-strategy-intelligence-runner";
 import type { StrategyIntelligenceRunner } from "./strategy/strategy-intelligence-runner";
+import { LlmVoiceProfileRunner, type VoiceProfileRunner } from "./voice/voice-profile-runner";
+import { buildVoicePromptBlock } from "../shared/voice-profile";
 
 export function createServerApp(options: {
   dataDir: string;
@@ -21,6 +23,7 @@ export function createServerApp(options: {
   captureRunner?: CaptureRunner;
   generationRunner?: GenerationRunner;
   strategyRunner?: StrategyIntelligenceRunner;
+  voiceRunner?: VoiceProfileRunner;
 }) {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
@@ -31,6 +34,30 @@ export function createServerApp(options: {
   const aiRunner = options.aiRunner ?? new CodexCliRunner();
   const generationRunner = options.generationRunner ?? new CodexGenerationRunner();
   const strategyRunner = options.strategyRunner ?? new CodexStrategyIntelligenceRunner();
+  const voiceRunner = options.voiceRunner ?? new LlmVoiceProfileRunner();
+
+  function currentVoiceBlock(): string {
+    return buildVoicePromptBlock({
+      profile: repos.getLatestVoiceProfile()?.profile ?? null,
+      overrides: repos.getVoiceOverrides()
+    });
+  }
+
+  async function refreshVoiceProfile(profileSnapshotId: number) {
+    const snapshot = repos.getLatestSnapshot();
+    if (!snapshot || snapshot.posts.length === 0) throw new Error("No posts captured for voice derivation");
+    const jobDir = createJobDir(options.dataDir, "voice-profile");
+    const profile = await voiceRunner.deriveProfile({ snapshot, jobDir });
+    repos.saveVoiceProfile({ profileSnapshotId, jobDir, profile });
+    return profile;
+  }
+
+  // ponytail: fire-and-forget after capture/import; failures only logged, capture never blocks on voice
+  function refreshVoiceProfileInBackground(profileSnapshotId: number) {
+    void refreshVoiceProfile(profileSnapshotId).catch((error) => {
+      console.error("[voice] background refresh failed:", error instanceof Error ? error.message : error);
+    });
+  }
 
   app.get("/api/health", (_request, response) => {
     response.json({ ok: true, service: "social-audit" });
@@ -40,6 +67,7 @@ export function createServerApp(options: {
     try {
       const snapshot = parseManualImportJson(JSON.stringify(request.body));
       const profileSnapshotId = repos.saveCapturedSnapshot(snapshot);
+      refreshVoiceProfileInBackground(profileSnapshotId);
       response.json({ ok: true, profileSnapshotId });
     } catch (error) {
       response.status(400).json({
@@ -113,6 +141,7 @@ export function createServerApp(options: {
       const handle = typeof request.body?.handle === "string" ? request.body.handle : "caseymcdougal";
       const snapshot = await captureRunner.captureRecentPosts(handle);
       const profileSnapshotId = repos.saveCapturedSnapshot(snapshot);
+      refreshVoiceProfileInBackground(profileSnapshotId);
       response.json({ ok: true, profileSnapshotId, snapshot });
     } catch (error) {
       if (error instanceof CaptureError) {
@@ -140,7 +169,7 @@ export function createServerApp(options: {
 
     const jobDir = createJobDir(options.dataDir, "analysis");
     try {
-      const output = await aiRunner.analyze(snapshot, jobDir);
+      const output = await aiRunner.analyze(snapshot, jobDir, currentVoiceBlock());
       const latestProfile = db
         .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
         .get() as { id: number } | undefined;
@@ -192,6 +221,7 @@ export function createServerApp(options: {
         analysis: latestAnalysis.analysis,
         strategyMemory: repos.getLatestStrategyMemory()?.memory ?? null,
         direction: repos.getCreativeDirection()?.text ?? null,
+        voiceBlock: currentVoiceBlock(),
         jobDir
       });
       const generationRunId = repos.saveGeneration({
@@ -288,6 +318,52 @@ export function createServerApp(options: {
     }
 
     response.json({ ok: true, memoryId: applied.id, memory: applied.memory });
+  });
+
+  app.get("/api/voice/latest", (_request, response) => {
+    const latest = repos.getLatestVoiceProfile();
+    response.json({
+      ok: true,
+      profile: latest?.profile ?? null,
+      derivedAt: latest?.derivedAt ?? null,
+      overrides: repos.getVoiceOverrides()
+    });
+  });
+
+  app.put("/api/voice/overrides", (request, response) => {
+    const text = typeof request.body?.text === "string" ? request.body.text : null;
+    if (text === null) {
+      response.status(400).json({ ok: false, errorStage: "invalid_overrides", errorMessage: "Provide overrides text" });
+      return;
+    }
+    repos.setVoiceOverrides(text);
+    response.json({ ok: true, overrides: repos.getVoiceOverrides() });
+  });
+
+  app.post("/api/voice/refresh", async (_request, response) => {
+    const latestProfile = db
+      .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (!latestProfile) {
+      response.status(409).json({
+        ok: false,
+        errorStage: "no_snapshot",
+        errorMessage: "Import or capture posts before deriving a voice profile"
+      });
+      return;
+    }
+
+    try {
+      const profile = await refreshVoiceProfile(latestProfile.id);
+      const latest = repos.getLatestVoiceProfile();
+      response.json({ ok: true, profile, derivedAt: latest?.derivedAt ?? null, overrides: repos.getVoiceOverrides() });
+    } catch (error) {
+      response.status(500).json({
+        ok: false,
+        errorStage: "voice_runner_failed",
+        errorMessage: error instanceof Error ? error.message : "Voice derivation failed"
+      });
+    }
   });
 
   app.post("/api/topics/explore", async (_request, response) => {

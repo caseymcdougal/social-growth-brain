@@ -145,5 +145,19 @@ function migrate(db: AppDatabase) {
       text TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS voice_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_snapshot_id INTEGER NOT NULL REFERENCES profile_snapshots(id) ON DELETE CASCADE,
+      profile_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      job_dir TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS voice_overrides (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      text TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 }

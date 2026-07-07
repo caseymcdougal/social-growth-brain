@@ -92,7 +92,7 @@ export function buildCodexExecArgs(paths: { jobDir: string; schemaPath: string; 
   ];
 }
 
-export function writeCodexJobFiles(jobDir: string, snapshot: unknown) {
+export function writeCodexJobFiles(jobDir: string, snapshot: unknown, voiceBlock = "") {
   mkdirSync(jobDir, { recursive: true });
   const inputPath = join(jobDir, "input.json");
   const promptPath = join(jobDir, "prompt.md");
@@ -108,10 +108,12 @@ export function writeCodexJobFiles(jobDir: string, snapshot: unknown) {
       "Analyze the provided X/Twitter profile snapshot and recent original posts.",
       "Diagnose why posts likely performed the way they did using only the public visible metrics and text.",
       "Use public visible metrics as supporting evidence, not as a substitute for strategic judgment.",
+      "Field semantics: top_patterns and what_is_working contain ONLY repeatable positive mechanisms worth doing again. If nothing clearly worked, name the closest-to-working mechanism in the set — never state a failure ('posts got 0 likes') in those fields. Failures and risks belong only in what_is_holding_back.",
       "In the post_analyses, rank the strongest and weakest posts through the performance_read language even though the JSON field is named per-post.",
       "For weak posts, be specific about whether the issue is hook, clarity, audience fit, specificity, or weak stakes.",
       "For strong posts, explain the concrete mechanism that likely made readers care.",
       "Make next_post_ideas copy-ready: each draft should be usable in X with minimal editing and should follow from the diagnosis.",
+      ...(voiceBlock ? [voiceBlock, "Every rewrite, variant hook, and next_post_ideas draft must follow the voice profile above."] : []),
       "Return JSON only. Do not include markdown.",
       "",
       "Input JSON:",
@@ -124,8 +126,8 @@ export function writeCodexJobFiles(jobDir: string, snapshot: unknown) {
 }
 
 export class CodexCliRunner implements AiRunner {
-  async analyze(snapshot: CapturedAccountSnapshot, jobDir: string): Promise<AnalysisOutput> {
-    const files = writeCodexJobFiles(jobDir, snapshot);
+  async analyze(snapshot: CapturedAccountSnapshot, jobDir: string, voiceBlock = ""): Promise<AnalysisOutput> {
+    const files = writeCodexJobFiles(jobDir, snapshot, voiceBlock);
     return runLlmJob({ jobDir, ...files }, (raw) => analysisOutputSchema.parse(raw));
   }
 }

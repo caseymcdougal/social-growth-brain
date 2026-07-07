@@ -9,6 +9,7 @@ export interface GenerationRunner {
     analysis: AnalysisOutput;
     strategyMemory?: StrategyMemory | null;
     direction?: string | null;
+    voiceBlock?: string;
     jobDir: string;
   }): Promise<GenerationOutput>;
 }
