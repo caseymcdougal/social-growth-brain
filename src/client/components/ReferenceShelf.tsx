@@ -90,7 +90,7 @@ export function ReferenceShelf({
               </div>
               <div>
                 <dt>Your top post</dt>
-                <dd>{topPostText ?? "Scan to see"}</dd>
+                <dd className="signal-top-post">{topPostText ?? "Scan to see"}</dd>
               </div>
             </dl>
           </section>

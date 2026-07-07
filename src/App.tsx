@@ -732,7 +732,7 @@ export function App() {
             <ReferenceShelf
               phase={phase}
               postCount={postCount}
-              topPostText={topPost ? topPost.text.slice(0, 42) : null}
+              topPostText={topPost ? topPost.text : null}
               metricHealth={metricHealth}
               coveragePercent={coveragePercent}
               metricSummary={metricSummary}

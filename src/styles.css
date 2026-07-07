@@ -14,8 +14,8 @@
   --panel: rgba(244, 247, 255, 0.038);
   --panel-strong: rgba(244, 247, 255, 0.06);
   --panel-elevated: rgba(244, 247, 255, 0.09);
-  --line: rgba(255, 255, 255, 0.085);
-  --line-strong: rgba(255, 255, 255, 0.17);
+  --line: rgba(244, 247, 255, 0.085);
+  --line-strong: rgba(244, 247, 255, 0.17);
   --text: #f4f6f8;
   --muted: #949ca8;
   --faint: #5c636e;
@@ -42,7 +42,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.62);
   --shadow-lg: 0 28px 64px -22px rgba(0, 0, 0, 0.72);
-  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  --inset-top: inset 0 1px 0 rgba(244, 247, 255, 0.055);
   --glass-blur: blur(18px) saturate(1.2);
 
   /* spacing scale (4px base) */
@@ -1551,6 +1551,14 @@ h3 {
   line-height: 1.35;
 }
 
+.signal-top-post {
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .trend-panel {
   min-height: 190px;
   padding: var(--pad-panel);
@@ -1617,6 +1625,14 @@ h3 {
   margin-top: 5px;
   color: var(--faint);
   line-height: 1.35;
+}
+
+.trend-delta[data-dir="up"] {
+  color: var(--green);
+}
+
+.trend-delta[data-dir="down"] {
+  color: var(--danger);
 }
 
 .trend-shift {
@@ -3187,6 +3203,7 @@ h3 {
 .post-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  align-items: start;
   gap: 12px;
   margin-top: 16px;
 }

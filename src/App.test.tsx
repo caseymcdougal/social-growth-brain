@@ -847,8 +847,8 @@ test("shows scan history trend intelligence from dashboard history", async () =>
   const trendPanel = await screen.findByLabelText("Scan history trend");
   expect(within(trendPanel).getByRole("heading", { name: "Trendline" })).toBeInTheDocument();
   expect(within(trendPanel).getByText("Median visible signal up by 68 since previous scan.")).toBeInTheDocument();
-  expect(within(trendPanel).getByText("+68")).toBeInTheDocument();
-  expect(within(trendPanel).getByText("+50")).toBeInTheDocument();
+  expect(within(trendPanel).getByText("+68 vs last")).toBeInTheDocument();
+  expect(within(trendPanel).getByText("+50 vs last")).toBeInTheDocument();
   expect(within(trendPanel).getByText("New top post took over")).toBeInTheDocument();
   expect(within(trendPanel).getByText("Double down on the new winner, then scan again after the next post lands.")).toBeInTheDocument();
 });

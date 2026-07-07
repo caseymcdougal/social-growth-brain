@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { AnalysisSummary } from "../../shared/analysis-schema";
 import type { GenerationOutput } from "../../shared/generation-schema";
+import { draftLeadsWithHook } from "../../shared/draft-hook";
 import { formatSelectedPostLabBriefForClipboard, type SelectedPostLabBrief } from "../../shared/post-lab";
 import { buildProductionOutcomeLoop } from "../../shared/production-outcomes";
 import {
@@ -193,7 +194,7 @@ export function NextPostQueue({
           </div>
           <strong>{slot.title}</strong>
           {slot.sourceSignal && <p className="draft-based-on">Based on: {slot.sourceSignal}</p>}
-          <p className="production-hook">{slot.hook}</p>
+          {!draftLeadsWithHook(slot.draft, slot.hook) && <p className="production-hook">{slot.hook}</p>}
           <p className="production-draft">{slot.draft}</p>
           <details className="disclosure disclosure-compact draft-support" aria-label={`Draft support for ${slot.title}`}>
             <summary>
@@ -514,7 +515,7 @@ export function NextPostQueue({
                 <Lightbulb size={17} aria-hidden="true" />
                 <div>
                   <span>{idea.title}</span>
-                  <p className="idea-hook">{idea.hook}</p>
+                  {!draftLeadsWithHook(idea.draft, idea.hook) && <p className="idea-hook">{idea.hook}</p>}
                   <p className="idea-draft idea-draft-preview">{idea.draft}</p>
                   <small>{idea.reason}</small>
                 </div>
@@ -545,7 +546,7 @@ export function NextPostQueue({
                   <div>
                     <span>{index === 0 ? `Recommended · ${post.title}` : post.title}</span>
                     {post.source_signal && <p className="draft-based-on">Based on: {post.source_signal}</p>}
-                    <p className="idea-hook">{post.hook}</p>
+                    {!draftLeadsWithHook(post.draft, post.hook) && <p className="idea-hook">{post.hook}</p>}
                     <small>{post.angle}</small>
                     <p className="idea-draft">{post.draft}</p>
                     <small>{post.why_this}</small>
