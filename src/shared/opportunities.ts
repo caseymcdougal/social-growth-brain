@@ -79,7 +79,7 @@ function buildCommand({
   }
 
   if (!generation) {
-    const topPattern = analysis.top_patterns[0] ?? "the strongest observed pattern";
+    const topPattern = analysis.what_is_working[0] ?? analysis.top_patterns[0] ?? "the strongest observed pattern";
     return {
       action: "generate",
       label: "Next command",

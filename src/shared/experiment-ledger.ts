@@ -48,12 +48,15 @@ function experimentsFromMemory(memory: StrategyMemory | null): ExperimentCandida
 
 function experimentsFromAnalysis(analysis: AnalysisSummary | null): ExperimentCandidate[] {
   if (!analysis) return [];
-  return analysis.top_patterns.slice(0, 2).map((pattern, index) => ({
+  // Watch what's working, not raw top_patterns — the latter can carry a "posts got 0 likes"
+  // observation, which reads as nonsense once prefixed with "Repeat:".
+  const wins = analysis.what_is_working.length > 0 ? analysis.what_is_working : analysis.top_patterns;
+  return wins.slice(0, 2).map((pattern, index) => ({
     id: `pattern-${index}`,
     hypothesis: `Repeat: ${pattern}`,
     source: "pattern",
     sourceLabel: "Pattern watch",
-    evidence: "From top audit patterns."
+    evidence: "From what the audit says is working."
   }));
 }
 

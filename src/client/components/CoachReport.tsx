@@ -38,7 +38,9 @@ export function CoachReport({
     );
   }
 
-  const winningPattern = analysis.top_patterns[0] ?? analysis.what_is_working[0] ?? "Repeat the clearest specific take.";
+  // Read the literally-named "what's working" field first so a failure statement that leaks into
+  // top_patterns can never surface as a win. top_patterns is only a fallback.
+  const winningPattern = analysis.what_is_working[0] ?? analysis.top_patterns[0] ?? "Repeat the clearest specific take.";
   const mainRisk = analysis.what_is_holding_back[0] ?? "Avoid abstract claims that hide the reader benefit.";
   const contentLane = analysis.recommended_content_pillars[0] ?? "Use the strongest current lane for the next post.";
   const detailCount =

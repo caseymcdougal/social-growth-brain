@@ -170,7 +170,7 @@ describe("experiment ledger", () => {
     });
   });
 
-  it("falls back to top audit patterns before memory is accepted", () => {
+  it("watches what's working before memory is accepted", () => {
     const ledger = buildExperimentLedger({
       analysis: analysisFixture as AnalysisSummary,
       memory: null,
@@ -180,9 +180,25 @@ describe("experiment ledger", () => {
     expect(ledger.summary).toBe("Pattern watch created from the latest audit until strategy memory is applied.");
     expect(ledger.items[0]).toMatchObject({
       sourceLabel: "Pattern watch",
-      hypothesis: "Repeat: Specific product takes outperform broad motivation.",
-      evidence: "From top audit patterns."
+      hypothesis: "Repeat: Direct product opinions",
+      evidence: "From what the audit says is working."
     });
+  });
+
+  it("never builds a Repeat watch from a failure statement in top_patterns", () => {
+    const failureLeaning: AnalysisSummary = {
+      ...(analysisFixture as AnalysisSummary),
+      top_patterns: ["Every post got 0 likes and 0 reposts regardless of format"],
+      what_is_working: ["Named-project build logs draw the most replies"]
+    };
+    const ledger = buildExperimentLedger({
+      analysis: failureLeaning,
+      memory: null,
+      scanHistory: buildScanHistoryBrief([])
+    });
+
+    expect(ledger.items[0]?.hypothesis).toBe("Repeat: Named-project build logs draw the most replies");
+    expect(ledger.items.some((item) => item.hypothesis.includes("0 likes"))).toBe(false);
   });
 
   it("formats a portable experiment brief for working notes", () => {

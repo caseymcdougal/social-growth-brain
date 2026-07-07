@@ -8,7 +8,7 @@ export function AuditCompleteBanner({
   analysis: AnalysisSummary;
   scorecard: CreatorScorecard;
 }) {
-  const winningPattern = analysis.top_patterns[0] ?? analysis.what_is_working[0] ?? "Your clearest take is your best bet.";
+  const winningPattern = analysis.what_is_working[0] ?? analysis.top_patterns[0] ?? "Your clearest take is your best bet.";
   const lessonWhy =
     "This is what's making your best posts work. Lean into it again this week — it's your fastest path to growth.";
 
