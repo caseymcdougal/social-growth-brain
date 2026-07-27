@@ -150,7 +150,7 @@ export function App() {
   const currentStep = getCurrentStep(snapshot, analysis, generation);
   const coveragePercent = Math.round(metricSummary.completenessRatio * 100);
   const metricHealth =
-    coveragePercent >= 85 ? "Strong read" : coveragePercent >= 55 ? "Partial read" : "Not enough data yet";
+    coveragePercent >= 85 ? "Strong data" : coveragePercent >= 55 ? "Partial data" : "Not enough data yet";
 
   const actionProgressItems = useMemo<ActionProgressItem[]>(
     () => [
@@ -275,7 +275,7 @@ export function App() {
               : strategyMemory
                 ? "Memory saved"
                 : analysis
-                  ? "4 deeper tools ready"
+                  ? "Ready when you are"
                   : "Find patterns first";
 
   const strategyEngineViews = useMemo(
@@ -401,31 +401,9 @@ export function App() {
     };
   }, [analysis, deferredPanelsReady]);
 
-  async function handleImport(rawJson: string) {
-    setImportingSnapshot(true);
-    try {
-      await importSnapshot(JSON.parse(rawJson));
-      setAnalysis(null);
-      setFullAnalysis(null);
-      setAnalysisError(null);
-      setGeneration(null);
-      setGenerationError(null);
-      setMemoryProposal(null);
-      setMemoryError(null);
-      setTopicExploration(null);
-      setTopicError(null);
-      setCaptureError(null);
-      setSelectedPostId(null);
-      await refresh();
-    } finally {
-      setImportingSnapshot(false);
-    }
-  }
-
-  async function handleCapture() {
-    setCapturing(true);
-    setCaptureError(null);
-    setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
+  // Clear derived state only AFTER a new snapshot lands: a failed scan/import must never
+  // destroy the audit and drafts the user already has.
+  function clearDerivedState() {
     setAnalysis(null);
     setFullAnalysis(null);
     setAnalysisError(null);
@@ -436,8 +414,27 @@ export function App() {
     setTopicExploration(null);
     setTopicError(null);
     setSelectedPostId(null);
+  }
+
+  async function handleImport(rawJson: string) {
+    setImportingSnapshot(true);
+    try {
+      await importSnapshot(JSON.parse(rawJson));
+      clearDerivedState();
+      setCaptureError(null);
+      await refresh();
+    } finally {
+      setImportingSnapshot(false);
+    }
+  }
+
+  async function handleCapture() {
+    setCapturing(true);
+    setCaptureError(null);
+    setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
     try {
       const capturedSnapshot = await captureSnapshot();
+      clearDerivedState();
       setSnapshot(capturedSnapshot);
       setHistory((currentHistory) => [
         capturedSnapshot,
@@ -454,15 +451,15 @@ export function App() {
   async function handleAnalyze() {
     setAnalyzing(true);
     setAnalysisError(null);
-    setGeneration(null);
-    setGenerationError(null);
-    setMemoryProposal(null);
-    setMemoryError(null);
-    setTopicExploration(null);
-    setTopicError(null);
-    setSelectedPostId(null);
     try {
       const latestAnalysis = await analyzeLatestSnapshot();
+      setGeneration(null);
+      setGenerationError(null);
+      setMemoryProposal(null);
+      setMemoryError(null);
+      setTopicExploration(null);
+      setTopicError(null);
+      setSelectedPostId(null);
       setAnalysis(latestAnalysis);
       setFullAnalysis(latestAnalysis);
       window.setTimeout(() => scrollToSection("coach-report-title", { expand: true }), 400);
@@ -635,18 +632,17 @@ export function App() {
             setDirections(await deleteCreativeDirection(id));
           }}
         />
-        <div className="strategy-engine-tabs" role="tablist" aria-label="Strategy engine views">
+        <div className="strategy-engine-tabs" role="group" aria-label="Strategy engine views">
           {strategyEngineViews.map((view) => {
             const selected = strategyEngineView === view.key;
             return (
               <button
                 aria-controls={`strategy-engine-panel-${view.key}`}
-                aria-selected={selected}
+                aria-pressed={selected}
                 className="strategy-engine-tab"
                 id={`strategy-engine-tab-${view.key}`}
                 key={view.key}
                 onClick={() => handleStrategyEngineTabChange(view.key)}
-                role="tab"
                 type="button"
               >
                 <span>{view.label}</span>
@@ -660,7 +656,6 @@ export function App() {
           aria-labelledby={`strategy-engine-tab-${strategyEngineView}`}
           className="strategy-engine-panel-slot"
           id={`strategy-engine-panel-${strategyEngineView}`}
-          role="tabpanel"
         >
           {strategyEngineView === "experiments" && (
             <DeferredExperimentLedgerPanel analysis={analysis} memory={strategyMemory} scanHistory={scanHistoryBrief} />

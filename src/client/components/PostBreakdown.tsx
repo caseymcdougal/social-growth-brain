@@ -199,7 +199,7 @@ export function PostBreakdown({
           <strong>
             {rankedPosts.length} {rankedPostLabel}
           </strong>
-          <small>Open to trace the draft back to source posts or choose another post to work.</small>
+          <small>See which posts the draft came from, or pick a different post to remix.</small>
         </summary>
         <div className="source-evidence-body">{postBreakdownContent}</div>
       </details>

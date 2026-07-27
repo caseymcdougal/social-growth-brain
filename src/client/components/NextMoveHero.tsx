@@ -76,7 +76,12 @@ export function NextMoveHero(props: {
             </span>
           ))}
         </div>
-        <p className="eyebrow">Next move / {phaseLabel}</p>
+        <p className="eyebrow">
+          Next move / {phaseLabel}
+          <span className="visually-hidden">
+            {" "}· step {phaseIndex + 1} of {heroPhaseSteps.length}
+          </span>
+        </p>
         <h2 id="next-move-title">{headline}</h2>
         <p>{guidance}</p>
         {preview && <p className="phase-preview">{preview}</p>}

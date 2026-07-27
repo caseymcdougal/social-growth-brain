@@ -52,8 +52,8 @@ export function CreativeDirectionCard({
         <p className="eyebrow">
           <Compass size={13} aria-hidden="true" /> Creative direction
         </p>
-        <h2>Steer what gets generated</h2>
-        <p>Plain-language guidance fed into every idea, topic, and memory run. All saved directions apply.</p>
+        <h2>Tell the writer what you want</h2>
+        <p>Plain-language guidance that shapes every draft, topic, and memory update. All saved directions apply.</p>
       </div>
       <textarea
         className="direction-input"

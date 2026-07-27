@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AnalysisSummary } from "../../src/shared/analysis-schema";
 import type { GenerationOutput } from "../../src/shared/generation-schema";
 import type { SelectedPostLabBrief } from "../../src/shared/post-lab";
-import { buildPostProductionPlan, formatPostProductionPlanForClipboard } from "../../src/shared/post-production-plan";
+import { buildPostProductionPlan, formatPostProductionPlanForClipboard, humanizeSourceSignal } from "../../src/shared/post-production-plan";
 
 const selectedPostBrief: SelectedPostLabBrief = {
   postId: "post-1",
@@ -98,7 +98,7 @@ describe("post production plan", () => {
     const plan = buildPostProductionPlan({ analysis, generation, selectedPostBrief });
     const copied = formatPostProductionPlanForClipboard(plan);
 
-    expect(copied).toContain("Production queue");
+    expect(copied).toContain("Draft queue");
     expect(copied).toContain("1. Remix selected post [Ready to copy]");
     expect(copied).toContain("Hook: Your analytics should tell you what to post next.");
     expect(copied).toContain("Draft: Most creator dashboards are autopsies.");
@@ -181,5 +181,21 @@ describe("post production plan", () => {
     expect(plan.slots).toHaveLength(5);
     expect(plan.slots[0].source).toBe("selected-post");
     expect(plan.slots[4]).toMatchObject({ id: "generated-4", title: "Draft 4" });
+  });
+});
+
+describe("humanizeSourceSignal", () => {
+  it("strips key-path prefixes and joins segments in plain language", () => {
+    expect(
+      humanizeSourceSignal(
+        "strategy.strongestLanes: restaurant-floor-to-agent-builder stories; workingPatterns: concrete scene + specific detail"
+      )
+    ).toBe("restaurant-floor-to-agent-builder stories · concrete scene + specific detail");
+  });
+
+  it("leaves plain-English signals untouched", () => {
+    expect(humanizeSourceSignal("Posts with a clear enemy have stronger hooks.")).toBe(
+      "Posts with a clear enemy have stronger hooks."
+    );
   });
 });

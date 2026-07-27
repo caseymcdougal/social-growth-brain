@@ -92,7 +92,7 @@ test("renders the dashboard shell", async () => {
   expect(await screen.findByRole("button", { name: /Paste snapshot instead/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Scan my posts/i })).toHaveClass("primary-button");
   expect(screen.queryByRole("button", { name: /Find what's working/i })).not.toBeInTheDocument();
-  expect(screen.queryByLabelText("Audit command center")).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Your next post, ready to go" })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Creative direction")).not.toBeInTheDocument();
 });
 
@@ -129,7 +129,7 @@ test("shows generate today's ideas after an audit is available", async () => {
   expect(await screen.findByRole("heading", { name: "What resonated most" })).toBeInTheDocument();
   expect(screen.getByLabelText("Patterns found")).toBeInTheDocument();
   expect(within(screen.getByLabelText("Next move")).queryByLabelText("Current posting brief")).not.toBeInTheDocument();
-  expect(screen.queryByLabelText("Audit command center")).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Your next post, ready to go" })).not.toBeInTheDocument();
   const moreOptions = within(screen.getByLabelText("Next move")).getByLabelText("More options");
   fireEvent.click(within(moreOptions).getByText("More options"));
   expect(within(moreOptions).getByRole("button", { name: /Find patterns again/i })).toBeInTheDocument();
@@ -163,7 +163,7 @@ test("uses review draft queue as the primary command inside the generated comman
 
   render(<App />);
 
-  const commandCenter = await screen.findByLabelText("Audit command center");
+  const commandCenter = await screen.findByRole("region", { name: "Your next post, ready to go" });
   expect(commandCenter).toHaveAttribute("data-mode", "draft");
   expect(screen.queryByLabelText("Next move")).not.toBeInTheDocument();
   const reviewButton = within(commandCenter).getByRole("button", { name: /See my drafts/i });
@@ -222,7 +222,7 @@ test("shows only the generated command center without a duplicate next-move hero
 
   render(<App />);
 
-  const commandCenter = await screen.findByLabelText("Audit command center");
+  const commandCenter = await screen.findByRole("region", { name: "Your next post, ready to go" });
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
   expect(screen.queryByLabelText("Next move")).not.toBeInTheDocument();
   expect(within(handoff).getByText("1 draft staged")).toBeInTheDocument();
@@ -267,7 +267,7 @@ test("describes generated handoff by staged drafts instead of repeating the revi
 
   render(<App />);
 
-  const commandCenter = await screen.findByLabelText("Audit command center");
+  const commandCenter = await screen.findByRole("region", { name: "Your next post, ready to go" });
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
   expect(within(commandCenter).getByText("2 drafts · 100% of metrics captured")).toBeInTheDocument();
   expect(within(handoff).getByText("2 drafts staged")).toBeInTheDocument();
@@ -304,7 +304,7 @@ test("keeps generated command signals behind a closed status disclosure", async 
 
   render(<App />);
 
-  const commandCenter = await screen.findByLabelText("Audit command center");
+  const commandCenter = await screen.findByRole("region", { name: "Your next post, ready to go" });
   const signals = within(commandCenter).getByLabelText("Command signals");
   expect(signals.closest("details")).toBeNull();
   expect(within(signals).getByText("Your account health")).toBeInTheDocument();
@@ -331,7 +331,7 @@ test("surfaces a single next-move hero before operational telemetry when audited
   const nextMove = await screen.findByLabelText("Next move");
   expect(within(nextMove).getByRole("heading", { name: "Write your next post" })).toBeInTheDocument();
   expect(within(nextMove).getByRole("button", { name: /Write draft ideas/i })).toHaveClass("primary-button");
-  expect(screen.queryByLabelText("Audit command center")).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Your next post, ready to go" })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Creative direction")).not.toBeInTheDocument();
 
   const progressPanel = screen.getByLabelText("What's happening");
@@ -519,7 +519,7 @@ test("keeps generated-state priority signals behind a closed decision support di
   expect(postLab).not.toBeNull();
   expect(nextMoves.tagName).toBe("DETAILS");
   expect(nextMoves).not.toHaveAttribute("open");
-  expect(within(nextMoves).getByText(/\d suggested moves/)).toBeInTheDocument();
+  expect(within(nextMoves).getByText(/\d moves?/)).toBeInTheDocument();
   expect(within(nextMoves).getByText("Repeat the winning mechanism")).toBeInTheDocument();
   expect(within(nextMoves).getByRole("button", { name: /Copy next moves/i })).toBeInTheDocument();
   expect(postLab!.compareDocumentPosition(nextMoves)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -966,7 +966,7 @@ test("shows an experiment ledger that ties memory hypotheses to scan movement", 
   render(<App />);
 
   const ledger = await screen.findByLabelText("Experiment ledger");
-  expect(within(ledger).getByRole("heading", { name: "Hypothesis tracker" })).toBeInTheDocument();
+  expect(within(ledger).getByRole("heading", { name: "Ideas you're testing" })).toBeInTheDocument();
   expect(within(ledger).getByText("1 experiment looks validated by the latest scan.")).toBeInTheDocument();
   expect(within(ledger).getByText("Named workflow enemies increase replies.")).toBeInTheDocument();
   expect(within(ledger).getByText("Winning")).toBeInTheDocument();
@@ -1076,7 +1076,7 @@ test("keeps creator score details inside the compact generated command center", 
 
   render(<App />);
 
-  const commandCenter = await screen.findByLabelText("Audit command center");
+  const commandCenter = await screen.findByRole("region", { name: "Your next post, ready to go" });
   expect(commandCenter).toHaveAttribute("data-mode", "draft");
   expect(commandCenter).toHaveClass("is-generated");
   expect(screen.queryByLabelText("Creator operating scorecard")).not.toBeInTheDocument();
@@ -1183,16 +1183,16 @@ test("keeps advanced strategy tools behind a closed strategy engine disclosure",
 
   fireEvent.click(within(strategyEngine).getByText("Strategy tools"));
 
-  expect(await within(strategyEngine).findByRole("tablist", { name: "Strategy engine views" })).toBeInTheDocument();
-  const experimentsTab = within(strategyEngine).getByRole("tab", { name: /Experiments/i });
-  expect(experimentsTab).toHaveAttribute("aria-selected", "true");
-  expect(within(strategyEngine).getByRole("heading", { name: "Hypothesis tracker" })).toBeInTheDocument();
+  expect(await within(strategyEngine).findByRole("group", { name: "Strategy engine views" })).toBeInTheDocument();
+  const experimentsTab = within(strategyEngine).getByRole("button", { name: /Experiments/i });
+  expect(experimentsTab).toHaveAttribute("aria-pressed", "true");
+  expect(within(strategyEngine).getByRole("heading", { name: "Ideas you're testing" })).toBeInTheDocument();
   expect(within(strategyEngine).queryByRole("button", { name: /Update strategy memory/i })).not.toBeInTheDocument();
 
-  fireEvent.click(within(strategyEngine).getByRole("tab", { name: /Memory/i }));
+  fireEvent.click(within(strategyEngine).getByRole("button", { name: /Memory/i }));
   expect(await within(strategyEngine).findByRole("button", { name: /Update strategy memory/i })).toBeInTheDocument();
 
-  fireEvent.click(within(strategyEngine).getByRole("tab", { name: /Topics/i }));
+  fireEvent.click(within(strategyEngine).getByRole("button", { name: /Topics/i }));
   expect(await within(strategyEngine).findByRole("button", { name: /Explore nearby topics/i })).toBeInTheDocument();
 });
 
@@ -1295,12 +1295,12 @@ test("shows a production queue that prioritizes selected post remixes over gener
   expect(slots).toHaveLength(1);
   expect(slots[0]).toHaveTextContent("Remix selected post");
   expect(slots[0]).toHaveTextContent("Ready to copy");
-  const backlog = within(productionQueue).getByLabelText("Queue backlog");
+  const backlog = within(productionQueue).getByLabelText("More drafts");
   expect(backlog.tagName).toBe("DETAILS");
   expect(backlog).not.toHaveAttribute("open");
   expect(within(backlog).getByText("1 alternate slot")).toBeInTheDocument();
   expect(within(backlog).getByText("Turn analytics into a strategist")).toBeInTheDocument();
-  expect(within(productionQueue).getByRole("button", { name: /Copy production plan/i })).toBeInTheDocument();
+  expect(within(productionQueue).getByRole("button", { name: /Copy today's plan/i })).toBeInTheDocument();
 });
 
 test("keeps raw generated drafts behind a closed draft library", async () => {
@@ -1467,8 +1467,8 @@ test("keeps skipped-only production workflow history behind the tracker summary"
   const productionQueue = await screen.findByLabelText("Today's drafts");
   const workflowTracker = within(productionQueue).getByLabelText("Draft status");
   expect(workflowTracker).not.toHaveAttribute("open");
-  expect(within(workflowTracker).getByText("Open 0 · planned 0 · used 0 · skipped 1")).toBeInTheDocument();
-  expect(within(workflowTracker).getByText("Closed until you plan, use, or measure a slot.")).toBeInTheDocument();
+  expect(within(workflowTracker).getByText(/1 skipped/)).toBeInTheDocument();
+  expect(within(workflowTracker).getByText("What happened to each draft.")).toBeInTheDocument();
 });
 
 test("promotes the next open production slot when the leading draft is skipped", async () => {
@@ -1527,7 +1527,7 @@ test("promotes the next open production slot when the leading draft is skipped",
   expect(primarySlot).toHaveTextContent("Next post");
   expect(primarySlot).not.toHaveTextContent("Skipped first idea");
 
-  const backlog = within(productionQueue).getByLabelText("Queue backlog");
+  const backlog = within(productionQueue).getByLabelText("More drafts");
   expect(within(backlog).getByText("Skipped first idea")).toBeInTheDocument();
   expect(within(backlog).getByText("Skipped")).toBeInTheDocument();
 });
@@ -1573,7 +1573,7 @@ test("persists production queue workflow state across refreshes", async () => {
   let productionQueue = await screen.findByLabelText("Today's drafts");
   fireEvent.click(within(productionQueue).getByRole("button", { name: /Plan slot/i }));
 
-  expect(within(productionQueue).getByText("Planned 1")).toBeInTheDocument();
+  expect(within(productionQueue).getByText(/1 planned/)).toBeInTheDocument();
   expect(within(productionQueue).getByText("Planned")).toBeInTheDocument();
   expect(window.localStorage.getItem("social-audit-production-workflow-v1")).toContain('"generated-1":"planned"');
 
@@ -1581,7 +1581,7 @@ test("persists production queue workflow state across refreshes", async () => {
   render(<App />);
 
   productionQueue = await screen.findByLabelText("Today's drafts");
-  expect(within(productionQueue).getByText("Planned 1")).toBeInTheDocument();
+  expect(within(productionQueue).getByText(/1 planned/)).toBeInTheDocument();
   expect(within(productionQueue).getByRole("button", { name: /Mark used/i })).toBeInTheDocument();
   expect(within(productionQueue).getByRole("button", { name: /Skip/i })).toBeInTheDocument();
 });
@@ -1712,7 +1712,7 @@ test("closes the production loop by matching used drafts to captured posts", asy
   fireEvent.click(within(productionQueue).getByRole("button", { name: /Plan slot/i }));
   fireEvent.click(within(productionQueue).getByRole("button", { name: /Mark used/i }));
 
-  const outcomeLoop = within(productionQueue).getByLabelText("Production outcome loop");
+  const outcomeLoop = within(productionQueue).getByLabelText("What happened after posting");
   expect(within(outcomeLoop).getByText("1 used slot matched in the latest scan.")).toBeInTheDocument();
   expect(within(outcomeLoop).getByText("Matched captured post")).toBeInTheDocument();
   expect(within(outcomeLoop).getByText("1,400 views · 22 likes · 3 replies · 5 reposts · 1 bookmark")).toBeInTheDocument();

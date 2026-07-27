@@ -87,7 +87,6 @@ export function AuditCommandCenter({
     <section
       className={isGenerated ? "panel command-center-panel is-generated" : "panel command-center-panel"}
       data-mode={isGenerated ? "draft" : "audit"}
-      aria-label="Audit command center"
       aria-labelledby="command-center-title"
     >
       <div className="command-center-lead">

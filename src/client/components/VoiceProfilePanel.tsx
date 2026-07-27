@@ -107,8 +107,8 @@ export function VoiceProfilePanel({ hasSnapshot }: { hasSnapshot: boolean }) {
         <div className="memory-empty">
           <AudioLines size={18} aria-hidden="true" />
           <p>
-            Derive a style card from your published posts. Every generated draft and rewrite follows it, so posts sound
-            like you instead of generic AI commentary. It re-derives automatically after each new scan.
+            Build a style card from your published posts. Every draft and rewrite follows it, so posts sound like you
+            instead of generic AI commentary. It updates automatically after each new scan.
           </p>
         </div>
       )}
@@ -128,7 +128,7 @@ export function VoiceProfilePanel({ hasSnapshot }: { hasSnapshot: boolean }) {
       <div className="voice-overrides">
         <label htmlFor="voice-overrides-input">
           <span>Your voice notes</span>
-          <small>Always applied, and they win over the derived rules. Survive re-derives.</small>
+          <small>Always applied. These win over the derived rules and stick around when the profile updates.</small>
         </label>
         <textarea
           id="voice-overrides-input"

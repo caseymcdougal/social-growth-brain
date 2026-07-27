@@ -14,5 +14,8 @@ export function scrollToSection(id: string, options: { expand?: boolean } = {}) 
 
   target.classList.add("scroll-target-focus");
   target.scrollIntoView({ block: "start", behavior: "smooth" });
+  // Move keyboard/screen-reader focus along with the visual scroll so the jump is announced.
+  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
   window.setTimeout(() => target.classList.remove("scroll-target-focus"), 2000);
 }

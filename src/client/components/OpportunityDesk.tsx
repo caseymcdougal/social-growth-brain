@@ -68,9 +68,9 @@ export function OpportunityDesk({ brief, deferred = false }: { brief: Opportunit
     return (
       <details className="panel disclosure disclosure-panel opportunity-desk opportunity-disclosure" aria-label="What to do next">
         <summary>
-          <span>What to do next</span>
-          <strong>{brief.priorityCards.length} suggested moves</strong>
-          <small>Open for what to repeat, fix, or trust after you review your drafts.</small>
+          <span>Next moves</span>
+          <strong>{brief.priorityCards.length} {brief.priorityCards.length === 1 ? "move" : "moves"}</strong>
+          <small>What to repeat, what to fix, and how much to trust this read.</small>
         </summary>
         {priorityContent}
       </details>

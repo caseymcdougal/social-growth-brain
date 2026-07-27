@@ -52,7 +52,7 @@ export function CoachReport({
   const lesson = winningPattern
     ? {
         title: winningPattern,
-        why: "This is what's making your best posts work. Lean into it again this week — it's your fastest path to growth."
+        why: "Repeat it in your next post before you experiment with anything new."
       }
     : mainRisk
       ? {
@@ -123,17 +123,17 @@ export function CoachReport({
         <article>
           <span>What's working</span>
           <strong>{winningPattern}</strong>
-          <p>Why this matters: repeat what's working before trying something brand new — it's your fastest growth.</p>
+          <p>Your fastest growth is repeating this, not trying something brand new.</p>
         </article>
         <article data-kind="risk">
           <span>What to fix</span>
           <strong>{mainRisk}</strong>
-          <p>Why this matters: this is the thing most likely to hold back your next post. Fix it first.</p>
+          <p>The thing most likely to hold back your next post. Fix it first.</p>
         </article>
         <article>
           <span>Your content lane</span>
           <strong>{contentLane}</strong>
-          <p>Why this matters: stay in this lane for a few posts so your audience knows what to expect from you.</p>
+          <p>Stay here for a few posts so your audience knows what to expect from you.</p>
         </article>
       </div>
 

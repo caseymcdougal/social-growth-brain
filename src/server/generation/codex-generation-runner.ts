@@ -102,7 +102,7 @@ export function writeGenerationJobFiles(
       "Before finalizing each draft, compare it against avoidCorpus.publishedPosts and avoidCorpus.priorDrafts. If it shares the same core claim, hook, or example, discard it and invent a new idea in the same lane.",
       "Write like a human operator, not an AI coach: short rhythm, concrete enemy or claim, one proof point, one decision/question. No tidy three-part listicles, no motivational filler, no 'here's the thing' transitions.",
       "Each draft must be paste-ready with minimal editing: specific angle, strong hook, clear why_this tied to a working mechanism (not a weak post).",
-      "source_signal should name the mechanism or lane, never quote a published post.",
+      "source_signal must be one plain-English phrase naming the mechanism or lane. No internal field names, no key: value syntax, never quote a published post.",
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
       ...(input.voiceBlock

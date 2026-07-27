@@ -19,9 +19,12 @@
   --text: #f4f6f8;
   --muted: #949ca8;
   --faint: #5c636e;
+  --faint-text: #8a919c; /* --faint fails 4.5:1 on --bg; use this for any readable text */
 
   /* brand: electric lime primary + imessage green success */
   --accent: #d7ff3e;
+  --accent-bright: #e4ff63;
+  --accent-glow: #f4ffd8;
   --accent-ink: #0e1014;
   --accent-soft: rgba(215, 255, 62, 0.14);
   --accent-line: rgba(215, 255, 62, 0.4);
@@ -297,7 +300,7 @@ button {
 }
 
 .step-row > span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 12px;
@@ -324,7 +327,7 @@ button {
 
 .step-row small {
   margin-top: 2px;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .privacy-note {
@@ -362,7 +365,7 @@ button {
   background: linear-gradient(
     120deg,
     var(--text) 0%,
-    #f4ffd8 24%,
+    var(--accent-glow) 24%,
     var(--accent) 48%,
     var(--accent-warm) 72%,
     var(--text) 100%
@@ -567,7 +570,7 @@ h3 {
 }
 
 .disclosure > summary span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -582,7 +585,7 @@ h3 {
 }
 
 .disclosure > summary small {
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.35;
 }
 
@@ -680,7 +683,7 @@ h3 {
 }
 
 .reference-shelf-head span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 12px;
 }
 
@@ -847,7 +850,7 @@ h3 {
 
 .command-center-primary-action span,
 .command-center-signal span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -1041,7 +1044,7 @@ h3 {
 
 .action-progress-row small,
 .action-state-label {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -1184,7 +1187,7 @@ h3 {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
-  color: var(--faint);
+  color: var(--faint-text);
   display: grid;
   place-items: center;
   font-family: var(--font-body);
@@ -1392,7 +1395,7 @@ h3 {
 }
 
 .capture-maintenance summary small {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -1444,7 +1447,7 @@ h3 {
 }
 
 .primary-button:hover:not(:disabled) {
-  background: #e4ff63;
+  background: var(--accent-bright);
   transform: translateY(-1px);
 }
 
@@ -1535,7 +1538,7 @@ h3 {
 
 .signal-list dt,
 .post-card dt {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
 }
@@ -1602,7 +1605,7 @@ h3 {
 .trend-kpis span,
 .trend-shift span {
   display: block;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -1623,7 +1626,7 @@ h3 {
 .trend-shift small {
   display: block;
   margin-top: 5px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.35;
 }
 
@@ -1681,7 +1684,7 @@ h3 {
 }
 
 .scorecard-inline-head span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1758,7 +1761,7 @@ h3 {
 }
 
 .scorecard-dimension-top span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -1794,7 +1797,7 @@ h3 {
 .scorecard-dimensions small {
   display: block;
   margin-top: 7px;
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -1802,7 +1805,6 @@ h3 {
 .scorecard-dimension-hint {
   margin-top: 10px !important;
   color: var(--muted) !important;
-  font-style: italic;
 }
 
 .dashboard-grid {
@@ -1945,7 +1947,7 @@ h3 {
   background: var(--tint-2);
 }
 
-.strategy-engine-tab[aria-selected="true"] {
+.strategy-engine-tab[aria-pressed="true"] {
   border-color: var(--line-strong);
   background: var(--tint-4);
   color: var(--text);
@@ -1963,7 +1965,7 @@ h3 {
 }
 
 .strategy-engine-tab small {
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.3;
 }
 
@@ -2067,7 +2069,7 @@ h3 {
 .selected-post-source span,
 .selected-post-grid span {
   display: block;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2176,7 +2178,7 @@ h3 {
 .posting-brief-grid small {
   display: block;
   margin-top: 6px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.35;
 }
 
@@ -2262,7 +2264,7 @@ h3 {
 
 .production-outcome-head span,
 .production-outcome-topline span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2328,7 +2330,7 @@ h3 {
 .production-outcome-entry small {
   display: block;
   margin-top: 6px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.4;
 }
 
@@ -2391,7 +2393,7 @@ h3 {
   display: grid;
   place-items: start center;
   padding-top: 16px;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
@@ -2412,7 +2414,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 4px 7px;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2449,7 +2451,7 @@ h3 {
 .production-slot small {
   display: block;
   margin-top: 8px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.42;
 }
 
@@ -2488,7 +2490,7 @@ h3 {
 }
 
 .draft-readiness-head span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2589,7 +2591,7 @@ h3 {
 .report-stack span,
 .idea-list span,
 .post-card-top {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
@@ -2663,7 +2665,7 @@ h3 {
 .idea-list small {
   display: block;
   margin-top: 8px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.45;
 }
 
@@ -2734,7 +2736,7 @@ h3 {
 
 .experiment-card-top > span {
   min-width: 0;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2802,7 +2804,7 @@ h3 {
 }
 
 .experiment-card small {
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .memory-actions,
@@ -2839,7 +2841,7 @@ h3 {
 .memory-block > span,
 .proposal-list span,
 .topic-card-top span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2910,7 +2912,7 @@ h3 {
 }
 
 .voice-overrides label span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -2938,7 +2940,7 @@ h3 {
 }
 
 .voice-overrides textarea::placeholder {
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .voice-overrides textarea:focus-visible {
@@ -2974,7 +2976,7 @@ h3 {
 .topic-card small {
   display: block;
   margin-top: 7px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.45;
 }
 
@@ -3024,7 +3026,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -3097,7 +3099,7 @@ h3 {
 
 .coach-brief-grid span {
   display: block;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -3153,7 +3155,7 @@ h3 {
 }
 
 .coach-columns h3 {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 12px;
   text-transform: uppercase;
@@ -3336,7 +3338,7 @@ h3 {
 
 .diagnosis-grid span {
   display: block;
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   text-transform: uppercase;
@@ -3387,7 +3389,7 @@ h3 {
 }
 
 .recovery-next-step span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -3438,7 +3440,7 @@ h3 {
 .opportunity-card small {
   display: block;
   margin-top: 8px;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.45;
 }
 
@@ -3477,7 +3479,7 @@ h3 {
 }
 
 .opportunity-card-top span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 700;
@@ -3946,7 +3948,7 @@ a:focus-visible {
 }
 
 .direction-input::placeholder {
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .direction-input:focus-visible {
@@ -4001,7 +4003,7 @@ a:focus-visible {
 .direction-entry small {
   display: block;
   margin-top: 3px;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .direction-delete {
@@ -4011,7 +4013,7 @@ a:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--faint);
+  color: var(--faint-text);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -4224,7 +4226,7 @@ details[open] > .strategy-engine-body {
 }
 
 .score-strip-detail span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -4282,7 +4284,7 @@ details[open] > .strategy-engine-body {
 }
 
 .pre-draft-brief .pre-draft-featured span {
-  color: var(--faint);
+  color: var(--faint-text);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -4412,7 +4414,7 @@ details[open] > .strategy-engine-body {
   .privacy-note-mobile {
     display: block;
     margin: 0;
-    color: var(--faint);
+    color: var(--faint-text);
     font-size: 10px;
     text-align: center;
   }
@@ -4478,4 +4480,16 @@ details[open] > .strategy-engine-body {
     animation: none;
     background-position: 50% center;
   }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
