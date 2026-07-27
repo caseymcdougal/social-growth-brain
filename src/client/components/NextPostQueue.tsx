@@ -114,7 +114,7 @@ export function NextPostQueue({
   const leadHook = featuredDraft?.hook ?? featuredIdea?.hook ?? null;
   const leadWhy = featuredDraft?.why_this ?? featuredIdea?.reason ?? null;
   const postingWindow = formatPostingWindow();
-  const productionPlan = buildPostProductionPlan({ analysis, generation, selectedPostBrief });
+  const productionPlan = buildPostProductionPlan({ analysis, generation, selectedPostBrief, capturedPosts });
   const activeSlotIds = useMemo(
     () => productionPlan.slots.map((slot) => slot.id),
     [productionPlan.primarySlotId, productionPlan.slots.length]
@@ -190,6 +190,7 @@ export function NextPostQueue({
           <div className="production-slot-topline">
             <span>{display.timing ?? slot.timing}</span>
             <span>{slot.status}</span>
+            <span>{slot.noveltyLabel}</span>
             <span>{workflowLabel(workflowStatus)}</span>
           </div>
           <strong>{slot.title}</strong>
@@ -200,7 +201,7 @@ export function NextPostQueue({
             <summary>
               <span>Draft support</span>
               <strong>
-                Readiness {slot.readiness.score} · {slot.readiness.verdict}
+                Readiness {slot.readiness.score} · {slot.readiness.verdict} · {slot.noveltyLabel}
               </strong>
               <small>Open for source signal, rationale, checks, and fixes.</small>
             </summary>
@@ -549,7 +550,13 @@ export function NextPostQueue({
                     {!draftLeadsWithHook(post.draft, post.hook) && <p className="idea-hook">{post.hook}</p>}
                     <small>{post.angle}</small>
                     <p className="idea-draft">{post.draft}</p>
-                    <small>{post.why_this}</small>
+                    <small>
+                      {post.why_this} ·{" "}
+                      {
+                        productionPlan.slots.find((slot) => slot.id === `generated-${index + 1}`)?.noveltyLabel ??
+                          "Novel"
+                      }
+                    </small>
                     <button className="copy-button" type="button" onClick={() => void copyText(copyId, post.draft)}>
                       {copied === copyId ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                       {copied === copyId ? "Copied" : copyFailed === copyId ? "Copy unavailable" : "Copy draft"}

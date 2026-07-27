@@ -53,13 +53,15 @@ describe("Codex generation runner", () => {
 
     const prompt = readFileSync(files.promptPath, "utf8");
     const input = readFileSync(files.inputPath, "utf8");
-    expect(input).toContain("\"analysis\"");
+    expect(input).toContain("\"analysisMechanisms\"");
     expect(input).toContain("\"generationBrief\"");
-    expect(prompt).toContain("Generate today's ideas");
+    expect(input).not.toContain("next_post_ideas");
     expect(prompt).toContain("copy-ready X posts");
     expect(prompt).toContain("Generation strategy brief");
-    expect(prompt).toContain("Do not average Casey's voice into generic AI commentary");
+    expect(prompt).toContain("paste-ready");
+    expect(prompt).toContain("hard negatives");
     expect(prompt).toContain("local-first AI tooling operator");
     expect(readFileSync(files.schemaPath, "utf8")).toContain("source_signal");
+    expect(readFileSync(files.schemaPath, "utf8")).toContain("\"minItems\": 3");
   });
 });

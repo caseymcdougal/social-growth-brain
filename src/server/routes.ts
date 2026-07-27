@@ -15,6 +15,7 @@ import { createRepositories } from "./repositories";
 import { CodexStrategyIntelligenceRunner } from "./strategy/codex-strategy-intelligence-runner";
 import type { StrategyIntelligenceRunner } from "./strategy/strategy-intelligence-runner";
 import { LlmVoiceProfileRunner, type VoiceProfileRunner } from "./voice/voice-profile-runner";
+import { runQualityGatedGeneration } from "../shared/generation-quality";
 import { buildVoicePromptBlock } from "../shared/voice-profile";
 
 export function createServerApp(options: {
@@ -90,7 +91,7 @@ export function createServerApp(options: {
       snapshot,
       history: repos.getRecentSnapshots(6),
       analysis,
-      generation: generation ? { posts: generation.posts.slice(0, 1) } : null,
+      generation,
       strategyMemory: { memory: null, proposal: null },
       topicExploration: null,
       directions: repos.listCreativeDirections()
@@ -216,14 +217,30 @@ export function createServerApp(options: {
 
     const jobDir = createJobDir(options.dataDir, "generation");
     try {
-      const generation = await generationRunner.generateToday({
+      const priorDrafts = repos.getRecentGeneratedDraftSnippets(12);
+      const strategyMemory = repos.getLatestStrategyMemory()?.memory ?? null;
+      const direction = repos.getCreativeDirection()?.text ?? null;
+      const voiceBlock = currentVoiceBlock();
+      let pass = 0;
+      const gated = await runQualityGatedGeneration({
         snapshot,
-        analysis: latestAnalysis.analysis,
-        strategyMemory: repos.getLatestStrategyMemory()?.memory ?? null,
-        direction: repos.getCreativeDirection()?.text ?? null,
-        voiceBlock: currentVoiceBlock(),
-        jobDir
+        priorDrafts,
+        generate: async (repairNotes) => {
+          pass += 1;
+          const passJobDir = pass === 1 ? jobDir : createJobDir(options.dataDir, "generation-repair");
+          return generationRunner.generateToday({
+            snapshot,
+            analysis: latestAnalysis.analysis,
+            strategyMemory,
+            direction,
+            voiceBlock,
+            priorDrafts,
+            repairNotes,
+            jobDir: passJobDir
+          });
+        }
       });
+      const generation = gated.generation;
       const generationRunId = repos.saveGeneration({
         profileSnapshotId: latestAnalysis.profileSnapshotId,
         analysisRunId: latestAnalysis.analysisRunId,
@@ -231,7 +248,16 @@ export function createServerApp(options: {
         mode: "today",
         output: generation
       });
-      response.json({ ok: true, generationRunId, generation });
+      response.json({
+        ok: true,
+        generationRunId,
+        generation,
+        quality: {
+          repaired: gated.repaired,
+          accepted: gated.firstPass.accepted.length + (gated.repairPass?.accepted.length ?? 0),
+          rejected: gated.firstPass.rejected.length + (gated.repairPass?.rejected.length ?? 0)
+        }
+      });
     } catch (error) {
       response.status(500).json({
         ok: false,

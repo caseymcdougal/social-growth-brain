@@ -482,7 +482,7 @@ test("surfaces copyable priority signals without repeating the top command", asy
   expect(nextMoves).not.toHaveAttribute("open");
   fireEvent.click(nextMoves.querySelector("summary") as HTMLElement);
   expect(within(nextMoves).queryByText("Generate the next draft set")).not.toBeInTheDocument();
-  expect(within(nextMoves).getByText("Repeat the public winner")).toBeInTheDocument();
+  expect(within(nextMoves).getByText("Repeat the winning mechanism")).toBeInTheDocument();
   expect(within(nextMoves).getByRole("button", { name: /Copy next moves/i })).toBeInTheDocument();
 });
 
@@ -520,7 +520,7 @@ test("keeps generated-state priority signals behind a closed decision support di
   expect(nextMoves.tagName).toBe("DETAILS");
   expect(nextMoves).not.toHaveAttribute("open");
   expect(within(nextMoves).getByText(/\d suggested moves/)).toBeInTheDocument();
-  expect(within(nextMoves).getByText("Repeat the public winner")).toBeInTheDocument();
+  expect(within(nextMoves).getByText("Repeat the winning mechanism")).toBeInTheDocument();
   expect(within(nextMoves).getByRole("button", { name: /Copy next moves/i })).toBeInTheDocument();
   expect(postLab!.compareDocumentPosition(nextMoves)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
@@ -607,39 +607,50 @@ test("keeps generated-state ranked review behind a closed source evidence disclo
   expect(strategyEngine.compareDocumentPosition(sourceEvidence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
-test("keeps the dashboard draft count stable during deferred intelligence refresh", async () => {
-  const currentGeneration = {
+test("hydrates the full generation set after dashboard bootstrap", async () => {
+  const bootstrapGeneration = {
     posts: [
       {
-        title: "Current snapshot draft",
-        angle: "Use the generation attached to the dashboard snapshot.",
-        why_this: "The visible dashboard state should stay internally consistent.",
-        hook: "The current audit should own the next draft.",
-        draft: "The current audit should own the next draft. Otherwise the user cannot trust the command center.",
-        source_signal: "Dashboard endpoint returned one current draft."
+        title: "Bootstrap draft",
+        angle: "Dashboard may return a partial set before hydration.",
+        why_this: "Deferred generation/latest should expand the queue.",
+        hook: "The first draft is not the whole queue.",
+        draft: "The first draft is not the whole queue. Hydrate the rest so operators can choose.",
+        source_signal: "Dashboard bootstrap"
       }
     ]
   };
-  const staleGeneration = {
-    posts: Array.from({ length: 10 }, (_, index) => ({
-      title: `Stale draft ${index + 1}`,
-      angle: "This belongs to an older generation response.",
-      why_this: "It should not replace the dashboard snapshot generation.",
-      hook: `Stale hook ${index + 1}`,
-      draft: `Stale draft body ${index + 1}`,
-      source_signal: "Deferred latest generation response."
-    }))
+  const fullGeneration = {
+    posts: [
+      bootstrapGeneration.posts[0],
+      {
+        title: "Hydrated draft 2",
+        angle: "Second option after hydration.",
+        why_this: "Choice needs more than one draft.",
+        hook: "One draft is a suggestion. Three drafts are a choice.",
+        draft: "One draft is a suggestion. Three drafts are a choice. Keep the queue wide enough to pick a true angle.",
+        source_signal: "Hydrated latest generation"
+      },
+      {
+        title: "Hydrated draft 3",
+        angle: "Third option after hydration.",
+        why_this: "Alternates matter.",
+        hook: "If the draft sounds like yesterday, it is not ready.",
+        draft: "If the draft sounds like yesterday, it is not ready. Write a new claim in the same lane and cut the rest.",
+        source_signal: "Hydrated latest generation"
+      }
+    ]
   };
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.endsWith("/api/dashboard")) {
       return new Response(
-        JSON.stringify(dashboardState({ snapshot: snapshotFixture, analysis: analysisFixture, generation: currentGeneration })),
+        JSON.stringify(dashboardState({ snapshot: snapshotFixture, analysis: analysisFixture, generation: bootstrapGeneration })),
         { status: 200 }
       );
     }
     if (url.endsWith("/api/generation/latest")) {
-      return new Response(JSON.stringify({ generation: staleGeneration }), { status: 200 });
+      return new Response(JSON.stringify({ generation: fullGeneration }), { status: 200 });
     }
     if (url.endsWith("/api/analysis/latest")) {
       return new Response(JSON.stringify({ analysis: analysisFixture }), { status: 200 });
@@ -660,13 +671,10 @@ test("keeps the dashboard draft count stable during deferred intelligence refres
   expect(postLab).not.toBeNull();
   expect(within(postLab as HTMLElement).getByText("1 draft")).toBeInTheDocument();
 
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/strategy-memory/latest"));
-
-  expect(within(postLab as HTMLElement).getByText("1 draft")).toBeInTheDocument();
-  expect(within(postLab as HTMLElement).queryByText("10 drafts")).not.toBeInTheDocument();
-  expect(within(postLab as HTMLElement).queryByLabelText("Draft library")).not.toBeInTheDocument();
-  expect(within(postLab as HTMLElement).queryByText("1 generated drafts")).not.toBeInTheDocument();
-  expect(within(postLab as HTMLElement).queryByText("Stale draft 2")).not.toBeInTheDocument();
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/generation/latest"));
+  await waitFor(() => expect(within(postLab as HTMLElement).getByText("3 drafts")).toBeInTheDocument());
+  expect(within(postLab as HTMLElement).getByLabelText("Draft library")).toBeInTheDocument();
+  expect(within(postLab as HTMLElement).getByText("3 generated drafts")).toBeInTheDocument();
 });
 
 test("keeps the priority copy action stable when clipboard permission is denied", async () => {
@@ -1651,7 +1659,7 @@ test("keeps production slot rationale and readiness checks behind draft support"
   expect(draftSupport.tagName).toBe("DETAILS");
   expect(draftSupport).not.toHaveAttribute("open");
   expect(within(draftSupport).getByText("Draft support")).toBeInTheDocument();
-  expect(within(draftSupport).getByText("Readiness 0 · Needs work")).toBeInTheDocument();
+  expect(within(draftSupport).getByText(/Readiness 0 · Needs work/i)).toBeInTheDocument();
   expect(within(draftSupport).getByText(/Add concrete proof/i)).toBeInTheDocument();
 });
 

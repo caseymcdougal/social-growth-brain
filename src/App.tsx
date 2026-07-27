@@ -8,6 +8,7 @@ import {
   getBootstrappedDashboardState,
   getDashboardState,
   getLatestAnalysis,
+  getLatestGeneration,
   getLatestStrategyMemory,
   getLatestTopicExploration,
   importSnapshot,
@@ -364,6 +365,21 @@ export function App() {
       canceled = true;
     };
   }, [analysis, deferredPanelsReady, fullAnalysis]);
+
+  useEffect(() => {
+    if (!deferredPanelsReady || !analysis) return;
+    let canceled = false;
+    void getLatestGeneration()
+      .then((latestGeneration) => {
+        if (!canceled && latestGeneration) setGeneration(latestGeneration);
+      })
+      .catch(() => {
+        // Keep whatever generation the dashboard bootstrap already provided.
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [analysis, deferredPanelsReady]);
 
   useEffect(() => {
     if (!deferredPanelsReady || !analysis) return;

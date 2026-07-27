@@ -25,7 +25,8 @@ const productionPlan: PostProductionPlan = {
         verdict: "Ready",
         checks: [],
         blockingFixes: []
-      }
+      },
+      noveltyLabel: "Novel"
     }
   ]
 };

@@ -60,12 +60,40 @@ describe("generation prompt direction", () => {
     expect(input).toContain("Move away from crypto");
   });
 
-  it("forbids reproducing already-published posts", () => {
+  it("forbids reproducing already-published posts and uses sanitized input", () => {
     const dir = mkdtempSync(join(tmpdir(), "gen-"));
-    writeGenerationJobFiles(dir, { snapshot, analysis, mode: "today", direction: null });
+    writeGenerationJobFiles(dir, {
+      snapshot: {
+        ...snapshot,
+        posts: [
+          {
+            xPostId: "1",
+            url: "https://x.com/x/status/1",
+            text: "Published post body that must not be a template.",
+            postedAt: null,
+            capturedAt: "2026-06-30T17:00:00.000Z",
+            source: "manual",
+            viewsCount: 10,
+            likesCount: 1,
+            repostsCount: 0,
+            repliesCount: 0,
+            bookmarksCount: 0
+          }
+        ]
+      },
+      analysis,
+      mode: "today",
+      direction: null
+    });
     const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
-    expect(prompt).toContain("ALREADY PUBLISHED");
+    const input = readFileSync(join(dir, "input.json"), "utf8");
+    expect(prompt.toLowerCase()).toContain("hard negatives");
     expect(prompt.toLowerCase()).toContain("do not reproduce");
+    expect(prompt).toContain("paste-ready");
+    expect(input).toContain("analysisMechanisms");
+    expect(input).not.toContain("next_post_ideas");
+    expect(input).not.toContain('"rewrite"');
+    expect(input).toContain("avoidCorpus");
   });
 
   it("omits direction block when null", () => {

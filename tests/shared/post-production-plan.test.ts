@@ -103,8 +103,64 @@ describe("post production plan", () => {
     expect(copied).toContain("Hook: Your analytics should tell you what to post next.");
     expect(copied).toContain("Draft: Most creator dashboards are autopsies.");
     expect(copied).toContain("Readiness:");
+    expect(copied).toContain("Novelty:");
     expect(copied).toContain("Source: #1 · score 128");
     expect(copied).toContain("2. Turn analytics into a strategist [Ready to copy]");
+  });
+
+  it("flags drafts that echo captured posts as close", () => {
+    const plan = buildPostProductionPlan({
+      analysis,
+      generation: {
+        posts: [
+          {
+            title: "Echo",
+            angle: "Too close",
+            why_this: "Should be flagged",
+            hook: "Most creator dashboards are autopsies.",
+            draft: "Most creator dashboards are autopsies. I want one that works like a strategist.",
+            source_signal: "selected rewrite"
+          },
+          {
+            title: "Fresh enough",
+            angle: "New",
+            why_this: "Different claim",
+            hook: "Ship the rewrite before you celebrate another metric tile.",
+            draft:
+              "Ship the rewrite before you celebrate another metric tile. Pick one weak post and change only the first sentence. Which post gets cut?",
+            source_signal: "rewrite loop"
+          },
+          {
+            title: "Also fresh",
+            angle: "New again",
+            why_this: "Different again",
+            hook: "A ranked list is not a strategy until it produces the next draft.",
+            draft:
+              "A ranked list is not a strategy until it produces the next draft. Use the top mechanism, invent a new claim, and cut the rest. What claim are you testing?",
+            source_signal: "mechanism reuse"
+          }
+        ]
+      },
+      selectedPostBrief: null,
+      capturedPosts: [
+        {
+          xPostId: "1",
+          url: "https://x.com/caseymcdougal/status/1",
+          text: "Most creator dashboards are autopsies. I want one that works like a strategist.",
+          postedAt: null,
+          capturedAt: "2026-07-16T12:00:00.000Z",
+          source: "manual",
+          viewsCount: 100,
+          likesCount: 5,
+          repostsCount: 0,
+          repliesCount: 0,
+          bookmarksCount: 0
+        }
+      ]
+    });
+
+    expect(plan.slots[0].noveltyLabel).toBe("Close to a recent post");
+    expect(plan.slots[1].noveltyLabel).toBe("Novel");
   });
 
   it("keeps a many-draft generation run focused to the next five slots", () => {

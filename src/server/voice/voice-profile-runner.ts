@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runLlmJob } from "../ai/llm-job";
+import { selectTopQuartilePosts } from "../../shared/generation-context";
 import { voiceProfileSchema, type VoiceProfile } from "../../shared/voice-profile";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 
@@ -40,10 +41,12 @@ export function writeVoiceProfileJobFiles(jobDir: string, snapshot: CapturedAcco
   const promptPath = join(jobDir, "prompt.md");
   const schemaPath = join(jobDir, "schema.json");
   const outputPath = join(jobDir, "output.json");
+  const topPerformers = selectTopQuartilePosts(snapshot.posts).map((item) => item.post.text);
   const inputJson = JSON.stringify(
     {
       bio: snapshot.profile.bio,
-      posts: snapshot.posts.map((post) => post.text)
+      posts: snapshot.posts.map((post) => post.text),
+      topPerformerPosts: topPerformers
     },
     null,
     2
@@ -53,11 +56,11 @@ export function writeVoiceProfileJobFiles(jobDir: string, snapshot: CapturedAcco
   writeFileSync(
     promptPath,
     [
-      "You are a forensic writing-style analyst. The input contains Casey McDougal's X/Twitter bio and every captured post, written by him.",
+      "You are a forensic writing-style analyst. The input contains Casey McDougal's X/Twitter bio, every captured post, and the top-performing subset by visible engagement.",
       "Describe HOW he writes, not WHAT he writes about. Another writer following your output should produce posts indistinguishable from his in sound.",
-      "Ground every rule in the actual posts: casing habits, punctuation habits, sentence length and rhythm, recurring words and phrasings, how his openings work.",
-      "banned_moves lists things that would immediately read as not-him (e.g. Title Case, hashtags, motivational filler, tidy corporate transitions) — derive these from what he demonstrably never does.",
-      "style_excerpts: pick 2-3 short verbatim fragments (one sentence each) that best capture his sound.",
+      "Weight casing, sentence_rhythm, vocabulary, hook_moves, and style_excerpts toward topPerformerPosts — that is the tone that actually works.",
+      "Use the full posts list for banned_moves: list things that would immediately read as not-him (e.g. Title Case, hashtags, motivational filler, tidy corporate transitions, generic AI cadence).",
+      "style_excerpts: pick 2-3 short verbatim fragments (one sentence each) from topPerformerPosts when possible that best capture his sound — sound reference only, not content to reuse.",
       "Be specific and testable ('drops the subject pronoun: \"shipped it today\"'), never generic ('authentic, engaging tone').",
       "Return JSON only. Do not include markdown.",
       "",

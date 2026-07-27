@@ -2,8 +2,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runLlmJob } from "../ai/llm-job";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
-import { buildGenerationStrategyBrief } from "../../shared/generation-context";
-import { generationOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
+import {
+  buildGenerationStrategyBrief,
+  buildSanitizedGenerationModelInput
+} from "../../shared/generation-context";
+import { generationBatchOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
 import type { StrategyMemory } from "../../shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 import type { GenerationRunner } from "./generation-runner";
@@ -17,7 +20,8 @@ const generationJsonSchema = {
   properties: {
     posts: {
       type: "array",
-      minItems: 1,
+      minItems: 3,
+      maxItems: 5,
       items: {
         type: "object",
         additionalProperties: false,
@@ -61,6 +65,8 @@ export function writeGenerationJobFiles(
     strategyMemory?: StrategyMemory | null;
     direction?: string | null;
     voiceBlock?: string;
+    priorDrafts?: string[];
+    repairNotes?: string | null;
   }
 ) {
   mkdirSync(jobDir, { recursive: true });
@@ -69,18 +75,20 @@ export function writeGenerationJobFiles(
   const schemaPath = join(jobDir, "schema.json");
   const outputPath = join(jobDir, "output.json");
   const direction = typeof input.direction === "string" ? input.direction.trim() : "";
+  const repairNotes = typeof input.repairNotes === "string" ? input.repairNotes.trim() : "";
   const generationBrief = buildGenerationStrategyBrief({
     snapshot: input.snapshot,
     analysis: input.analysis,
     strategyMemory: input.strategyMemory ?? null,
-    direction
+    direction,
+    priorDrafts: input.priorDrafts ?? []
   });
-  const modelInput = {
+  const modelInput = buildSanitizedGenerationModelInput({
     snapshot: input.snapshot,
     analysis: input.analysis,
     generationBrief,
     mode: input.mode
-  };
+  });
   const inputJson = JSON.stringify(modelInput, null, 2);
 
   writeFileSync(inputPath, inputJson);
@@ -88,24 +96,29 @@ export function writeGenerationJobFiles(
     promptPath,
     [
       "You are Casey McDougal's direct X/Twitter post strategist.",
-      "Generate today's ideas as copy-ready X posts based on the latest public-metric audit.",
-      "Use the provided strategy audit, top patterns, weak spots, and captured posts as evidence.",
-      "The captured posts in the input are what Casey has ALREADY PUBLISHED. They are evidence of what works, never templates. Do not reproduce, lightly rephrase, or re-angle any of them.",
-      "Before finalizing each draft, compare it against every captured post text. If it shares the same core claim, hook, or example as a published post, discard it and write a genuinely new idea in the same lane.",
-      "Use the Generation strategy brief as the operating frame before looking at raw posts.",
-      "Do not average Casey's voice into generic AI commentary. Preserve the strongest lanes, voice rules, and current direction.",
-      "Every draft must make a concrete claim, name a specific workflow/product tension, or create a useful enemy. No abstract motivation.",
+      "Generate exactly 3 copy-ready X posts based on the sanitized strategy brief and analysis mechanisms.",
+      "Learn TOPIC LANES and WRITING MOVES from topicMechanismWinners and toneMoves — never copy their content.",
+      "antiPatterns and avoidCorpus are hard negatives: do not reproduce, lightly rephrase, or re-angle any published post or prior draft.",
+      "Before finalizing each draft, compare it against avoidCorpus.publishedPosts and avoidCorpus.priorDrafts. If it shares the same core claim, hook, or example, discard it and invent a new idea in the same lane.",
+      "Write like a human operator, not an AI coach: short rhythm, concrete enemy or claim, one proof point, one decision/question. No tidy three-part listicles, no motivational filler, no 'here's the thing' transitions.",
+      "Each draft must be paste-ready with minimal editing: specific angle, strong hook, clear why_this tied to a working mechanism (not a weak post).",
+      "source_signal should name the mechanism or lane, never quote a published post.",
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
-      "Each draft should have a specific angle, a strong hook, and a clear reason tied to the audit.",
-      ...(input.voiceBlock ? [input.voiceBlock, "Every hook and draft must follow the voice profile above. The style excerpts show the sound only — reusing their content counts as duplication."] : []),
+      ...(input.voiceBlock
+        ? [
+            input.voiceBlock,
+            "Every hook and draft must follow the voice profile above. The style excerpts show the sound only — reusing their content counts as duplication."
+          ]
+        : []),
       ...(direction ? [`Casey's current creative direction (follow it): ${direction}`] : []),
+      ...(repairNotes ? ["", "Repair pass notes:", repairNotes] : []),
       "Return JSON only. Do not include markdown.",
       "",
       "Generation strategy brief:",
       JSON.stringify(generationBrief, null, 2),
       "",
-      "Input JSON:",
+      "Sanitized input JSON:",
       inputJson
     ].join("\n")
   );
@@ -121,6 +134,8 @@ export class CodexGenerationRunner implements GenerationRunner {
     strategyMemory?: StrategyMemory | null;
     direction?: string | null;
     voiceBlock?: string;
+    priorDrafts?: string[];
+    repairNotes?: string | null;
     jobDir: string;
   }): Promise<GenerationOutput> {
     const files = writeGenerationJobFiles(input.jobDir, {
@@ -129,8 +144,10 @@ export class CodexGenerationRunner implements GenerationRunner {
       mode: "today",
       strategyMemory: input.strategyMemory ?? null,
       direction: input.direction ?? null,
-      voiceBlock: input.voiceBlock
+      voiceBlock: input.voiceBlock,
+      priorDrafts: input.priorDrafts,
+      repairNotes: input.repairNotes
     });
-    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => generationOutputSchema.parse(raw));
+    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => generationBatchOutputSchema.parse(raw));
   }
 }

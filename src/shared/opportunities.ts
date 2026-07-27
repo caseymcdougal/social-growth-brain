@@ -105,8 +105,12 @@ function repeatCard(rankedPosts: RankedPost[], analysis: OpportunityAnalysis | n
   return {
     kind: "repeat",
     label: `#${top.rank} · score ${Math.round(top.score)}`,
-    title: "Repeat the public winner",
-    detail: compactText(postAnalysis?.recommended_change ?? top.post.text),
+    title: "Repeat the winning mechanism",
+    detail: compactText(
+      postAnalysis?.recommended_change ??
+        postAnalysis?.performance_read ??
+        "Reuse the structure and stakes that earned attention — write a new claim in that lane."
+    ),
     evidence: postAnalysis?.performance_read ?? "This post has the strongest visible engagement signal in the capture.",
     postId: top.post.xPostId,
     postUrl: top.post.url,

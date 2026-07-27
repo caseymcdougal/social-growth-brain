@@ -365,6 +365,22 @@ export function createRepositories(db: AppDatabase) {
       return generationOutputSchema.parse({ posts });
     },
 
+    /** Recent generated draft texts used as avoid-corpus negatives for the next run. */
+    getRecentGeneratedDraftSnippets(limit = 12): string[] {
+      const rows = db
+        .prepare(
+          `
+          SELECT hook, draft
+          FROM generated_posts
+          ORDER BY id DESC
+          LIMIT ?
+        `
+        )
+        .all(limit) as Array<{ hook: string; draft: string }>;
+
+      return rows.map((row) => `${row.hook}\n${row.draft}`.trim()).filter(Boolean);
+    },
+
     getLatestStrategyMemory(): { id: number; memory: StrategyMemory; createdAt: string } | null {
       const row = db
         .prepare("SELECT id, memory_json, created_at FROM strategy_memories ORDER BY created_at DESC, id DESC LIMIT 1")

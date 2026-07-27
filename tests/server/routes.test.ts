@@ -283,6 +283,22 @@ describe("server routes", () => {
           hook: "The audit is not the product. The next post is.",
           draft: "The audit is not the product. The next post is. A content tool earns its keep when it turns the read into a draft.",
           source_signal: "Clear next-action workflow."
+        },
+        {
+          title: "Second draft",
+          angle: "Keep alternates visible.",
+          why_this: "Operators need more than one option.",
+          hook: "One draft is a suggestion. Three drafts are a choice.",
+          draft: "One draft is a suggestion. Three drafts are a choice. Keep the queue wide enough to pick a true angle.",
+          source_signal: "Choice over single-shot generation."
+        },
+        {
+          title: "Third draft",
+          angle: "Ship the mechanism, not the clone.",
+          why_this: "Novelty matters.",
+          hook: "If the draft sounds like yesterday, it is not ready.",
+          draft: "If the draft sounds like yesterday, it is not ready. Write a new claim in the same lane and cut the rest.",
+          source_signal: "Mechanism reuse."
         }
       ]
     });
@@ -308,6 +324,11 @@ describe("server routes", () => {
 
     expect(response.status).toBe(200);
     expect(body.generation.posts[0].draft).toContain("content tool earns");
+
+    const dashboard = await fetch(`${baseUrl}/api/dashboard`);
+    const dashboardBody = await dashboard.json();
+    expect(dashboard.status).toBe(200);
+    expect(dashboardBody.generation.posts).toHaveLength(3);
   });
 
   it("requires a successful audit before refreshing strategy memory", async () => {
