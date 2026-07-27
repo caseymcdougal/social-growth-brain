@@ -90,7 +90,8 @@ test("renders the dashboard shell", async () => {
   expect(screen.getByRole("heading", { name: "Social Audit Studio" })).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "Audit sequence" })).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: /Paste snapshot instead/i })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Scan my posts/i })).toHaveClass("primary-button");
+  expect(screen.getByRole("button", { name: /Run my audit/i })).toHaveClass("primary-button");
+  expect(screen.getByRole("button", { name: /Scan my posts/i })).toHaveClass("secondary-button");
   expect(screen.queryByRole("button", { name: /Find what's working/i })).not.toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Your next post, ready to go" })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Creative direction")).not.toBeInTheDocument();
@@ -1720,4 +1721,83 @@ test("closes the production loop by matching used drafts to captured posts", asy
     "href",
     "https://x.com/caseymcdougal/status/posted-generated-1"
   );
+});
+
+test("run my audit chains scan, analysis, and drafting in order", async () => {
+  const calls: string[] = [];
+  const generation = {
+    posts: [
+      {
+        title: "Pipeline post",
+        angle: "One button.",
+        why_this: "Chained run.",
+        hook: "One click should do the whole audit.",
+        draft: "One click should do the whole audit. Everything else is busywork.",
+        source_signal: "Specific product takes outperform broad claims."
+      }
+    ]
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/dashboard")) {
+        return new Response(JSON.stringify(dashboardState()), { status: 200 });
+      }
+      if (url.endsWith("/api/capture")) {
+        calls.push("capture");
+        return new Response(JSON.stringify({ ok: true, snapshot: snapshotFixture }), { status: 200 });
+      }
+      if (url.endsWith("/api/analyze")) {
+        calls.push("analyze");
+        return new Response(JSON.stringify({ ok: true, output: analysisFixture }), { status: 200 });
+      }
+      if (url.endsWith("/api/generate/today")) {
+        calls.push("generate");
+        return new Response(JSON.stringify({ ok: true, generation }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    })
+  );
+
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /Run my audit/i }));
+
+  await screen.findByRole("region", { name: "Your next post, ready to go" });
+  expect(calls).toEqual(["capture", "analyze", "generate"]);
+});
+
+test("run my audit stops the chain when analysis fails", async () => {
+  const calls: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/dashboard")) {
+        return new Response(JSON.stringify(dashboardState()), { status: 200 });
+      }
+      if (url.endsWith("/api/capture")) {
+        calls.push("capture");
+        return new Response(JSON.stringify({ ok: true, snapshot: snapshotFixture }), { status: 200 });
+      }
+      if (url.endsWith("/api/analyze")) {
+        calls.push("analyze");
+        return new Response(JSON.stringify({ errorMessage: "Model quota exhausted" }), { status: 500 });
+      }
+      if (url.endsWith("/api/generate/today")) {
+        calls.push("generate");
+        return new Response(JSON.stringify({ ok: true, generation: { posts: [] } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    })
+  );
+
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /Run my audit/i }));
+
+  const alert = await screen.findByRole("alert");
+  expect(within(alert).getByText("Model quota exhausted")).toBeInTheDocument();
+  expect(calls).toEqual(["capture", "analyze"]);
 });

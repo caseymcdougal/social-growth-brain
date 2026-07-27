@@ -285,6 +285,26 @@ export function createRepositories(db: AppDatabase) {
       return this.getLatestAnalysisRecordForLatestSnapshot()?.analysis ?? null;
     },
 
+    // Unlike the method above, this survives a re-scan: it returns the newest successful
+    // analysis across ALL snapshots, so a fresh audit can reference the previous one.
+    getMostRecentAnalysis(): AnalysisOutput | null {
+      const run = db
+        .prepare("SELECT id, profile_snapshot_id FROM analysis_runs WHERE status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1")
+        .get() as StoredAnalysisRun | undefined;
+      if (!run) return null;
+
+      const report = db
+        .prepare("SELECT * FROM strategy_reports WHERE analysis_run_id = ? LIMIT 1")
+        .get(run.id) as StoredStrategyReport | undefined;
+      if (!report) return null;
+
+      const postAnalyses = db
+        .prepare("SELECT * FROM post_analyses WHERE analysis_run_id = ? ORDER BY id ASC")
+        .all(run.id) as StoredPostAnalysis[];
+
+      return buildAnalysisOutput(report, postAnalyses);
+    },
+
     getLatestAnalysisSummaryForLatestSnapshot(): AnalysisSummary | null {
       const profile = db
         .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")

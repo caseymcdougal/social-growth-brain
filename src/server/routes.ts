@@ -16,6 +16,7 @@ import { CodexStrategyIntelligenceRunner } from "./strategy/codex-strategy-intel
 import type { StrategyIntelligenceRunner } from "./strategy/strategy-intelligence-runner";
 import { LlmVoiceProfileRunner, type VoiceProfileRunner } from "./voice/voice-profile-runner";
 import { runQualityGatedGeneration } from "../shared/generation-quality";
+import { buildScanHistoryBrief } from "../shared/scan-history";
 import { buildVoicePromptBlock } from "../shared/voice-profile";
 
 export function createServerApp(options: {
@@ -170,7 +171,11 @@ export function createServerApp(options: {
 
     const jobDir = createJobDir(options.dataDir, "analysis");
     try {
-      const output = await aiRunner.analyze(snapshot, jobDir, currentVoiceBlock());
+      const output = await aiRunner.analyze(snapshot, jobDir, currentVoiceBlock(), {
+        scanHistory: buildScanHistoryBrief(repos.getRecentSnapshots(6)),
+        previousAnalysis: repos.getMostRecentAnalysis(),
+        strategyMemory: repos.getLatestStrategyMemory()?.memory ?? null
+      });
       const latestProfile = db
         .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
         .get() as { id: number } | undefined;

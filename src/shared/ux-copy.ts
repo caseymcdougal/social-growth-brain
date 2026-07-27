@@ -10,6 +10,8 @@ export type AuditStepKey = (typeof auditSteps)[number]["key"];
 export const heroPhaseSteps = ["See", "Find", "Understand", "Write"] as const;
 
 export const cta = {
+  runFullAudit: "Run my audit",
+  fullAuditHint: "Scans your posts, finds the patterns, and writes drafts in one go. Takes a few minutes.",
   scanPosts: "Scan my posts",
   scanning: "Scanning…",
   pasteSnapshot: "Paste snapshot instead",

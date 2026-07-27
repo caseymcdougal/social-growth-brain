@@ -19,6 +19,7 @@ export function AuditCommandCenter({
   onGenerateToday,
   onOpenImport,
   onReviewDraftQueue,
+  onRunFullAudit,
   opportunityBrief,
   postCount,
   scorecard
@@ -36,6 +37,7 @@ export function AuditCommandCenter({
   onGenerateToday: () => void;
   onOpenImport: () => void;
   onReviewDraftQueue: () => void;
+  onRunFullAudit: () => void;
   opportunityBrief: OpportunityBrief;
   postCount: number;
   scorecard: CreatorScorecard;
@@ -123,6 +125,9 @@ export function AuditCommandCenter({
                 <span>More options</span>
               </summary>
               <div className="capture-maintenance-actions">
+                <button className="secondary-button" type="button" disabled={isBusy} onClick={onRunFullAudit}>
+                  <RefreshCcw size={16} aria-hidden="true" /> Fresh scan + full audit
+                </button>
                 <button
                   className="secondary-button"
                   type="button"

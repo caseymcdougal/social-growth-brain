@@ -428,7 +428,7 @@ export function App() {
     }
   }
 
-  async function handleCapture() {
+  async function handleCapture(): Promise<boolean> {
     setCapturing(true);
     setCaptureError(null);
     setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
@@ -441,14 +441,16 @@ export function App() {
         ...currentHistory.filter((item) => item.profile.capturedAt !== capturedSnapshot.profile.capturedAt)
       ].slice(0, 6));
       setCaptureStatus(null);
+      return true;
     } catch (error) {
       setCaptureError(error instanceof Error ? error.message : "Capture failed");
+      return false;
     } finally {
       setCapturing(false);
     }
   }
 
-  async function handleAnalyze() {
+  async function handleAnalyze(options: { scroll?: boolean } = {}): Promise<boolean> {
     setAnalyzing(true);
     setAnalysisError(null);
     try {
@@ -462,25 +464,41 @@ export function App() {
       setSelectedPostId(null);
       setAnalysis(latestAnalysis);
       setFullAnalysis(latestAnalysis);
-      window.setTimeout(() => scrollToSection("coach-report-title", { expand: true }), 400);
+      if (options.scroll ?? true) {
+        window.setTimeout(() => scrollToSection("coach-report-title", { expand: true }), 400);
+      }
+      return true;
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "Analysis failed");
+      return false;
     } finally {
       setAnalyzing(false);
     }
   }
 
-  async function handleGenerateToday() {
+  async function handleGenerateToday(): Promise<boolean> {
     setGenerating(true);
     setGenerationError(null);
     try {
       setGeneration(await generateTodaysIdeas());
       window.setTimeout(() => scrollToSection("next-posts-title", { expand: true }), 400);
+      return true;
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
+      return false;
     } finally {
       setGenerating(false);
     }
+  }
+
+  // One-button pipeline: run every remaining step in order, stopping at the first
+  // failure (the per-step recovery panel takes over from there).
+  async function handleRunFullAudit(options: { rescan?: boolean } = {}) {
+    if (!snapshot || options.rescan) {
+      if (!(await handleCapture())) return;
+    }
+    if (!(await handleAnalyze({ scroll: false }))) return;
+    await handleGenerateToday();
   }
 
   function handleReviewDraftQueue() {
@@ -554,6 +572,7 @@ export function App() {
       onCapture={() => void handleCapture()}
       onGenerateToday={() => void handleGenerateToday()}
       onOpenImport={() => setImportOpen(true)}
+      onRunFullAudit={() => void handleRunFullAudit()}
     />
   );
 
@@ -573,6 +592,7 @@ export function App() {
         onGenerateToday={() => void handleGenerateToday()}
         onOpenImport={() => setImportOpen(true)}
         onReviewDraftQueue={handleReviewDraftQueue}
+        onRunFullAudit={() => void handleRunFullAudit({ rescan: true })}
         opportunityBrief={opportunityBrief}
         postCount={postCount}
         scorecard={creatorScorecard}

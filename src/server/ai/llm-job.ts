@@ -2,10 +2,12 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 // Primary engine: Claude Code CLI on the Max subscription (no API billing).
-// Fallback: Codex CLI (gpt-5.5 xhigh from ~/.codex/config.toml), the original path.
-const CLAUDE_MODEL = "sonnet";
+// Opus 5 first; the CLI auto-falls back to Sonnet if Opus is unavailable/overloaded.
+// Final fallback: Codex CLI (gpt-5.5 xhigh from ~/.codex/config.toml), the original path.
+const CLAUDE_MODEL = "opus";
+const CLAUDE_FALLBACK_MODEL = "sonnet";
 const CLAUDE_EFFORT = "high";
-const CLAUDE_TIMEOUT_MS = 10 * 60_000;
+const CLAUDE_TIMEOUT_MS = 15 * 60_000;
 
 export interface LlmJobPaths {
   jobDir: string;
@@ -89,7 +91,7 @@ export async function runLlmJob<T>(paths: LlmJobPaths, parse: (raw: unknown) => 
     const schema = readFileSync(paths.schemaPath, "utf8");
     const stdout = await runCommand(
       "claude",
-      ["-p", "--model", CLAUDE_MODEL, "--effort", CLAUDE_EFFORT],
+      ["-p", "--model", CLAUDE_MODEL, "--fallback-model", CLAUDE_FALLBACK_MODEL, "--effort", CLAUDE_EFFORT],
       `${prompt}\n\nYour entire reply must be raw JSON (no markdown fences, no prose) that validates against this JSON Schema:\n${schema}`,
       { timeoutMs: CLAUDE_TIMEOUT_MS }
     );

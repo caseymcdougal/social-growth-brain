@@ -30,6 +30,7 @@ export function NextMoveHero(props: {
   onCapture: () => void;
   onGenerateToday: () => void;
   onOpenImport: () => void;
+  onRunFullAudit: () => void;
 }) {
   const capturedAt = props.snapshot?.profile.capturedAt
     ? new Date(props.snapshot.profile.capturedAt).toLocaleString()
@@ -39,6 +40,13 @@ export function NextMoveHero(props: {
   const postLabel = postCount === 1 ? "post" : "posts";
   const coverage = Math.round(props.metricSummary.completenessRatio * 100);
   const isBusy = props.loading || props.capturing || props.analyzing || props.generating;
+  const runningStepLabel = props.capturing
+    ? cta.scanning
+    : props.analyzing
+      ? cta.analyzing
+      : props.generating
+        ? cta.writing
+        : null;
   const postingWindow = formatPostingWindow();
   const phase = props.generation ? "drafted" : props.hasAnalysis ? "audited" : props.snapshot ? "scanned" : "empty";
 
@@ -109,7 +117,8 @@ export function NextMoveHero(props: {
           </div>
         )}
         {props.status && <p className="inline-status">{props.status}</p>}
-        {props.analyzing && <p className="inline-status">Reading patterns… usually 30–90 seconds.</p>}
+        {props.analyzing && <p className="inline-status">Reading patterns… usually a couple of minutes.</p>}
+        {props.generating && <p className="inline-status">Writing drafts in your voice… almost there.</p>}
         {props.error && (
           <p className="inline-error" role="alert">
             {props.error}
@@ -122,15 +131,33 @@ export function NextMoveHero(props: {
             <button
               className="primary-button"
               type="button"
-              onClick={props.onCapture}
+              onClick={props.onRunFullAudit}
               disabled={isBusy}
-              aria-busy={props.capturing || undefined}
+              aria-busy={isBusy || undefined}
             >
-              <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? cta.scanning : cta.scanPosts}
+              <Wand2 size={16} aria-hidden="true" /> {runningStepLabel ?? cta.runFullAudit}
             </button>
-            <button className="inline-text-action" type="button" onClick={props.onOpenImport} disabled={isBusy}>
-              <Upload size={14} aria-hidden="true" /> {cta.pasteSnapshot}
-            </button>
+            <p className="cta-hint">{cta.fullAuditHint}</p>
+            <details className="capture-maintenance" aria-label="More options">
+              <summary>
+                <span>More options</span>
+                <small>One step at a time, paste</small>
+              </summary>
+              <div className="capture-maintenance-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={props.onCapture}
+                  disabled={isBusy}
+                  aria-busy={props.capturing || undefined}
+                >
+                  <RefreshCcw size={16} aria-hidden="true" /> {props.capturing ? cta.scanning : cta.scanPosts}
+                </button>
+                <button className="secondary-button" type="button" onClick={props.onOpenImport} disabled={isBusy}>
+                  <Upload size={16} aria-hidden="true" /> {cta.pasteSnapshot}
+                </button>
+              </div>
+            </details>
           </>
         ) : phase === "audited" ? (
           <>
@@ -179,17 +206,27 @@ export function NextMoveHero(props: {
               className="primary-button"
               type="button"
               disabled={isBusy}
-              onClick={props.onAnalyze}
-              aria-busy={props.analyzing || undefined}
+              onClick={props.onRunFullAudit}
+              aria-busy={isBusy || undefined}
             >
-              <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? cta.analyzing : cta.findPatterns}
+              <Wand2 size={16} aria-hidden="true" /> {runningStepLabel ?? cta.runFullAudit}
             </button>
+            <p className="cta-hint">Finds the patterns in your posts, then writes drafts. Takes a few minutes.</p>
             <details className="capture-maintenance" aria-label="More options">
               <summary>
                 <span>More options</span>
-                <small>Scan again, paste</small>
+                <small>One step at a time, paste</small>
               </summary>
               <div className="capture-maintenance-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isBusy}
+                  onClick={props.onAnalyze}
+                  aria-busy={props.analyzing || undefined}
+                >
+                  <Wand2 size={16} aria-hidden="true" /> {props.analyzing ? cta.analyzing : cta.findPatterns}
+                </button>
                 <button
                   className="secondary-button"
                   type="button"
