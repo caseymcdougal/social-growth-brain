@@ -90,6 +90,8 @@ describe("generation prompt direction", () => {
     expect(prompt.toLowerCase()).toContain("hard negatives");
     expect(prompt.toLowerCase()).toContain("do not reproduce");
     expect(prompt).toContain("paste-ready");
+    expect(prompt).toContain("never invent personal facts");
+    expect(prompt).toContain("bracketed placeholder");
     expect(input).toContain("analysisMechanisms");
     expect(input).not.toContain("next_post_ideas");
     expect(input).not.toContain('"rewrite"');

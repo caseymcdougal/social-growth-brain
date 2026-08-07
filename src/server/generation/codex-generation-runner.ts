@@ -105,6 +105,7 @@ export function writeGenerationJobFiles(
       "source_signal must be one plain-English phrase naming the mechanism or lane. No internal field names, no key: value syntax, never quote a published post.",
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
+      "FACTS RULE: never invent personal facts, events, numbers, or commitments. Anything Casey supposedly did, built, shipped, measured, or is offering must come from the input snapshot, brief, or strategy memory. If a draft needs a specific he hasn't stated, write it as a bracketed placeholder he fills in (e.g. [n] features, [component]) — a draft with a placeholder is fine, a draft with a made-up fact is not. Offers of his time or capacity are commitments: only include one if the brief explicitly calls for it, and mark its scope as a placeholder.",
       ...(input.voiceBlock
         ? [
             input.voiceBlock,
