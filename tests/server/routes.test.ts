@@ -556,3 +556,22 @@ describe("server routes", () => {
     expect(body.errorStage).toBe("no_snapshot");
   });
 });
+
+it("POST /api/direction rejects a missing or empty text body instead of silently no-opping", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "social-audit-api-"));
+  const baseUrl = await listen(makeApp({ dataDir: dir }));
+  const post = (body: unknown) =>
+    fetch(`${baseUrl}/api/direction`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+  expect((await post({ direction: "comeback post" })).status).toBe(400);
+  expect((await post({ text: "   " })).status).toBe(400);
+
+  const valid = await post({ text: "comeback post" });
+  expect(valid.status).toBe(200);
+  const body = await valid.json();
+  expect(body.directions.some((d: { text: string }) => d.text === "comeback post")).toBe(true);
+});

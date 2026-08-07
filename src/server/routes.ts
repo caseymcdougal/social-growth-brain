@@ -104,7 +104,11 @@ export function createServerApp(options: {
   });
 
   app.post("/api/direction", (request, response) => {
-    const text = typeof request.body?.text === "string" ? request.body.text : "";
+    const text = typeof request.body?.text === "string" ? request.body.text.trim() : "";
+    if (!text) {
+      response.status(400).json({ ok: false, errorMessage: "Direction text is required (body: {\"text\": ...})" });
+      return;
+    }
     repos.addCreativeDirection(text);
     response.json({ ok: true, directions: repos.listCreativeDirections() });
   });
