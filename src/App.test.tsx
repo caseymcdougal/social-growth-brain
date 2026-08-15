@@ -1085,8 +1085,8 @@ test("keeps creator score details inside the compact generated command center", 
   expect(within(commandCenter).getByText("Ready to write")).toBeInTheDocument();
   expect(within(commandCenter).getByRole("heading", { name: "Your next post, ready to go" })).toBeInTheDocument();
   expect(commandCenter.querySelector(".command-center-grid")).not.toBeInTheDocument();
-  expect(within(commandCenter).getByText("Growing strong · 88")).toBeInTheDocument();
-  expect(within(commandCenter).getByText("You're on a good roll — keep doing what's working.")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("On track · 84")).toBeInTheDocument();
+  expect(within(commandCenter).getByText("Your audit points to recent-post performance as the first thing to improve.")).toBeInTheDocument();
   const handoff = within(commandCenter).getByLabelText("Draft handoff priorities");
   expect(within(handoff).getByText("Your drafts")).toBeInTheDocument();
   expect(within(handoff).getByText("1 draft staged")).toBeInTheDocument();
@@ -1095,16 +1095,16 @@ test("keeps creator score details inside the compact generated command center", 
     signal.textContent?.includes("What to fix")
   );
   expect(constraintSignal).not.toBeUndefined();
-  expect(within(constraintSignal as HTMLElement).getByText("Ready to post")).toBeInTheDocument();
-  expect(within(constraintSignal as HTMLElement).getByText(/Pick a draft, post it on X/i)).toBeInTheDocument();
+  expect(within(constraintSignal as HTMLElement).getByText("Recent-post performance")).toBeInTheDocument();
+  expect(within(constraintSignal as HTMLElement).getByText(/Repeat the strongest topic and structure/i)).toBeInTheDocument();
   const breakdown = within(commandCenter).getByLabelText("Score breakdown");
   expect(breakdown.tagName).toBe("SECTION");
-  expect(within(breakdown).getByText("4 things we measure")).toBeInTheDocument();
+  expect(within(breakdown).getByText("3 things we measure")).toBeInTheDocument();
 
   fireEvent.click(within(breakdown).getByRole("button", { name: /Copy my summary/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalled());
   expect(writeText.mock.calls[0]?.[0]).toContain("Creator scorecard:");
-  expect(writeText.mock.calls[0]?.[0]).toContain("What to fix first: Ready to post");
+  expect(writeText.mock.calls[0]?.[0]).toContain("What to fix first: Recent-post performance");
 });
 
 test("marks the workflow rail with completed and current steps", async () => {

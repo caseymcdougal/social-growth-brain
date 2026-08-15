@@ -26,10 +26,9 @@ export const cta = {
 } as const;
 
 export const scorecardDimensionHints = {
-  evidence: "How complete your post data is. Better data means better advice.",
-  momentum: "Whether your posts are getting more traction over time.",
-  strategy: "Whether you've turned patterns into a repeatable plan.",
-  production: "Whether you have drafts ready to post."
+  profile: "Based on your live name, handle, and bio. It does not score follower growth.",
+  performance: "Based on recent post views and public actions: likes, replies, reposts, and bookmarks.",
+  evidence: "How complete your post data is. Better data means better advice."
 } as const;
 
 export const emptyStatePreview = [
