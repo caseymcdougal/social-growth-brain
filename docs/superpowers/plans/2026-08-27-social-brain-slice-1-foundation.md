@@ -89,7 +89,7 @@ services:
       timeout: 3s
       retries: 15
     volumes:
-      - social-brain-postgres-data:/var/lib/postgresql/data
+      - social-brain-postgres-data:/var/lib/postgresql
 
 volumes:
   social-brain-postgres-data:
