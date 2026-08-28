@@ -32,6 +32,7 @@ class RecordingEventStore implements BrainEventStore {
   async listOutcomeSnapshots(): Promise<OutcomeSnapshot[]> { return []; }
   async listComplianceChecks(): Promise<ComplianceCheck[]> { return []; }
   async appendCreatorArchive(_value: CreatorArchive) { throw new Error("not used"); }
+  async getCreatorArchiveByFingerprint(_sourceFingerprint: string): Promise<CreatorArchive | null> { return null; }
   async getLatestCreatorArchive(): Promise<CreatorArchive | null> { return null; }
   async healthCheck() {}
 }

@@ -32,6 +32,7 @@ export interface BrainEventStore {
   appendComplianceCheck(check: ComplianceCheck): Promise<void>;
   listComplianceChecks(retainedPostId?: string): Promise<ComplianceCheck[]>;
   appendCreatorArchive(archive: CreatorArchive): Promise<void>;
+  getCreatorArchiveByFingerprint(sourceFingerprint: string): Promise<CreatorArchive | null>;
   getLatestCreatorArchive(): Promise<CreatorArchive | null>;
   healthCheck(): Promise<void>;
 }

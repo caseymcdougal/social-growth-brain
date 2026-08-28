@@ -53,6 +53,7 @@ class SeedStore implements BrainEventStore {
   async listOutcomeSnapshots(): Promise<OutcomeSnapshot[]> { return this.outcomes; }
   async listComplianceChecks(): Promise<ComplianceCheck[]> { return this.compliance; }
   async appendCreatorArchive(_value: CreatorArchive) { throw new Error("not used"); }
+  async getCreatorArchiveByFingerprint(_sourceFingerprint: string): Promise<CreatorArchive | null> { return null; }
   async getLatestCreatorArchive(): Promise<CreatorArchive | null> { return null; }
   async healthCheck() {}
 }
