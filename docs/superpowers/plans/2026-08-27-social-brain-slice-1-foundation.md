@@ -1535,8 +1535,8 @@ export interface ReadLegacyArchiveOptions {
 
 export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive {
   const db = new Database(options.sqlitePath, { readonly: true, fileMustExist: true });
-  db.pragma("query_only = ON");
   try {
+    db.pragma("query_only = ON");
     const requiredTables = [
       "profile_snapshots",
       "post_snapshots",

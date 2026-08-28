@@ -11,6 +11,19 @@ const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 const voice = { summary: "Direct", casing_and_punctuation: ["lowercase"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build the useful thing."] };
 const strategy = { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "direct works", status: "active", evidence: "posts" }] };
+function sourceSnapshot(sqlitePath: string) {
+  const db = new Database(sqlitePath, { readonly: true, fileMustExist: true });
+  try {
+    const tableNames = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all() as Array<{ name: string }>).map((row) => row.name);
+    return {
+      schemaVersion: db.pragma("schema_version", { simple: true }),
+      tableNames,
+      rowCounts: Object.fromEntries(tableNames.map((table) => [table, Number((db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count)])),
+      bytes: readFileSync(sqlitePath),
+      files: readdirSync(join(sqlitePath, "..")).sort()
+    };
+  } finally { db.close(); }
+}
 function fixture(mixed = false) {
   const dir = mkdtempSync(join(tmpdir(), "legacy-reader-")); dirs.push(dir); const sqlitePath = join(dir, "legacy.sqlite"); const db = openDatabase(sqlitePath); const repos = createRepositories(db);
   const add = (handle: string, at: string, body: string, xPostId = "100") => repos.saveCapturedSnapshot({ profile: { handle, displayName: handle, bio: "bio", profileUrl: `https://x.com/${handle}`, followersCount: 1, followingCount: 2, capturedAt: at, source: "manual" }, posts: [{ xPostId, url: `https://x.com/${handle}/status/${xPostId}`, text: body, postedAt: null, capturedAt: at, source: "manual", viewsCount: 1, likesCount: 2, repostsCount: 3, repliesCount: 4, bookmarksCount: 5 }] });
@@ -59,8 +72,8 @@ describe("readLegacyCreatorArchive", () => {
   it("does not depend on forbidden analysis tables or mutate source state", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
     db.pragma("foreign_keys = OFF"); for (const table of ["analysis_runs", "strategy_reports", "post_analyses", "generation_runs", "generated_posts", "topic_exploration_runs"]) db.exec(`DROP TABLE ${table}`); db.pragma("journal_mode = DELETE"); db.close();
-    const before = { bytes: readFileSync(sqlitePath), files: readdirSync(join(sqlitePath, "..")).sort() };
+    const before = sourceSnapshot(sqlitePath);
     expect(readLegacyCreatorArchive({ sqlitePath }).profile?.handle).toBe("caseymcdougal");
-    expect(readFileSync(sqlitePath)).toEqual(before.bytes); expect(readdirSync(join(sqlitePath, "..")).sort()).toEqual(before.files);
+    expect(sourceSnapshot(sqlitePath)).toEqual(before);
   });
 });
