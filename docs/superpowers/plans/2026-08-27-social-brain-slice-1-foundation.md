@@ -1033,6 +1033,7 @@ git commit -m "feat(brain): add immutable postgres event store"
 - Create: `src/brain/storage/run-migrations.ts`
 - Create: `tests/brain/config/runtime-config.test.ts`
 - Create: `tests/brain/policy/policy-gate.test.ts`
+- Modify: `docs/superpowers/plans/2026-08-27-social-brain-slice-1-foundation.md`
 
 - [ ] **Step 1: Write failing runtime configuration tests**
 
@@ -1043,6 +1044,7 @@ import { describe, expect, it } from "vitest";
 import { loadRuntimeConfig } from "../../../src/brain/config/runtime-config";
 
 const databaseUrl = "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test";
+const productionDatabaseUrl = "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require";
 
 describe("loadRuntimeConfig", () => {
   it("defaults to synthetic mode and the isolated local database", () => {
@@ -1053,14 +1055,14 @@ describe("loadRuntimeConfig", () => {
   });
 
   it("rejects production without an approval reference and spend limits", () => {
-    expect(() => loadRuntimeConfig({ SOCIAL_BRAIN_MODE: "production", SOCIAL_BRAIN_DATABASE_URL: databaseUrl })).toThrow();
+    expect(() => loadRuntimeConfig({ SOCIAL_BRAIN_MODE: "production", SOCIAL_BRAIN_DATABASE_URL: productionDatabaseUrl })).toThrow();
   });
 
   it("rejects a daily limit above the monthly limit", () => {
     expect(() =>
       loadRuntimeConfig({
         SOCIAL_BRAIN_MODE: "production",
-        SOCIAL_BRAIN_DATABASE_URL: databaseUrl,
+        SOCIAL_BRAIN_DATABASE_URL: productionDatabaseUrl,
         SOCIAL_BRAIN_X_APPROVAL_REFERENCE: "x-approval-2026-08",
         SOCIAL_BRAIN_DAILY_SPEND_LIMIT_USD: "101",
         SOCIAL_BRAIN_MONTHLY_SPEND_LIMIT_USD: "100"
@@ -1078,58 +1080,18 @@ npm run test:brain -- tests/brain/config/runtime-config.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 2: Implement the discriminated runtime parser**
+The test suite must also cover every runtime boundary: malformed hand-built production configs, unknown modes, unknown installed/requested capabilities, unsafe database URLs, and strict USD parsing. USD input must be plain base-10 positive text with at most two fractional digits; parse decimal text into integer cents, reject cents above `Number.MAX_SAFE_INTEGER`, and compare daily/monthly limits by cents. Tests must cover hex, exponent, signs, NaN, Infinity, blank input, excessive precision, exact two-decimal acceptance, and daily/monthly values that differ by one cent.
 
-Create `src/brain/config/runtime-config.ts`:
+- [ ] **Step 2: Implement the hardened discriminated runtime parser**
 
-```ts
-import { z } from "zod";
+The original illustrative parser below is superseded by these required boundaries and must not be copied as-is:
 
-type RuntimeEnv = Record<string, string | undefined>;
+- Export `runtimeConfigSchema`; `RuntimeConfig` is its output type, and every public consumer re-parses configuration through it.
+- Accept only `postgres:`/`postgresql:` URLs with hostname and one nonempty database name. Synthetic databases must end in `_test`; production databases must not, and require `sslmode=require`, `verify-ca`, or `verify-full`.
+- Accept both environment strings and already-parsed numeric amounts, but perform money validation via canonical decimal text and integer cents. Do not use `z.coerce.number()` or compare floating-point dollars.
+- Production configuration has no defaults for its URL, approval reference, or limits.
 
-const requiredText = z.string().trim().min(1);
-const positiveMoney = z.coerce.number().positive().finite();
-export const DEFAULT_SYNTHETIC_DATABASE_URL =
-  "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test";
-
-const syntheticConfigSchema = z.object({
-  mode: z.literal("synthetic"),
-  databaseUrl: requiredText
-});
-
-const productionConfigSchema = z
-  .object({
-    mode: z.literal("production"),
-    databaseUrl: requiredText,
-    xApprovalReference: requiredText,
-    dailySpendLimitUsd: positiveMoney,
-    monthlySpendLimitUsd: positiveMoney
-  })
-  .superRefine((value, context) => {
-    if (value.dailySpendLimitUsd > value.monthlySpendLimitUsd) {
-      context.addIssue({ code: "custom", path: ["dailySpendLimitUsd"], message: "daily limit cannot exceed monthly limit" });
-    }
-  });
-
-export type RuntimeConfig = z.infer<typeof syntheticConfigSchema> | z.infer<typeof productionConfigSchema>;
-
-export function loadRuntimeConfig(env: RuntimeEnv = process.env): RuntimeConfig {
-  const mode = z.enum(["synthetic", "production"]).parse(env.SOCIAL_BRAIN_MODE ?? "synthetic");
-  if (mode === "synthetic") {
-    return syntheticConfigSchema.parse({
-      mode,
-      databaseUrl: env.SOCIAL_BRAIN_DATABASE_URL ?? DEFAULT_SYNTHETIC_DATABASE_URL
-    });
-  }
-  return productionConfigSchema.parse({
-    mode,
-    databaseUrl: env.SOCIAL_BRAIN_DATABASE_URL,
-    xApprovalReference: env.SOCIAL_BRAIN_X_APPROVAL_REFERENCE,
-    dailySpendLimitUsd: env.SOCIAL_BRAIN_DAILY_SPEND_LIMIT_USD,
-    monthlySpendLimitUsd: env.SOCIAL_BRAIN_MONTHLY_SPEND_LIMIT_USD
-  });
-}
-```
+Create `src/brain/config/runtime-config.ts` with exported `runtimeConfigSchema`, `syntheticConfigSchema`, and `productionConfigSchema`. The production branch may transform internal validated cents into public dollar-number fields only after the cent-level comparison. `loadRuntimeConfig` first parses the environment mode, maps only the matching mode's variables, and returns `runtimeConfigSchema.parse(...)`.
 
 - [ ] **Step 3: Add the now-type-safe migration CLI**
 
@@ -1153,6 +1115,8 @@ try {
 
 - [ ] **Step 4: Write failing policy-gate tests**
 
+Use a synthetic URL ending in `_test` and a dummy production URL such as `postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require`; never use real credentials. In addition to the decisions below, require construction to reject blank approval references, invalid limits/URLs, and `{ mode: "staging" } as any`. Require unknown installed/requested strings such as `future-unreviewed-operation` to throw (or otherwise return an unambiguously denied decision).
+
 Create `tests/brain/policy/policy-gate.test.ts` and require explicit results for all capabilities:
 
 ```ts
@@ -1161,7 +1125,7 @@ import { createPolicyGate } from "../../../src/brain/policy/policy-gate";
 
 describe("policy gate", () => {
   it("denies every live capability in synthetic mode", () => {
-    const gate = createPolicyGate({ mode: "synthetic", databaseUrl: "postgresql://test" });
+    const gate = createPolicyGate({ mode: "synthetic", databaseUrl: "postgresql://social_brain:placeholder@127.0.0.1/social_brain_test" });
     for (const capability of ["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"] as const) {
       expect(gate.check(capability)).toMatchObject({ allowed: false, mode: "synthetic" });
       expect(() => gate.assertAllowed(capability)).toThrow("synthetic mode");
@@ -1171,7 +1135,7 @@ describe("policy gate", () => {
   it("denies production capabilities that are not installed in this slice", () => {
     const config = {
       mode: "production",
-      databaseUrl: "postgresql://test",
+      databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require",
       xApprovalReference: "x-approval-2026-08",
       dailySpendLimitUsd: 10,
       monthlySpendLimitUsd: 100
@@ -1195,81 +1159,9 @@ Expected: FAIL because the gate does not exist.
 
 - [ ] **Step 5: Implement the auditable policy gate**
 
-Create `src/brain/policy/policy-gate.ts`:
+The gate must export `liveCapabilitySchema = z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"])` and infer `LiveCapability` from it. Re-parse config with `runtimeConfigSchema` at construction, use a strict options schema to parse `installedCapabilities`, and parse every capability passed to `check` or `assertAllowed`. Preserve the listed order and decisions, but use explicit synthetic and production branches with an exhaustive impossible-mode failure; no malformed mode may reach an allow path.
 
-```ts
-import type { RuntimeConfig } from "../config/runtime-config";
-
-export type LiveCapability = "live-x-read" | "live-ai-judgment" | "live-ai-generation" | "x-write";
-
-export interface CapabilityDecision {
-  capability: LiveCapability;
-  allowed: boolean;
-  mode: RuntimeConfig["mode"];
-  reason: string;
-  approvalReference: string | null;
-}
-
-export class PolicyDeniedError extends Error {
-  constructor(readonly decision: CapabilityDecision) {
-    super(`${decision.capability} denied: ${decision.reason}`);
-  }
-}
-
-export interface PolicyGateOptions {
-  installedCapabilities?: readonly LiveCapability[];
-}
-
-const allCapabilities: readonly LiveCapability[] = [
-  "live-x-read",
-  "live-ai-judgment",
-  "live-ai-generation",
-  "x-write"
-];
-
-export function createPolicyGate(config: RuntimeConfig, options: PolicyGateOptions = {}) {
-  const installed = new Set(options.installedCapabilities ?? []);
-
-  function check(capability: LiveCapability): CapabilityDecision {
-    if (config.mode === "synthetic") {
-      return {
-        capability,
-        allowed: false,
-        mode: config.mode,
-        reason: "live capabilities are disabled in synthetic mode",
-        approvalReference: null
-      };
-    }
-    if (!installed.has(capability)) {
-      return {
-        capability,
-        allowed: false,
-        mode: config.mode,
-        reason: "capability adapter is not installed in this slice",
-        approvalReference: config.xApprovalReference
-      };
-    }
-    return {
-      capability,
-      allowed: true,
-      mode: config.mode,
-      reason: "production configuration includes approval reference and spend limits",
-      approvalReference: config.xApprovalReference
-    };
-  }
-
-  return {
-    check,
-    assertAllowed(capability: LiveCapability): void {
-      const decision = check(capability);
-      if (!decision.allowed) throw new PolicyDeniedError(decision);
-    },
-    list(): CapabilityDecision[] {
-      return allCapabilities.map(check);
-    }
-  };
-}
-```
+Create `src/brain/policy/policy-gate.ts` with `CapabilityDecision` and `PolicyDeniedError` output shapes unchanged. At construction, validate config and strict options before building the installed set. At each check boundary, validate the capability enum before entering the explicit mode switch. Synthetic decisions always deny with a null approval reference; production decisions use the configuration approval reference but only allow an explicitly installed enum member.
 
 Later slices must pass each adapter's exact capability in `installedCapabilities`. Production configuration alone cannot enable live behavior.
 

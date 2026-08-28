@@ -4,7 +4,7 @@ import { createPolicyGate } from "../../../src/brain/policy/policy-gate";
 
 const productionConfig: RuntimeConfig = {
   mode: "production",
-  databaseUrl: "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test",
+  databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require",
   xApprovalReference: "approved-by-casey",
   dailySpendLimitUsd: 50,
   monthlySpendLimitUsd: 100
@@ -34,5 +34,25 @@ describe("createPolicyGate", () => {
 
     expect(gate.check("live-x-read")).toMatchObject({ allowed: true, mode: "production" });
     expect(gate.check("x-write")).toMatchObject({ allowed: false, mode: "production" });
+  });
+
+  it.each([
+    { ...productionConfig, xApprovalReference: " " },
+    { ...productionConfig, dailySpendLimitUsd: -1 },
+    { ...productionConfig, monthlySpendLimitUsd: Number.NaN },
+    { ...productionConfig, databaseUrl: "postgresql://db.example.invalid/social_brain" },
+    { mode: "staging" }
+  ])("rejects invalid hand-built runtime configuration %j", (invalidConfig) => {
+    expect(() => createPolicyGate(invalidConfig as RuntimeConfig)).toThrow();
+  });
+
+  it("rejects unreviewed capability strings at every policy boundary", () => {
+    expect(() => createPolicyGate(productionConfig, {
+      installedCapabilities: ["future-unreviewed-operation"] as never
+    })).toThrow();
+
+    const gate = createPolicyGate(productionConfig);
+    expect(() => gate.check("future-unreviewed-operation" as never)).toThrow();
+    expect(() => gate.assertAllowed("future-unreviewed-operation" as never)).toThrow();
   });
 });

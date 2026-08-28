@@ -5,42 +5,113 @@ export type RuntimeEnv = Record<string, string | undefined>;
 export const DEFAULT_SYNTHETIC_DATABASE_URL = "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test";
 
 const requiredText = z.string().trim().min(1);
-const positiveMoney = z.coerce.number().finite().positive();
+const plainUsdSyntax = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/;
 
-const syntheticConfigSchema = z.object({
-  mode: z.literal("synthetic"),
-  databaseUrl: requiredText
+type ParsedUsd = { cents: number; dollars: number };
+
+function parseUsd(value: string | number): ParsedUsd {
+  const text = typeof value === "number" ? String(value) : value;
+  if (!plainUsdSyntax.test(text)) throw new Error("USD must be a plain base-10 value with at most two decimal places");
+
+  const [whole, fraction = ""] = text.split(".");
+  const cents = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+  if (cents <= 0n || cents > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("USD cents must be positive and no greater than Number.MAX_SAFE_INTEGER");
+  }
+
+  const safeCents = Number(cents);
+  return { cents: safeCents, dollars: safeCents / 100 };
+}
+
+const usdSchema = z.union([z.string(), z.number()]).transform((value, context): ParsedUsd => {
+  try {
+    return parseUsd(value);
+  } catch (error) {
+    context.addIssue({
+      code: "custom",
+      message: error instanceof Error ? error.message : "Invalid USD value"
+    });
+    return z.NEVER;
+  }
 });
 
-const productionConfigSchema = z.object({
+function databaseUrlSchema(mode: "synthetic" | "production") {
+  return z.string().trim().superRefine((value, context) => {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      context.addIssue({ code: "custom", message: "Database URL must be parseable" });
+      return;
+    }
+
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+      context.addIssue({ code: "custom", message: "Database URL must use postgres or postgresql" });
+    }
+    if (!url.hostname) {
+      context.addIssue({ code: "custom", message: "Database URL must include a hostname" });
+    }
+
+    const databaseName = url.pathname.replace(/^\/+|\/+$/g, "");
+    if (!databaseName || databaseName.includes("/")) {
+      context.addIssue({ code: "custom", message: "Database URL must include one database name" });
+      return;
+    }
+
+    if (mode === "synthetic" && !databaseName.endsWith("_test")) {
+      context.addIssue({ code: "custom", message: "Synthetic database name must end in _test" });
+    }
+    if (mode === "production") {
+      if (databaseName.endsWith("_test")) {
+        context.addIssue({ code: "custom", message: "Production database name must not end in _test" });
+      }
+      if (!new Set(["require", "verify-ca", "verify-full"]).has(url.searchParams.get("sslmode") ?? "")) {
+        context.addIssue({ code: "custom", message: "Production database URL requires secure sslmode" });
+      }
+    }
+  });
+}
+
+export const syntheticConfigSchema = z.object({
+  mode: z.literal("synthetic"),
+  databaseUrl: databaseUrlSchema("synthetic")
+}).strict();
+
+export const productionConfigSchema = z.object({
   mode: z.literal("production"),
-  databaseUrl: requiredText,
+  databaseUrl: databaseUrlSchema("production"),
   xApprovalReference: requiredText,
-  dailySpendLimitUsd: positiveMoney,
-  monthlySpendLimitUsd: positiveMoney
-}).superRefine((config, context) => {
-  if (config.dailySpendLimitUsd > config.monthlySpendLimitUsd) {
+  dailySpendLimitUsd: usdSchema,
+  monthlySpendLimitUsd: usdSchema
+}).strict().superRefine((config, context) => {
+  if (config.dailySpendLimitUsd.cents > config.monthlySpendLimitUsd.cents) {
     context.addIssue({
       code: "custom",
       path: ["dailySpendLimitUsd"],
       message: "Daily spend limit must not exceed monthly spend limit"
     });
   }
-});
+}).transform((config) => ({
+  ...config,
+  dailySpendLimitUsd: config.dailySpendLimitUsd.dollars,
+  monthlySpendLimitUsd: config.monthlySpendLimitUsd.dollars
+}));
 
-export type RuntimeConfig = z.infer<typeof syntheticConfigSchema> | z.infer<typeof productionConfigSchema>;
+export const runtimeConfigSchema = z.union([syntheticConfigSchema, productionConfigSchema]);
+
+export type RuntimeConfig = z.output<typeof runtimeConfigSchema>;
 
 export function loadRuntimeConfig(env: RuntimeEnv = process.env): RuntimeConfig {
   const mode = z.enum(["synthetic", "production"]).parse(env.SOCIAL_BRAIN_MODE ?? "synthetic");
 
   if (mode === "synthetic") {
-    return syntheticConfigSchema.parse({
+    return runtimeConfigSchema.parse({
       mode,
       databaseUrl: env.SOCIAL_BRAIN_DATABASE_URL ?? DEFAULT_SYNTHETIC_DATABASE_URL
     });
   }
 
-  return productionConfigSchema.parse({
+  return runtimeConfigSchema.parse({
     mode,
     databaseUrl: env.SOCIAL_BRAIN_DATABASE_URL,
     xApprovalReference: env.SOCIAL_BRAIN_X_APPROVAL_REFERENCE,

@@ -1,6 +1,8 @@
-import type { RuntimeConfig } from "../config/runtime-config";
+import { z } from "zod";
+import { runtimeConfigSchema, type RuntimeConfig } from "../config/runtime-config";
 
-export type LiveCapability = "live-x-read" | "live-ai-judgment" | "live-ai-generation" | "x-write";
+export const liveCapabilitySchema = z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"]);
+export type LiveCapability = z.infer<typeof liveCapabilitySchema>;
 
 export interface CapabilityDecision {
   capability: LiveCapability;
@@ -21,39 +23,54 @@ export interface PolicyGateOptions {
   readonly installedCapabilities?: readonly LiveCapability[];
 }
 
-const allCapabilities = ["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"] as const;
+const policyGateOptionsSchema = z.object({
+  installedCapabilities: z.array(liveCapabilitySchema).optional()
+}).strict();
+const allCapabilities: readonly LiveCapability[] = ["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"];
+
+function impossibleMode(mode: never): never {
+  throw new Error(`Unsupported runtime mode: ${String(mode)}`);
+}
 
 export function createPolicyGate(config: RuntimeConfig, options: PolicyGateOptions = {}) {
-  const installedCapabilities = new Set(options.installedCapabilities);
+  const parsedConfig = runtimeConfigSchema.parse(config);
+  const parsedOptions = policyGateOptionsSchema.parse(options);
+  const installedCapabilities = new Set(parsedOptions.installedCapabilities ?? []);
 
   function check(capability: LiveCapability): CapabilityDecision {
-    if (config.mode === "synthetic") {
+    const parsedCapability = liveCapabilitySchema.parse(capability);
+
+    if (parsedConfig.mode === "synthetic") {
       return {
-        capability,
+        capability: parsedCapability,
         allowed: false,
-        mode: config.mode,
+        mode: parsedConfig.mode,
         reason: "live capabilities are disabled in synthetic mode",
         approvalReference: null
       };
     }
 
-    if (!installedCapabilities.has(capability)) {
+    if (parsedConfig.mode === "production") {
+      if (!installedCapabilities.has(parsedCapability)) {
+        return {
+          capability: parsedCapability,
+          allowed: false,
+          mode: parsedConfig.mode,
+          reason: "capability adapter is not installed in this slice",
+          approvalReference: parsedConfig.xApprovalReference
+        };
+      }
+
       return {
-        capability,
-        allowed: false,
-        mode: config.mode,
-        reason: "capability adapter is not installed in this slice",
-        approvalReference: config.xApprovalReference
+        capability: parsedCapability,
+        allowed: true,
+        mode: parsedConfig.mode,
+        reason: "production configuration includes approval reference and spend limits",
+        approvalReference: parsedConfig.xApprovalReference
       };
     }
 
-    return {
-      capability,
-      allowed: true,
-      mode: config.mode,
-      reason: "production configuration includes approval reference and spend limits",
-      approvalReference: config.xApprovalReference
-    };
+    return impossibleMode(parsedConfig);
   }
 
   function assertAllowed(capability: LiveCapability): void {
