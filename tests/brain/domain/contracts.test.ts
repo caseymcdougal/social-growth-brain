@@ -240,6 +240,16 @@ describe("Social Brain domain contracts", () => {
     expect(complianceCheckSchema.parse(validComplianceCheck()).id).toBe(UUID);
   });
 
+  it("requires signal evidence to retain at least one feature", () => {
+    expect(() => signalEvidenceSchema.parse({ ...validSignalEvidence(), features: [] })).toThrow();
+  });
+
+  it("enforces draft action and target consistency", () => {
+    expect(() =>
+      draftVariantSchema.parse({ ...validDraftVariant(), actionType: "original", targetPostId: "900000000000000001" })
+    ).toThrow();
+  });
+
   it("rejects raw content and unknown keys in decision payloads", () => {
     expect(() =>
       decisionEventSchema.parse({

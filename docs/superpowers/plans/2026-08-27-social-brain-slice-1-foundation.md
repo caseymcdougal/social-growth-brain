@@ -260,7 +260,7 @@ npm run test:brain -- tests/brain/domain/contracts.test.ts
 
 Expected: FAIL because the domain modules do not exist.
 
-The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject decision payload raw text and unknown keys, type/payload mismatches, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
+The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject empty signal evidence features, inconsistent draft action/target pairs, decision payload raw text and unknown keys, type/payload mismatches, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
 
 - [ ] **Step 2: Implement common identifiers and enums**
 
