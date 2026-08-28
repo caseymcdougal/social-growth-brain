@@ -11,7 +11,11 @@ export interface ReadLegacyArchiveOptions { sqlitePath: string; now?: () => Date
 
 type Row = Record<string, unknown>;
 const text = (value: unknown) => typeof value === "string" ? value : "";
-const nullableNumber = (value: unknown) => value === null || typeof value === "number" ? value : null;
+function nullableNumber(value: unknown, field: string): number | null {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  throw new Error(`Invalid legacy numeric field: ${field}`);
+}
 
 function parseJson(value: unknown, label: string): unknown {
   try { return JSON.parse(text(value)); } catch { throw new Error(`Invalid archived ${label} JSON`); }
@@ -20,11 +24,11 @@ function parseJson(value: unknown, label: string): unknown {
 function profileFrom(row: Row) {
   return {
     handle: "caseymcdougal" as const, displayName: text(row.display_name), bio: text(row.bio), profileUrl: text(row.profile_url),
-    followersCount: nullableNumber(row.followers_count), followingCount: nullableNumber(row.following_count), capturedAt: text(row.captured_at)
+    followersCount: nullableNumber(row.followers_count, "followers_count"), followingCount: nullableNumber(row.following_count, "following_count"), capturedAt: text(row.captured_at)
   };
 }
 function postFrom(row: Row) {
-  return { xPostId: text(row.x_post_id), url: text(row.url), text: text(row.text), postedAt: row.posted_at === null ? null : text(row.posted_at), capturedAt: text(row.captured_at), viewsCount: nullableNumber(row.views_count), likesCount: nullableNumber(row.likes_count), repostsCount: nullableNumber(row.reposts_count), repliesCount: nullableNumber(row.replies_count), bookmarksCount: nullableNumber(row.bookmarks_count) };
+  return { xPostId: text(row.x_post_id), url: text(row.url), text: text(row.text), postedAt: row.posted_at === null ? null : text(row.posted_at), capturedAt: text(row.captured_at), viewsCount: nullableNumber(row.views_count, "views_count"), likesCount: nullableNumber(row.likes_count, "likes_count"), repostsCount: nullableNumber(row.reposts_count, "reposts_count"), repliesCount: nullableNumber(row.replies_count, "replies_count"), bookmarksCount: nullableNumber(row.bookmarks_count, "bookmarks_count") };
 }
 
 export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive {
@@ -33,7 +37,7 @@ export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): Cre
     db.pragma("query_only = ON");
     const tableNames = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name));
     for (const table of REQUIRED_TABLES) if (!tableNames.has(table)) throw new Error(`Missing required legacy table: ${table}`);
-    const handles = (db.prepare("SELECT DISTINCT lower(trim(handle)) AS handle FROM profile_snapshots").all() as Array<{ handle: string }>).map((row) => row.handle).filter(Boolean);
+    const handles = (db.prepare("SELECT DISTINCT lower(trim(handle)) AS handle FROM profile_snapshots").all() as Array<{ handle: string | null }>).map((row) => row.handle);
     const caseyOnly = handles.length === 1 && handles[0] === CASEY_HANDLE;
     const profileRow = db.prepare("SELECT * FROM profile_snapshots WHERE lower(trim(handle)) = 'caseymcdougal' ORDER BY captured_at DESC, id DESC LIMIT 1").get() as Row | undefined;
     const profile = profileRow ? profileFrom(profileRow) : null;

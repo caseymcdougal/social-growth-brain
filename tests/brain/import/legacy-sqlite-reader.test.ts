@@ -1,6 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../../../src/server/db";
 import { createRepositories } from "../../../src/server/repositories";
@@ -17,7 +18,7 @@ function fixture(mixed = false) {
   db.prepare("INSERT INTO voice_profiles (profile_snapshot_id, profile_json, created_at, job_dir) VALUES (?, ?, ?, ?)").run(caseyNew, JSON.stringify(voice), "2026-08-04T00:00:00.000Z", "ignored");
   const analysisId = Number(db.prepare("INSERT INTO analysis_runs (profile_snapshot_id, status, input_post_count, prompt_version, schema_version, started_at, job_dir) VALUES (?, 'succeeded', 0, 'v1', 'v1', ?, 'ignored')").run(caseyNew, "2026-08-04T00:00:00.000Z").lastInsertRowid);
   const proposalId = Number(db.prepare("INSERT INTO strategy_memory_proposals (profile_snapshot_id, analysis_run_id, status, proposed_memory_json, updates_json, created_at, job_dir) VALUES (?, ?, 'applied', ?, '[]', ?, 'ignored')").run(caseyNew, analysisId, JSON.stringify(strategy), "2026-08-04T00:00:00.000Z").lastInsertRowid);
-  db.prepare("INSERT INTO strategy_memories (source_proposal_id, memory_json, created_at) VALUES (?, ?, ?)").run(proposalId, JSON.stringify(strategy), "2026-08-05T00:00:00.000Z"); db.prepare("INSERT INTO voice_overrides (id, text, updated_at) VALUES (1, 'keep it sharp', ?)").run("2026-08-05T00:00:00.000Z"); db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('write more examples', ?)").run("2026-08-05T00:00:00.000Z"); db.close(); return { sqlitePath };
+  db.prepare("INSERT INTO strategy_memories (source_proposal_id, memory_json, created_at) VALUES (?, ?, ?)").run(proposalId, JSON.stringify(strategy), "2026-08-05T00:00:00.000Z"); db.prepare("INSERT INTO voice_overrides (id, text, updated_at) VALUES (1, 'keep it sharp', ?)").run("2026-08-05T00:00:00.000Z"); db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('write more examples', ?)").run("2026-08-05T00:00:00.000Z"); db.pragma("journal_mode = DELETE"); db.close(); return { sqlitePath };
 }
 describe("readLegacyCreatorArchive", () => {
   it("imports only Casey-owned latest/deduplicated content without mutating source", () => {
@@ -27,5 +28,39 @@ describe("readLegacyCreatorArchive", () => {
   it("omits global fields from mixed-creator archives", () => {
     const { sqlitePath } = fixture(true); const archive = readLegacyCreatorArchive({ sqlitePath });
     expect(archive.posts).toHaveLength(1); expect(archive.voiceOverrides).toBe(""); expect(archive.creativeDirections).toEqual([]); expect(archive.importReport.omittedFields).toEqual(expect.arrayContaining([expect.stringContaining("voice overrides"), expect.stringContaining("creative directions")]));
+  });
+  it("rejects corrupt numeric values instead of silently converting them", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.prepare("UPDATE profile_snapshots SET followers_count = 'broken' WHERE lower(handle) = 'caseymcdougal'").run(); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("followers_count");
+  });
+  it("rejects corrupt post metrics instead of silently converting them", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.prepare("UPDATE post_snapshots SET likes_count = 'broken'").run(); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("likes_count");
+  });
+  it("treats blank handles as unattributable mixed creators", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.prepare("INSERT INTO profile_snapshots (handle, display_name, bio, profile_url, captured_at, source) VALUES ('   ', 'unknown', '', 'https://x.com/unknown', '2026-08-06T00:00:00.000Z', 'manual')").run(); db.prepare("DELETE FROM strategy_memories").run(); db.prepare("INSERT INTO strategy_memories (memory_json, created_at) VALUES (?, ?)").run(JSON.stringify(strategy), "2026-08-06T00:00:00.000Z"); db.close();
+    const archive = readLegacyCreatorArchive({ sqlitePath });
+    expect(archive.voiceOverrides).toBe(""); expect(archive.creativeDirections).toEqual([]); expect(archive.strategyMemory).toBeNull(); expect(archive.importReport.omittedFields).toEqual(expect.arrayContaining([expect.stringContaining("voice overrides"), expect.stringContaining("creative directions"), expect.stringContaining("strategy memory omitted")]));
+  });
+  it("fails named missing tables without recreating a legacy schema", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.exec("DROP TABLE creative_direction"); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("Missing required legacy table: creative_direction");
+    const check = new Database(sqlitePath, { readonly: true, fileMustExist: true }); expect(check.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'creative_direction'").get()).toBeUndefined(); check.close();
+  });
+  it("rejects invalid archived voice and strategy JSON", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.prepare("UPDATE voice_profiles SET profile_json = '{bad'").run(); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("Invalid archived voice profile JSON");
+    const second = fixture().sqlitePath; const db2 = openDatabase(second); db2.prepare("UPDATE strategy_memories SET memory_json = '{bad'").run(); db2.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath: second })).toThrow("Invalid archived strategy memory JSON");
+  });
+  it("does not depend on forbidden analysis tables or mutate source state", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.pragma("foreign_keys = OFF"); for (const table of ["analysis_runs", "strategy_reports", "post_analyses", "generation_runs", "generated_posts", "topic_exploration_runs"]) db.exec(`DROP TABLE ${table}`); db.pragma("journal_mode = DELETE"); db.close();
+    const before = { bytes: readFileSync(sqlitePath), files: readdirSync(join(sqlitePath, "..")).sort() };
+    expect(readLegacyCreatorArchive({ sqlitePath }).profile?.handle).toBe("caseymcdougal");
+    expect(readFileSync(sqlitePath)).toEqual(before.bytes); expect(readdirSync(join(sqlitePath, "..")).sort()).toEqual(before.files);
   });
 });
