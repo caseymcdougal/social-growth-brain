@@ -65,7 +65,7 @@ Add these keys to `package.json` under `scripts`, preserving every existing scri
   "brain:mcp": "tsx src/brain/interfaces/mcp/stdio.ts",
   "brain:verify:slice1": "tsx src/brain/dev/verify-slice-1.ts",
   "test:brain": "vitest run tests/brain --exclude 'tests/brain/integration/**'",
-  "test:brain:integration": "vitest run tests/brain/integration"
+  "test:brain:integration": "vitest run --no-file-parallelism tests/brain/integration"
 }
 ```
 
