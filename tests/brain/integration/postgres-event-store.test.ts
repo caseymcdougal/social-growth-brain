@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   complianceCheckSchema,
   creatorArchiveSchema,
@@ -103,5 +106,20 @@ describe("PostgresBrainEventStore", () => {
 
   it("refuses destructive cleanup for non-test databases", () => {
     expect(() => assertTestDatabaseUrl("postgresql://user:pass@localhost/social_brain")).toThrow("Refusing destructive test cleanup");
+  });
+
+  it("runs migrations after the process changes to a temporary directory", async () => {
+    const originalCwd = process.cwd();
+    const temporaryCwd = await mkdtemp(join(tmpdir(), "social-brain-migration-"));
+    try {
+      process.chdir(temporaryCwd);
+      await vi.resetModules();
+      const { runMigrations: runFromTemporaryCwd } = await import("../../../src/brain/storage/migrations");
+      await pool.query("DELETE FROM brain_schema_migrations WHERE version = $1", [1]);
+      await runFromTemporaryCwd(pool);
+    } finally {
+      process.chdir(originalCwd);
+      await rm(temporaryCwd, { recursive: true, force: true });
+    }
   });
 });

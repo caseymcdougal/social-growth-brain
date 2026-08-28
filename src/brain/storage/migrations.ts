@@ -5,7 +5,7 @@ import type { Pool } from "pg";
 const migrations = [{
   version: 1,
   name: "brain_foundation",
-  url: new URL("./migrations/0001_brain_foundation.sql", pathToFileURL(`${process.cwd()}/src/brain/storage/`))
+  url: new URL("./migrations/0001_brain_foundation.sql", pathToFileURL(`${import.meta.dirname}/`))
 }];
 
 export async function runMigrations(pool: Pool): Promise<void> {
