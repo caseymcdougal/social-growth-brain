@@ -81,7 +81,7 @@ const decisionEventEnvelopeSchema = z
   id: uuidSchema,
   opportunityId: uuidSchema,
   opportunityRevision: z.number().int().positive(),
-  actor: z.object({ type: z.enum(["system", "human"]), id: z.string().trim().min(1) }),
+  actor: z.object({ type: z.enum(["system", "human"]), id: z.string().trim().min(1) }).strict(),
   interface: z.enum(["replay", "mcp", "telegram", "system"]),
   occurredAt: isoTimestampSchema
   })
@@ -142,7 +142,15 @@ export const decisionEventSchema = z.discriminatedUnion("type", [
       .object({ publishedPostId: xPostIdSchema, outcomeSnapshotId: uuidSchema, qualifiesForProof: z.boolean() })
       .strict()
   })
-]);
+]).superRefine((value, context) => {
+  if (value.type === "approved" && Date.parse(value.payload.approvalExpiresAt) <= Date.parse(value.occurredAt)) {
+    context.addIssue({
+      code: "custom",
+      path: ["payload", "approvalExpiresAt"],
+      message: "approvalExpiresAt must follow occurredAt"
+    });
+  }
+});
 
 export const outcomeSnapshotSchema = z
   .object({

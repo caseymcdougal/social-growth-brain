@@ -265,6 +265,30 @@ describe("Social Brain domain contracts", () => {
     ).toThrow();
   });
 
+  it("requires approval expiry to follow the approval event", () => {
+    expect(() =>
+      decisionEventSchema.parse({
+        ...validDecisionEvent(),
+        payload: { ...validDecisionEvent().payload, approvalExpiresAt: "2026-08-27T14:00:00.000Z" }
+      })
+    ).toThrow();
+    expect(() =>
+      decisionEventSchema.parse({
+        ...validDecisionEvent(),
+        payload: { ...validDecisionEvent().payload, approvalExpiresAt: "2026-08-27T13:59:59.000Z" }
+      })
+    ).toThrow();
+  });
+
+  it("rejects unknown nested actor fields", () => {
+    expect(() =>
+      decisionEventSchema.parse({
+        ...validDecisionEvent(),
+        actor: { ...validDecisionEvent().actor, rawPostText: "do not persist this" }
+      })
+    ).toThrow();
+  });
+
   it("rejects mismatched decision type and payload variants", () => {
     expect(() =>
       decisionEventSchema.parse({

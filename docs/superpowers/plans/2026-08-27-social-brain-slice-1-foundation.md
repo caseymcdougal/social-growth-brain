@@ -260,7 +260,7 @@ npm run test:brain -- tests/brain/domain/contracts.test.ts
 
 Expected: FAIL because the domain modules do not exist.
 
-The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject empty signal evidence features, inconsistent draft action/target pairs, decision payload raw text and unknown keys, type/payload mismatches, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
+The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject empty signal evidence features, inconsistent draft action/target pairs, decision payload or nested actor raw text and unknown keys, type/payload mismatches, approval expiry at or before the event timestamp, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
 
 - [ ] **Step 2: Implement common identifiers and enums**
 
@@ -466,7 +466,7 @@ const decisionEventEnvelopeSchema = z
   id: uuidSchema,
   opportunityId: uuidSchema,
   opportunityRevision: z.number().int().positive(),
-  actor: z.object({ type: z.enum(["system", "human"]), id: z.string().trim().min(1) }),
+  actor: z.object({ type: z.enum(["system", "human"]), id: z.string().trim().min(1) }).strict(),
   interface: z.enum(["replay", "mcp", "telegram", "system"]),
   occurredAt: isoTimestampSchema
   })
@@ -485,7 +485,11 @@ export const decisionEventSchema = z.discriminatedUnion("type", [
   decisionEventEnvelopeSchema.extend({ type: z.literal("failed"), payload: z.object({ publishIntentId: uuidSchema.nullable(), errorCode: machineCodeSchema, retryable: z.boolean() }).strict() }),
   decisionEventEnvelopeSchema.extend({ type: z.literal("measuring"), payload: z.object({ publishedPostId: xPostIdSchema }).strict() }),
   decisionEventEnvelopeSchema.extend({ type: z.literal("matured"), payload: z.object({ publishedPostId: xPostIdSchema, outcomeSnapshotId: uuidSchema, qualifiesForProof: z.boolean() }).strict() })
-]);
+]).superRefine((value, context) => {
+  if (value.type === "approved" && Date.parse(value.payload.approvalExpiresAt) <= Date.parse(value.occurredAt)) {
+    context.addIssue({ code: "custom", path: ["payload", "approvalExpiresAt"], message: "approvalExpiresAt must follow occurredAt" });
+  }
+});
 
 export const outcomeSnapshotSchema = z.object({
   schemaVersion: z.literal(SOCIAL_BRAIN_SCHEMA_VERSION),
