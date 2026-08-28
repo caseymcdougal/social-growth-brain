@@ -54,6 +54,9 @@ describe("Social Brain domain contracts", () => {
 
   it("requires a target for replies and quotes", () => {
     expect(() => opportunitySchema.parse({ ...validOpportunity(), targetPostId: null })).toThrow();
+    expect(() =>
+      opportunitySchema.parse({ ...validOpportunity(), actionType: "quote", targetPostId: null })
+    ).toThrow();
   });
 
   it("forbids a target on original posts", () => {
