@@ -20,7 +20,17 @@ function parseUsd(value: string | number): ParsedUsd {
   }
 
   const safeCents = Number(cents);
-  return { cents: safeCents, dollars: safeCents / 100 };
+  const dollars = safeCents / 100;
+  const publicText = String(dollars);
+  const [publicWhole, publicFraction = ""] = publicText.split(".");
+  const publicCents = plainUsdSyntax.test(publicText)
+    ? BigInt(publicWhole) * 100n + BigInt(publicFraction.padEnd(2, "0"))
+    : -1n;
+  if (publicCents !== cents) {
+    throw new Error("USD value cannot be represented as a stable dollar number");
+  }
+
+  return { cents: safeCents, dollars };
 }
 
 const usdSchema = z.union([z.string(), z.number()]).transform((value, context): ParsedUsd => {
@@ -65,8 +75,9 @@ function databaseUrlSchema(mode: "synthetic" | "production") {
       if (databaseName.endsWith("_test")) {
         context.addIssue({ code: "custom", message: "Production database name must not end in _test" });
       }
-      if (!new Set(["require", "verify-ca", "verify-full"]).has(url.searchParams.get("sslmode") ?? "")) {
-        context.addIssue({ code: "custom", message: "Production database URL requires secure sslmode" });
+      const sslModes = url.searchParams.getAll("sslmode");
+      if (sslModes.length !== 1 || !new Set(["require", "verify-ca", "verify-full"]).has(sslModes[0])) {
+        context.addIssue({ code: "custom", message: "Production database URL requires exactly one secure sslmode" });
       }
     }
   });

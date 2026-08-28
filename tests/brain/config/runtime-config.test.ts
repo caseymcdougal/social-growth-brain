@@ -79,6 +79,16 @@ describe("loadRuntimeConfig", () => {
     })).toThrow();
   });
 
+  it("rejects safe-cent inputs whose public dollar number loses a cent", () => {
+    expect(() => loadRuntimeConfig({
+      SOCIAL_BRAIN_MODE: "production",
+      SOCIAL_BRAIN_DATABASE_URL: productionDatabaseUrl,
+      SOCIAL_BRAIN_X_APPROVAL_REFERENCE: "approved-by-casey",
+      SOCIAL_BRAIN_DAILY_SPEND_LIMIT_USD: "90071992547409.91",
+      SOCIAL_BRAIN_MONTHLY_SPEND_LIMIT_USD: "90071992547409.91"
+    })).toThrow();
+  });
+
   it.each([
     ["not-a-url", "synthetic"],
     ["https://db.example.invalid/social_brain_test", "synthetic"],
@@ -92,6 +102,8 @@ describe("loadRuntimeConfig", () => {
   it.each([
     "postgresql://db.example.invalid/social_brain",
     "postgresql://db.example.invalid/social_brain_test?sslmode=require",
+    "postgresql://db.example.invalid/social_brain?sslmode=require&sslmode=disable",
+    "postgresql://db.example.invalid/social_brain?sslmode=require&sslmode=verify-full",
     "http://db.example.invalid/social_brain?sslmode=require",
     "postgresql:///social_brain?sslmode=require",
     "postgresql://db.example.invalid/?sslmode=require"

@@ -1087,8 +1087,8 @@ The test suite must also cover every runtime boundary: malformed hand-built prod
 The original illustrative parser below is superseded by these required boundaries and must not be copied as-is:
 
 - Export `runtimeConfigSchema`; `RuntimeConfig` is its output type, and every public consumer re-parses configuration through it.
-- Accept only `postgres:`/`postgresql:` URLs with hostname and one nonempty database name. Synthetic databases must end in `_test`; production databases must not, and require `sslmode=require`, `verify-ca`, or `verify-full`.
-- Accept both environment strings and already-parsed numeric amounts, but perform money validation via canonical decimal text and integer cents. Do not use `z.coerce.number()` or compare floating-point dollars.
+- Accept only `postgres:`/`postgresql:` URLs with hostname and one nonempty database name. Synthetic databases must end in `_test`; production databases must not, and require exactly one `sslmode` value of `require`, `verify-ca`, or `verify-full`. Reject duplicate `sslmode` parameters even when both values are secure.
+- Accept both environment strings and already-parsed numeric amounts, but perform money validation via canonical decimal text and integer cents. Do not use `z.coerce.number()` or compare floating-point dollars. Before returning public dollar-number fields, round-trip their decimal text back to cents and reject any value that would lose a cent.
 - Production configuration has no defaults for its URL, approval reference, or limits.
 
 Create `src/brain/config/runtime-config.ts` with exported `runtimeConfigSchema`, `syntheticConfigSchema`, and `productionConfigSchema`. The production branch may transform internal validated cents into public dollar-number fields only after the cent-level comparison. `loadRuntimeConfig` first parses the environment mode, maps only the matching mode's variables, and returns `runtimeConfigSchema.parse(...)`.
