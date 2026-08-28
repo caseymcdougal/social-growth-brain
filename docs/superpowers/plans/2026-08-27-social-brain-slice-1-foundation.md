@@ -1433,10 +1433,12 @@ git commit -m "feat(brain): add deterministic synthetic replay"
 Use the existing `openDatabase` and `createRepositories` helpers only to construct and close temporary SQLite fixtures. Test these cases:
 
 1. A database containing only `caseymcdougal` imports his profile, deduplicated posts, latest voice profile, overrides, linked strategy memory, and creative directions.
-2. A database containing Casey and another handle imports only Casey's profile and posts, then omits every globally scoped field that cannot be attributed safely.
-3. The reader never queries `analysis_runs`, `strategy_reports`, `post_analyses`, `generation_runs`, `generated_posts`, `topic_exploration_runs`, or any job directory.
-4. Sequential or concurrent reimport of the same canonical archive returns one stored row rather than appending a duplicate.
-5. Opening the source is read-only and does not invoke the legacy migration function.
+2. A database containing Casey plus another, blank, whitespace-only, or `NULL` handle imports only Casey's profile and posts, then omits every globally scoped field and unlinked strategy that cannot be attributed safely, with explicit reasons.
+3. Corrupt numeric values in profile or post metric columns fail by legacy field name; SQL `NULL` is the only value that maps to `null`.
+4. Missing required tables fail by name and are not recreated; malformed voice or strategy JSON fails explicitly.
+5. The reader still succeeds after dropping `analysis_runs`, `strategy_reports`, `post_analyses`, `generation_runs`, `generated_posts`, and `topic_exploration_runs`, proving it does not query those tables or any job directory.
+6. Capture source schema version, table names, row counts, main SQLite bytes, and directory file set before a successful read; every value remains unchanged afterwards.
+7. Two first imports started concurrently on an empty archive table produce exactly `imported` and `already-imported`, the same winner ID/fingerprint, and a guarded direct fingerprint row count of exactly one; a later sequential import is `already-imported`.
 
 Run:
 
@@ -1474,8 +1476,8 @@ interface LegacyProfileRow {
   display_name: string;
   bio: string;
   profile_url: string;
-  followers_count: number | null;
-  following_count: number | null;
+  followers_count: unknown;
+  following_count: unknown;
   captured_at: string;
 }
 
@@ -1485,11 +1487,17 @@ interface LegacyPostRow {
   text: string;
   posted_at: string | null;
   captured_at: string;
-  views_count: number | null;
-  likes_count: number | null;
-  reposts_count: number | null;
-  replies_count: number | null;
-  bookmarks_count: number | null;
+  views_count: unknown;
+  likes_count: unknown;
+  reposts_count: unknown;
+  replies_count: unknown;
+  bookmarks_count: unknown;
+}
+
+function requiredLegacyNumber(value: unknown, field: string): number | null {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  throw new Error(`Invalid legacy numeric field: ${field}`);
 }
 
 function mapLegacyProfile(row: LegacyProfileRow | undefined) {
@@ -1499,8 +1507,8 @@ function mapLegacyProfile(row: LegacyProfileRow | undefined) {
     displayName: row.display_name,
     bio: row.bio,
     profileUrl: row.profile_url,
-    followersCount: row.followers_count,
-    followingCount: row.following_count,
+    followersCount: requiredLegacyNumber(row.followers_count, "followers_count"),
+    followingCount: requiredLegacyNumber(row.following_count, "following_count"),
     capturedAt: row.captured_at
   };
 }
@@ -1512,11 +1520,11 @@ function mapLegacyPost(row: LegacyPostRow) {
     text: row.text,
     postedAt: row.posted_at,
     capturedAt: row.captured_at,
-    viewsCount: row.views_count,
-    likesCount: row.likes_count,
-    repostsCount: row.reposts_count,
-    repliesCount: row.replies_count,
-    bookmarksCount: row.bookmarks_count
+    viewsCount: requiredLegacyNumber(row.views_count, "views_count"),
+    likesCount: requiredLegacyNumber(row.likes_count, "likes_count"),
+    repostsCount: requiredLegacyNumber(row.reposts_count, "reposts_count"),
+    repliesCount: requiredLegacyNumber(row.replies_count, "replies_count"),
+    bookmarksCount: requiredLegacyNumber(row.bookmarks_count, "bookmarks_count")
   };
 }
 
@@ -1549,9 +1557,11 @@ export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): Cre
 
     const handles = (
       db.prepare("SELECT DISTINCT lower(trim(handle)) AS handle FROM profile_snapshots ORDER BY handle").all() as Array<{
-        handle: string;
+        handle: string | null;
       }>
     ).map((row) => row.handle);
+    // Do not filter falsy normalized handles: blank, whitespace-only, and NULL
+    // values are distinct unattributable creators and therefore make globals unsafe.
     const globalFieldsAreAttributable = handles.length === 1 && handles[0] === "caseymcdougal";
 
     const profile = db
