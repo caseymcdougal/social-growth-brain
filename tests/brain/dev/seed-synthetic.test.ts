@@ -101,4 +101,27 @@ describe("seedSynthetic", () => {
     expect(store.drafts).toHaveLength(1);
     expect(store.decisions).toHaveLength(2);
   });
+
+  it("accepts JSONB-reordered immutable payload keys but rejects changed values", async () => {
+    const fixtureWithOutcome = {
+      ...structuredClone(fixture),
+      events: [...fixture.events, {
+        sequence: 9,
+        at: "2026-08-27T14:08:00.000Z",
+        kind: "outcome_snapshot",
+        payload: {
+          schemaVersion: 1, id: "80000000-0000-4000-8000-000000000001", opportunityId: fixture.primaryOpportunityId,
+          publishedPostId: "900000000000000001", publishedAt: "2026-08-27T14:00:00.000Z", observedAt: "2026-08-27T14:08:00.000Z",
+          observationAgeMinutes: 8, publicMetrics: { views: 1, likes: 1, replies: 1, reposts: 1, bookmarks: 1 },
+          privateMetrics: { zeta: 2, alpha: 1 }, source: "synthetic", collectionStatus: "complete"
+        }
+      }]
+    };
+    const store = new SeedStore();
+    await seedSynthetic(store, fixtureWithOutcome);
+    store.outcomes[0] = { ...store.outcomes[0], privateMetrics: { alpha: 1, zeta: 2 } };
+    await expect(seedSynthetic(store, fixtureWithOutcome)).resolves.toMatchObject({ status: "already-seeded" });
+    store.outcomes[0] = { ...store.outcomes[0], privateMetrics: { alpha: 9, zeta: 2 } };
+    await expect(seedSynthetic(store, fixtureWithOutcome)).rejects.toThrow("Partial synthetic replay detected");
+  });
 });

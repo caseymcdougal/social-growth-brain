@@ -28,7 +28,6 @@ export const replayFixtureSchema = z.object({
   const issue = (index: number, message: string) => context.addIssue({ code: "custom", path: ["events", index], message });
   const revisions = new Map<string, { index: number; payload: Extract<ReplayFixture["events"][number], { kind: "opportunity_revision" }> ["payload"] }>();
   const immutableIds = new Set<string>();
-  const targets = new Set<string>();
   for (let index = 1; index < fixture.events.length; index += 1) {
     const previous = fixture.events[index - 1];
     const current = fixture.events[index];
@@ -51,13 +50,17 @@ export const replayFixtureSchema = z.object({
       const key = `${event.payload.id}:${event.payload.revision}`;
       if (revisions.has(key)) issue(index, "opportunity revision keys must be unique");
       revisions.set(key, { index, payload: event.payload });
-      if (event.payload.targetPostId) targets.add(event.payload.targetPostId);
       return;
     }
     if (!immutableIds.add(event.payload.id)) issue(index, "immutable payload ids must be globally unique");
     if (event.kind === "compliance_check") {
-      if (!targets.has(event.payload.retainedPostId)) issue(index, "compliance target must match an opportunity target");
+      if (![...revisions.values()].some(({ index: revisionIndex, payload }) => revisionIndex < index && payload.targetPostId === event.payload.retainedPostId)) {
+        issue(index, "compliance must follow an opportunity revision with its matching target");
+      }
       return;
+    }
+    if (event.kind === "outcome_snapshot" && ![...revisions.values()].some(({ index: revisionIndex }) => revisionIndex < index)) {
+      issue(index, "outcome must follow an opportunity revision");
     }
     if (event.payload.opportunityId !== fixture.primaryOpportunityId) issue(index, "record must belong to primary opportunity");
     const revision = event.kind === "signal_evidence" || event.kind === "draft_variant" ? event.payload.predictionRevision

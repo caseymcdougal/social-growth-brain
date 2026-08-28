@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { loadRuntimeConfig } from "../config/runtime-config";
 import type { BrainEventStore } from "../storage/event-store";
 import { runMigrations } from "../storage/migrations";
@@ -27,7 +28,7 @@ export async function isReplayMaterialized(store: BrainEventStore, fixture: Repl
     .filter((event) => event.kind === "opportunity_revision")
     .map((event) => `${event.payload.id}:${event.payload.revision}`);
 
-  const exact = <T extends { id: string }>(expected: T[], actual: T[]) => expected.every((value) => actual.some((record) => record.id === value.id && JSON.stringify(record) === JSON.stringify(value)));
+  const exact = <T extends { id: string }>(expected: T[], actual: T[]) => expected.every((value) => actual.some((record) => record.id === value.id && isDeepStrictEqual(record, value)));
   const expectedRevisions = fixture.events.filter((event) => event.kind === "opportunity_revision").map((event) => event.payload);
   const expectedEvidence = fixture.events.filter((event) => event.kind === "signal_evidence").map((event) => event.payload);
   const expectedDrafts = fixture.events.filter((event) => event.kind === "draft_variant").map((event) => event.payload);

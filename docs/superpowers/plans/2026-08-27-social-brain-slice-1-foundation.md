@@ -1185,7 +1185,7 @@ git commit -m "feat(brain): fail closed on live capabilities"
 
 ## Task 5: Add deterministic synthetic replay and seed data
 
-**Replay guidance (review update):** Preflight the whole fixture before its first append: validate IDs, revision dependencies, referenced evidence/drafts, targets, immutable uniqueness, and envelope timestamps. Replay and seed share one exclusive replay lock. Materialization checks exact immutable history payloads by ID/revision while permitting a newer current projection and unrelated later records; concurrent seeds resolve as one seeded and one already-seeded.
+**Replay guidance (review update):** Preflight the whole fixture before its first append: validate IDs, revision dependencies, referenced evidence/drafts, targets, immutable uniqueness, and envelope timestamps. Outcomes must follow an included primary Opportunity revision; compliance checks must follow a revision with their matching retained target. Replay and seed share one exclusive replay lock. Materialization checks exact immutable history payloads by ID/revision with structural, key-order-insensitive equality while permitting a newer current projection and unrelated later records; concurrent seeds resolve as one seeded and one already-seeded.
 
 **Files:**
 
