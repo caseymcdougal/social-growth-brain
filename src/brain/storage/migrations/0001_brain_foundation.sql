@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS brain_decision_events (
   opportunity_revision INTEGER NOT NULL,
   event_type TEXT NOT NULL,
   occurred_at TIMESTAMPTZ NOT NULL,
-  payload JSONB NOT NULL
+  payload JSONB NOT NULL,
+  FOREIGN KEY (opportunity_id, opportunity_revision)
+    REFERENCES brain_opportunity_revisions (opportunity_id, revision)
 );
 CREATE TABLE IF NOT EXISTS brain_outcome_snapshots (
   id UUID PRIMARY KEY,

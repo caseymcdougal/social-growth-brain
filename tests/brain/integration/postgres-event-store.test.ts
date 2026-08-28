@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   complianceCheckSchema,
@@ -20,7 +21,12 @@ import {
 import { runMigrations } from "../../../src/brain/storage/migrations";
 import { PostgresBrainEventStore } from "../../../src/brain/storage/postgres-event-store";
 import { createPostgresPool } from "../../../src/brain/storage/postgres";
-import { assertTestDatabaseUrl, TEST_DATABASE_URL, truncateBrainTables } from "./postgres-test-harness";
+import {
+  assertConnectedTestDatabase,
+  assertTestDatabaseUrl,
+  TEST_DATABASE_URL,
+  truncateBrainTables
+} from "./postgres-test-harness";
 
 const IDS = {
   opportunity: "00000000-0000-4000-8000-000000000001",
@@ -55,11 +61,17 @@ const outcome: OutcomeSnapshot = { schemaVersion: 1, id: IDS.outcome, opportunit
 const compliance: ComplianceCheck = { schemaVersion: 1, id: IDS.compliance, retainedPostId: "900000000000000001", checkedAt: T1, nextCheckAt: "2026-08-27T20:00:00.000Z", status: "active", requiredAction: "retain", source: "synthetic" };
 const archive: CreatorArchive = { schemaVersion: 1, id: IDS.archive, creatorId: "casey-mcdougal", source: "legacy-sqlite", consentBasis: "casey-requested-import", consentRecordedAt: T0, sourceFingerprint: HASH, importedAt: T1, profile: null, posts: [{ xPostId: "900000000000000001", url: "https://x.com/caseymcdougal/status/900000000000000001", text: "Archived post", postedAt: T0, capturedAt: T1, viewsCount: 100, likesCount: 2, repostsCount: 1, repliesCount: 0, bookmarksCount: 0 }], voiceProfile: null, voiceOverrides: "", strategyMemory: null, creativeDirections: [], importReport: { importedPosts: 1, omittedFields: [] } };
 
-const pool = createPostgresPool(TEST_DATABASE_URL);
-const store = new PostgresBrainEventStore(pool);
+assertTestDatabaseUrl(TEST_DATABASE_URL);
+let pool: Pool;
+let store: PostgresBrainEventStore;
 
 describe("PostgresBrainEventStore", () => {
-  beforeAll(async () => { await runMigrations(pool); });
+  beforeAll(async () => {
+    pool = createPostgresPool(TEST_DATABASE_URL);
+    await assertConnectedTestDatabase(pool);
+    store = new PostgresBrainEventStore(pool);
+    await runMigrations(pool);
+  });
   beforeEach(async () => { await truncateBrainTables(pool); });
   afterAll(async () => { await pool.end(); });
 
@@ -88,6 +100,11 @@ describe("PostgresBrainEventStore", () => {
     await expect(store.appendOpportunityRevision(opportunity(1))).rejects.toThrow();
   });
 
+  it("rejects a decision event for an opportunity revision that does not exist", async () => {
+    await store.appendOpportunityRevision(opportunity(1));
+    await expect(store.appendDecisionEvent({ ...decision, opportunityRevision: 999 })).rejects.toThrow();
+  });
+
   it("blocks direct update and delete of every append-only table", async () => {
     await store.appendOpportunityRevision(opportunity(1)); await store.appendSignalEvidence(evidence); await store.appendDraftVariant(draft);
     await store.appendDecisionEvent(decision); await store.appendOutcomeSnapshot(outcome); await store.appendComplianceCheck(compliance); await store.appendCreatorArchive(archive);
@@ -106,6 +123,22 @@ describe("PostgresBrainEventStore", () => {
 
   it("refuses destructive cleanup for non-test databases", () => {
     expect(() => assertTestDatabaseUrl("postgresql://user:pass@localhost/social_brain")).toThrow("Refusing destructive test cleanup");
+  });
+
+  it("accepts the configured connected test database and rejects a mismatched test URL", async () => {
+    await expect(assertConnectedTestDatabase(pool)).resolves.toBeUndefined();
+    await expect(
+      assertConnectedTestDatabase(pool, "postgresql://social_brain:social_brain@127.0.0.1:54329/another_test")
+    ).rejects.toThrow("Refusing test database operation");
+  });
+
+  it("rejects invalid opportunity query limits and statuses at the adapter boundary", async () => {
+    for (const query of [
+      { limit: 1.5 }, { limit: Number.NaN }, { limit: Number.POSITIVE_INFINITY }, { limit: 0 }, { limit: 101 },
+      { statuses: ["not-a-status"] }
+    ]) {
+      await expect(store.listOpportunities(query as never)).rejects.toThrow();
+    }
   });
 
   it("runs migrations after the process changes to a temporary directory", async () => {

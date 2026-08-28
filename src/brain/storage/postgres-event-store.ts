@@ -1,13 +1,18 @@
 import type { Pool } from "pg";
+import { z } from "zod";
 import {
   complianceCheckSchema, creatorArchiveSchema, decisionEventSchema, draftVariantSchema,
-  opportunitySchema, outcomeSnapshotSchema, signalEvidenceSchema,
+  opportunitySchema, opportunityStatusSchema, outcomeSnapshotSchema, signalEvidenceSchema,
   type ComplianceCheck, type CreatorArchive, type DecisionEvent, type DraftVariant,
   type Opportunity, type OutcomeSnapshot, type SignalEvidence
 } from "../domain";
 import type { BrainEventStore, OpportunityQuery } from "./event-store";
 
 type PayloadRow = { payload: unknown };
+const opportunityQuerySchema = z.object({
+  statuses: z.array(opportunityStatusSchema).optional(),
+  limit: z.number().int().min(1).max(100).optional()
+}).strict();
 
 export class PostgresBrainEventStore implements BrainEventStore {
   constructor(private readonly pool: Pool) {}
@@ -42,8 +47,9 @@ export class PostgresBrainEventStore implements BrainEventStore {
   async listOpportunityRevisions(id: string): Promise<Opportunity[]> { return this.many("SELECT payload FROM brain_opportunity_revisions WHERE opportunity_id = $1 ORDER BY revision ASC", [id], opportunitySchema); }
 
   async listOpportunities(query: OpportunityQuery = {}): Promise<Opportunity[]> {
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    if (query.statuses?.length) return this.many("SELECT payload FROM brain_opportunities WHERE status = ANY($1::text[]) ORDER BY publish_by ASC, id ASC LIMIT $2", [query.statuses, limit], opportunitySchema);
+    const validatedQuery = opportunityQuerySchema.parse(query);
+    const limit = validatedQuery.limit ?? 20;
+    if (validatedQuery.statuses?.length) return this.many("SELECT payload FROM brain_opportunities WHERE status = ANY($1::text[]) ORDER BY publish_by ASC, id ASC LIMIT $2", [validatedQuery.statuses, limit], opportunitySchema);
     return this.many("SELECT payload FROM brain_opportunities ORDER BY publish_by ASC, id ASC LIMIT $1", [limit], opportunitySchema);
   }
 

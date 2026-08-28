@@ -695,7 +695,7 @@ Create `tests/brain/integration/postgres-event-store.test.ts` to prove these obs
 4. Direct `UPDATE` and `DELETE` against every append-only table fail.
 5. Revision history is returned in ascending order and a stale revision can never replace the current projection.
 
-Use `beforeAll` to create a pool and run migrations, `beforeEach` to call `truncateBrainTables`, and `afterAll` to close the pool.
+Call `assertTestDatabaseUrl(TEST_DATABASE_URL)` before pool construction. In `beforeAll`, create the pool, then call an async connected-database guard before migrations; the guard must query `SELECT current_database()`, require the actual name to end in `_test`, and require it to equal the database name in the configured URL. In `truncateBrainTables`, call that connected-database guard again immediately before `TRUNCATE`. Use `beforeEach` to call `truncateBrainTables`, and `afterAll` to close the pool. Test both the configured test pool and rejection for a mismatched expected `_test` URL.
 
 Run:
 
@@ -815,7 +815,9 @@ CREATE TABLE IF NOT EXISTS brain_decision_events (
   opportunity_revision INTEGER NOT NULL,
   event_type TEXT NOT NULL,
   occurred_at TIMESTAMPTZ NOT NULL,
-  payload JSONB NOT NULL
+  payload JSONB NOT NULL,
+  FOREIGN KEY (opportunity_id, opportunity_revision)
+    REFERENCES brain_opportunity_revisions (opportunity_id, revision)
 );
 
 CREATE TABLE IF NOT EXISTS brain_outcome_snapshots (
@@ -971,7 +973,7 @@ async appendOpportunityRevision(opportunityInput: Opportunity): Promise<void> {
 }
 ```
 
-For every read, parse `row.payload` with the corresponding Zod schema. For every list, use deterministic secondary ordering by immutable ID. Bound `listOpportunities` to `1..100`, default `20`. Parameterize every value. Do not interpolate statuses into SQL.
+For every read, parse `row.payload` with the corresponding Zod schema. For every list, use deterministic secondary ordering by immutable ID. At the adapter boundary, parse the entire `listOpportunities` query with Zod: a strict object with an optional array of domain `opportunityStatusSchema` values and an optional finite integer limit `1..100`; default limit to `20`. Empty statuses means no filter. Parameterize every value. Do not interpolate statuses into SQL. Test runtime rejection for fractional, non-finite, out-of-range limits and invalid statuses.
 
 Implement the remaining methods with these exact query rules:
 
