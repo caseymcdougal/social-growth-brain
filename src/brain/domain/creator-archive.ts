@@ -53,6 +53,14 @@ export const creatorArchiveSchema = z.object({
     importedPosts: z.number().int().nonnegative(),
     omittedFields: z.array(z.string().trim().min(1))
   })
+}).superRefine((value, context) => {
+  if (value.importReport.importedPosts !== value.posts.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["importReport", "importedPosts"],
+      message: "importedPosts must equal the number of retained posts"
+    });
+  }
 });
 
 export type CreatorArchive = z.infer<typeof creatorArchiveSchema>;

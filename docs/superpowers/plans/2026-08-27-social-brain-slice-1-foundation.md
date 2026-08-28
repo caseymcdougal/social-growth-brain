@@ -204,6 +204,9 @@ describe("Social Brain domain contracts", () => {
 
   it("requires a target for replies and quotes", () => {
     expect(() => opportunitySchema.parse({ ...validOpportunity(), targetPostId: null })).toThrow();
+    expect(() =>
+      opportunitySchema.parse({ ...validOpportunity(), actionType: "quote", targetPostId: null })
+    ).toThrow();
   });
 
   it("forbids a target on original posts", () => {
@@ -256,6 +259,8 @@ npm run test:brain -- tests/brain/domain/contracts.test.ts
 ```
 
 Expected: FAIL because the domain modules do not exist.
+
+The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject decision payload raw text and unknown keys, type/payload mismatches, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
 
 - [ ] **Step 2: Implement common identifiers and enums**
 
@@ -453,17 +458,34 @@ export const decisionEventTypeSchema = z.enum([
   "matured"
 ]);
 
-export const decisionEventSchema = z.object({
+const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+const machineCodeSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
+const decisionEventEnvelopeSchema = z
+  .object({
   schemaVersion: z.literal(SOCIAL_BRAIN_SCHEMA_VERSION),
   id: uuidSchema,
   opportunityId: uuidSchema,
   opportunityRevision: z.number().int().positive(),
-  type: decisionEventTypeSchema,
   actor: z.object({ type: z.enum(["system", "human"]), id: z.string().trim().min(1) }),
   interface: z.enum(["replay", "mcp", "telegram", "system"]),
-  occurredAt: isoTimestampSchema,
-  payload: z.record(z.string(), z.unknown())
-});
+  occurredAt: isoTimestampSchema
+  })
+  .strict();
+
+export const decisionEventSchema = z.discriminatedUnion("type", [
+  decisionEventEnvelopeSchema.extend({ type: z.literal("detected"), payload: z.object({ pipelineRunId: uuidSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("surfaced"), payload: z.object({ deliveryId: uuidSchema.optional() }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("approved"), payload: z.object({ draftId: uuidSchema, draftContentHash: sha256Schema, approvalExpiresAt: isoTimestampSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("revised"), payload: z.object({ previousDraftId: uuidSchema, draftId: uuidSchema, draftContentHash: sha256Schema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("rejected"), payload: z.object({ reasonCode: machineCodeSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("expired"), payload: z.object({ reasonCode: machineCodeSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("publishing"), payload: z.object({ publishIntentId: uuidSchema, draftContentHash: sha256Schema, idempotencyKeyHash: sha256Schema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("published"), payload: z.object({ publishIntentId: uuidSchema, publishedPostId: xPostIdSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("publish_uncertain"), payload: z.object({ publishIntentId: uuidSchema, reasonCode: machineCodeSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("failed"), payload: z.object({ publishIntentId: uuidSchema.nullable(), errorCode: machineCodeSchema, retryable: z.boolean() }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("measuring"), payload: z.object({ publishedPostId: xPostIdSchema }).strict() }),
+  decisionEventEnvelopeSchema.extend({ type: z.literal("matured"), payload: z.object({ publishedPostId: xPostIdSchema, outcomeSnapshotId: uuidSchema, qualifiesForProof: z.boolean() }).strict() })
+]);
 
 export const outcomeSnapshotSchema = z.object({
   schemaVersion: z.literal(SOCIAL_BRAIN_SCHEMA_VERSION),
@@ -483,6 +505,12 @@ export const outcomeSnapshotSchema = z.object({
   privateMetrics: z.record(z.string(), z.number().nonnegative()).nullable(),
   source: z.enum(["synthetic", "official-x-api"]),
   collectionStatus: z.enum(["complete", "partial", "unavailable"])
+}).superRefine((value, context) => {
+  const elapsedMinutes = Math.floor((Date.parse(value.observedAt) - Date.parse(value.publishedAt)) / 60_000);
+  if (elapsedMinutes < 0) context.addIssue({ code: "custom", path: ["observedAt"], message: "observedAt cannot precede publishedAt" });
+  if (value.observationAgeMinutes !== elapsedMinutes) {
+    context.addIssue({ code: "custom", path: ["observationAgeMinutes"], message: "observation age must match timestamps" });
+  }
 });
 
 export const complianceCheckSchema = z.object({
@@ -494,6 +522,15 @@ export const complianceCheckSchema = z.object({
   status: z.enum(["active", "deleted", "edited", "protected", "withheld", "suspended"]),
   requiredAction: z.enum(["retain", "rehydrate", "purge"]),
   source: z.enum(["synthetic", "x-batch-compliance", "direct-removal-notice"])
+}).superRefine((value, context) => {
+  const intervalMs = Date.parse(value.nextCheckAt) - Date.parse(value.checkedAt);
+  if (intervalMs <= 0 || intervalMs > 12 * 60 * 60 * 1000) {
+    context.addIssue({ code: "custom", path: ["nextCheckAt"], message: "nextCheckAt must be within the next 12 hours" });
+  }
+  const expected = value.status === "active" ? "retain" : value.status === "edited" ? "rehydrate" : "purge";
+  if (value.requiredAction !== expected) {
+    context.addIssue({ code: "custom", path: ["requiredAction"], message: "requiredAction must match status" });
+  }
 });
 
 export type SignalEvidence = z.infer<typeof signalEvidenceSchema>;
@@ -563,6 +600,10 @@ export const creatorArchiveSchema = z.object({
     importedPosts: z.number().int().nonnegative(),
     omittedFields: z.array(z.string().trim().min(1))
   })
+}).superRefine((value, context) => {
+  if (value.importReport.importedPosts !== value.posts.length) {
+    context.addIssue({ code: "custom", path: ["importReport", "importedPosts"], message: "importedPosts must equal retained posts" });
+  }
 });
 
 export type CreatorArchive = z.infer<typeof creatorArchiveSchema>;
