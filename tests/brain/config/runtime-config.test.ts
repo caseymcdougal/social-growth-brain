@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadRuntimeConfig, runtimeConfigSchema } from "../../../src/brain/config/runtime-config";
 
 const databaseUrl = "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test";
-const productionDatabaseUrl = "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require";
+const productionDatabaseUrl = "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full";
 
 describe("loadRuntimeConfig", () => {
   it("uses the safe synthetic defaults", () => {
@@ -101,9 +101,16 @@ describe("loadRuntimeConfig", () => {
 
   it.each([
     "postgresql://db.example.invalid/social_brain",
-    "postgresql://db.example.invalid/social_brain_test?sslmode=require",
+    "postgresql://db.example.invalid/social_brain?sslmode=require",
+    "postgresql://db.example.invalid/social_brain?sslmode=verify-ca",
+    "postgresql://db.example.invalid/social_brain?sslmode=require&uselibpqcompat=true",
+    "postgresql://db.example.invalid/social_brain_test?sslmode=verify-full",
+    "postgresql://db.example.invalid/social_brain%5Ftest?sslmode=verify-full",
+    "postgresql://db.example.invalid/social_brain/?sslmode=verify-full",
+    "postgresql://db.example.invalid//social_brain?sslmode=verify-full",
+    "postgresql://db.example.invalid/social/brain?sslmode=verify-full",
     "postgresql://db.example.invalid/social_brain?sslmode=require&sslmode=disable",
-    "postgresql://db.example.invalid/social_brain?sslmode=require&sslmode=verify-full",
+    "postgresql://db.example.invalid/social_brain?sslmode=verify-full&sslmode=verify-full",
     "http://db.example.invalid/social_brain?sslmode=require",
     "postgresql:///social_brain?sslmode=require",
     "postgresql://db.example.invalid/?sslmode=require"
@@ -115,5 +122,19 @@ describe("loadRuntimeConfig", () => {
       SOCIAL_BRAIN_DAILY_SPEND_LIMIT_USD: "1",
       SOCIAL_BRAIN_MONTHLY_SPEND_LIMIT_USD: "2"
     })).toThrow();
+  });
+
+  it.each([
+    "postgresql://db.example.invalid/social_brain_test/",
+    "postgresql://db.example.invalid//social_brain_test",
+    "postgresql://db.example.invalid/social/brain_test"
+  ])("rejects synthetic database paths that are not exactly one segment %s", (unsafeDatabaseUrl) => {
+    expect(() => loadRuntimeConfig({ SOCIAL_BRAIN_DATABASE_URL: unsafeDatabaseUrl })).toThrow();
+  });
+
+  it("uses decoded database names for mode isolation", () => {
+    expect(loadRuntimeConfig({
+      SOCIAL_BRAIN_DATABASE_URL: "postgresql://db.example.invalid/social_brain%5Ftest"
+    })).toMatchObject({ mode: "synthetic" });
   });
 });

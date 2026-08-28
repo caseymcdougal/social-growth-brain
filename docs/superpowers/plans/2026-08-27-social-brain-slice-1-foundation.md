@@ -1044,7 +1044,7 @@ import { describe, expect, it } from "vitest";
 import { loadRuntimeConfig } from "../../../src/brain/config/runtime-config";
 
 const databaseUrl = "postgresql://social_brain:social_brain@127.0.0.1:54329/social_brain_test";
-const productionDatabaseUrl = "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require";
+const productionDatabaseUrl = "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full";
 
 describe("loadRuntimeConfig", () => {
   it("defaults to synthetic mode and the isolated local database", () => {
@@ -1087,7 +1087,7 @@ The test suite must also cover every runtime boundary: malformed hand-built prod
 The original illustrative parser below is superseded by these required boundaries and must not be copied as-is:
 
 - Export `runtimeConfigSchema`; `RuntimeConfig` is its output type, and every public consumer re-parses configuration through it.
-- Accept only `postgres:`/`postgresql:` URLs with hostname and one nonempty database name. Synthetic databases must end in `_test`; production databases must not, and require exactly one `sslmode` value of `require`, `verify-ca`, or `verify-full`. Reject duplicate `sslmode` parameters even when both values are secure.
+- Accept only `postgres:`/`postgresql:` URLs with hostname and a pathname containing exactly one leading slash and one nonempty raw database segment. Decode that segment with `decodeURI` before applying mode isolation; reject decode errors, extra leading/trailing slashes, and multiple raw path segments. Synthetic decoded names must end in `_test`; production decoded names must not. Production requires exactly one `sslmode=verify-full`; reject `require`, `verify-ca`, missing values, duplicates, and downgrade flags paired with weaker modes.
 - Accept both environment strings and already-parsed numeric amounts, but perform money validation via canonical decimal text and integer cents. Do not use `z.coerce.number()` or compare floating-point dollars. Before returning public dollar-number fields, round-trip their decimal text back to cents and reject any value that would lose a cent.
 - Production configuration has no defaults for its URL, approval reference, or limits.
 
@@ -1115,7 +1115,7 @@ try {
 
 - [ ] **Step 4: Write failing policy-gate tests**
 
-Use a synthetic URL ending in `_test` and a dummy production URL such as `postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require`; never use real credentials. In addition to the decisions below, require construction to reject blank approval references, invalid limits/URLs, and `{ mode: "staging" } as any`. Require unknown installed/requested strings such as `future-unreviewed-operation` to throw (or otherwise return an unambiguously denied decision).
+Use a synthetic URL ending in `_test` and a dummy production URL such as `postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full`; never use real credentials. In addition to the decisions below, require construction to reject blank approval references, invalid limits/URLs, and `{ mode: "staging" } as any`. Require unknown installed/requested strings such as `future-unreviewed-operation` to throw (or otherwise return an unambiguously denied decision).
 
 Create `tests/brain/policy/policy-gate.test.ts` and require explicit results for all capabilities:
 
@@ -1135,7 +1135,7 @@ describe("policy gate", () => {
   it("denies production capabilities that are not installed in this slice", () => {
     const config = {
       mode: "production",
-      databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require",
+      databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full",
       xApprovalReference: "x-approval-2026-08",
       dailySpendLimitUsd: 10,
       monthlySpendLimitUsd: 100

@@ -62,9 +62,16 @@ function databaseUrlSchema(mode: "synthetic" | "production") {
       context.addIssue({ code: "custom", message: "Database URL must include a hostname" });
     }
 
-    const databaseName = url.pathname.replace(/^\/+|\/+$/g, "");
-    if (!databaseName || databaseName.includes("/")) {
-      context.addIssue({ code: "custom", message: "Database URL must include one database name" });
+    if (!/^\/[^/]+$/.test(url.pathname)) {
+      context.addIssue({ code: "custom", message: "Database URL must contain exactly one path database segment" });
+      return;
+    }
+
+    let databaseName: string;
+    try {
+      databaseName = decodeURI(url.pathname.slice(1));
+    } catch {
+      context.addIssue({ code: "custom", message: "Database URL database name must decode successfully" });
       return;
     }
 
@@ -76,8 +83,8 @@ function databaseUrlSchema(mode: "synthetic" | "production") {
         context.addIssue({ code: "custom", message: "Production database name must not end in _test" });
       }
       const sslModes = url.searchParams.getAll("sslmode");
-      if (sslModes.length !== 1 || !new Set(["require", "verify-ca", "verify-full"]).has(sslModes[0])) {
-        context.addIssue({ code: "custom", message: "Production database URL requires exactly one secure sslmode" });
+      if (sslModes.length !== 1 || sslModes[0] !== "verify-full") {
+        context.addIssue({ code: "custom", message: "Production database URL requires exactly one sslmode=verify-full" });
       }
     }
   });

@@ -4,7 +4,7 @@ import { createPolicyGate } from "../../../src/brain/policy/policy-gate";
 
 const productionConfig: RuntimeConfig = {
   mode: "production",
-  databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=require",
+  databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full",
   xApprovalReference: "approved-by-casey",
   dailySpendLimitUsd: 50,
   monthlySpendLimitUsd: 100
