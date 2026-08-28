@@ -20,6 +20,23 @@ class SeedStore implements BrainEventStore {
   decisions: DecisionEvent[] = [];
   outcomes: OutcomeSnapshot[] = [];
   compliance: ComplianceCheck[] = [];
+  private scoped = false;
+  private readonly lockTails = new Map<string, Promise<void>>();
+  async withExclusiveLock<T>(key: string, operation: (store: BrainEventStore) => Promise<T>): Promise<T> {
+    if (this.scoped) return operation(this);
+    const prior = this.lockTails.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const completion = new Promise<void>((resolve) => { release = resolve; });
+    this.lockTails.set(key, prior.then(() => completion));
+    await prior;
+    const transaction = Object.create(this) as SeedStore;
+    transaction.scoped = true;
+    try {
+      const result = await operation(transaction);
+      this.opportunity = transaction.opportunity;
+      return result;
+    } finally { release(); }
+  }
   async appendOpportunityRevision(value: Opportunity) { this.opportunity = value; this.revisions.push(value); }
   async appendSignalEvidence(value: SignalEvidence) { this.evidence.push(value); }
   async appendDraftVariant(value: DraftVariant) { this.drafts.push(value); }
@@ -61,5 +78,27 @@ describe("seedSynthetic", () => {
       status: "already-seeded",
       opportunityId: "20000000-0000-4000-8000-000000000001"
     });
+  });
+
+  it("keeps the canonical revision immutable when the current projection advances", async () => {
+    const store = new SeedStore();
+    await seedSynthetic(store, fixture);
+    const revision2 = { ...store.opportunity!, revision: 2, status: "approved" as const, revisedAt: "2026-08-27T14:08:00.000Z" };
+    await store.appendOpportunityRevision(revision2);
+
+    await expect(seedSynthetic(store, fixture)).resolves.toEqual({
+      status: "already-seeded",
+      opportunityId: "20000000-0000-4000-8000-000000000001"
+    });
+    expect(store.revisions[0]).toEqual(fixture.events[0].payload);
+  });
+
+  it("serializes concurrent seeders into seeded then already-seeded", async () => {
+    const store = new SeedStore();
+    const results = await Promise.all([seedSynthetic(store, fixture), seedSynthetic(store, fixture)]);
+    expect(results.map((result) => result.status).sort()).toEqual(["already-seeded", "seeded"]);
+    expect(store.evidence).toHaveLength(3);
+    expect(store.drafts).toHaveLength(1);
+    expect(store.decisions).toHaveLength(2);
   });
 });

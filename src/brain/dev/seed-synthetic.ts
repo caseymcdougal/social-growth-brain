@@ -15,42 +15,42 @@ const expectedIds = <K extends ReplayFixture["events"][number]["kind"]>(fixture:
 
 const containsEvery = (expected: string[], actual: string[]) => expected.every((id) => actual.includes(id));
 
-export async function isReplayMaterialized(store: BrainEventStore, fixture: ReplayFixture, existingOpportunity?: unknown): Promise<boolean> {
-  const expectedPrimary = fixture.events.find((event) => event.kind === "opportunity_revision" && event.payload.id === fixture.primaryOpportunityId);
-  if (!expectedPrimary || JSON.stringify(existingOpportunity) !== JSON.stringify(expectedPrimary.payload)) return false;
+export async function isReplayMaterialized(store: BrainEventStore, fixture: ReplayFixture): Promise<boolean> {
 
-  const [revisions, evidence, drafts, decisions, outcomes, compliance] = await Promise.all([
-    store.listOpportunityRevisions(fixture.primaryOpportunityId),
-    store.listSignalEvidence(fixture.primaryOpportunityId),
-    store.listDraftVariants(fixture.primaryOpportunityId),
-    store.listDecisionEvents(fixture.primaryOpportunityId),
-    store.listOutcomeSnapshots(fixture.primaryOpportunityId),
-    store.listComplianceChecks()
-  ]);
+  const revisions = await store.listOpportunityRevisions(fixture.primaryOpportunityId);
+  const evidence = await store.listSignalEvidence(fixture.primaryOpportunityId);
+  const drafts = await store.listDraftVariants(fixture.primaryOpportunityId);
+  const decisions = await store.listDecisionEvents(fixture.primaryOpportunityId);
+  const outcomes = await store.listOutcomeSnapshots(fixture.primaryOpportunityId);
+  const compliance = await store.listComplianceChecks();
   const expectedRevisionKeys = fixture.events
     .filter((event) => event.kind === "opportunity_revision")
     .map((event) => `${event.payload.id}:${event.payload.revision}`);
 
+  const exact = <T extends { id: string }>(expected: T[], actual: T[]) => expected.every((value) => actual.some((record) => record.id === value.id && JSON.stringify(record) === JSON.stringify(value)));
+  const expectedRevisions = fixture.events.filter((event) => event.kind === "opportunity_revision").map((event) => event.payload);
+  const expectedEvidence = fixture.events.filter((event) => event.kind === "signal_evidence").map((event) => event.payload);
+  const expectedDrafts = fixture.events.filter((event) => event.kind === "draft_variant").map((event) => event.payload);
+  const expectedDecisions = fixture.events.filter((event) => event.kind === "decision_event").map((event) => event.payload);
+  const expectedOutcomes = fixture.events.filter((event) => event.kind === "outcome_snapshot").map((event) => event.payload);
+  const expectedCompliance = fixture.events.filter((event) => event.kind === "compliance_check").map((event) => event.payload);
   return containsEvery(expectedRevisionKeys, revisions.map((value) => `${value.id}:${value.revision}`))
-    && containsEvery(expectedIds(fixture, "signal_evidence"), evidence.map((value) => value.id))
-    && containsEvery(expectedIds(fixture, "draft_variant"), drafts.map((value) => value.id))
-    && containsEvery(expectedIds(fixture, "decision_event"), decisions.map((value) => value.id))
-    && containsEvery(expectedIds(fixture, "outcome_snapshot"), outcomes.map((value) => value.id))
-    && containsEvery(expectedIds(fixture, "compliance_check"), compliance.map((value) => value.id));
+    && exact(expectedRevisions, revisions) && exact(expectedEvidence, evidence) && exact(expectedDrafts, drafts)
+    && exact(expectedDecisions, decisions) && exact(expectedOutcomes, outcomes) && exact(expectedCompliance, compliance);
 }
 
 export async function seedSynthetic(store: BrainEventStore, fixtureInput: unknown): Promise<SeedResult> {
   const fixture = replayFixtureSchema.parse(fixtureInput);
-  const existing = await store.getOpportunity(fixture.primaryOpportunityId);
-  if (existing) {
-    if (!await isReplayMaterialized(store, fixture, existing)) throw new Error("Partial synthetic replay detected");
-    return { status: "already-seeded", opportunityId: fixture.primaryOpportunityId };
-  }
-
-  await runReplay(store, fixture);
-  const materialized = await store.getOpportunity(fixture.primaryOpportunityId);
-  if (!await isReplayMaterialized(store, fixture, materialized)) throw new Error("Partial synthetic replay detected");
-  return { status: "seeded", opportunityId: fixture.primaryOpportunityId };
+  return store.withExclusiveLock(`social-brain-replay:${fixture.replayId}`, async (transaction) => {
+    const existing = await transaction.getOpportunity(fixture.primaryOpportunityId);
+    if (existing) {
+      if (!await isReplayMaterialized(transaction, fixture)) throw new Error("Partial synthetic replay detected");
+      return { status: "already-seeded", opportunityId: fixture.primaryOpportunityId };
+    }
+    await runReplay(transaction, fixture);
+    if (!await isReplayMaterialized(transaction, fixture)) throw new Error("Partial synthetic replay detected");
+    return { status: "seeded", opportunityId: fixture.primaryOpportunityId };
+  });
 }
 
 async function main(): Promise<void> {

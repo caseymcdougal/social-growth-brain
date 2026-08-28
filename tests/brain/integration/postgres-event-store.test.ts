@@ -82,6 +82,31 @@ describe("PostgresBrainEventStore", () => {
     expect((await store.getOpportunityRevision(IDS.opportunity, 1))?.revision).toBe(1);
   });
 
+  it("rolls back every callback write when an exclusive transaction fails", async () => {
+    await expect(store.withExclusiveLock("rollback-test", async (transaction) => {
+      await transaction.appendOpportunityRevision(opportunity(1));
+      throw new Error("force rollback");
+    })).rejects.toThrow("force rollback");
+    await expect(store.getOpportunity(IDS.opportunity)).resolves.toBeNull();
+    await expect(store.getOpportunityRevision(IDS.opportunity, 1)).resolves.toBeNull();
+  });
+
+  it("serializes callbacks holding the same exclusive key", async () => {
+    const order: string[] = [];
+    let releaseFirst!: () => void;
+    const firstMayFinish = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const first = store.withExclusiveLock("serialize-test", async () => {
+      order.push("first-start");
+      await firstMayFinish;
+      order.push("first-end");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const second = store.withExclusiveLock("serialize-test", async () => { order.push("second"); });
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first-start", "first-end", "second"]);
+  });
+
   it("round-trips immutable records through their domain parsers", async () => {
     await store.appendOpportunityRevision(opportunity(1));
     await store.appendSignalEvidence(evidence); await store.appendDraftVariant(draft);

@@ -642,6 +642,8 @@ git commit -m "feat(brain): define versioned domain contracts"
 
 ## Task 3: Implement immutable PostgreSQL event storage
 
+**Transaction guidance (review update):** `BrainEventStore.withExclusiveLock` must use one transaction-bound store for its callback, acquire a parameterized transaction advisory lock, roll back every callback write on failure, and reuse the scoped store for nested calls. Tests cover rollback and same-key serialization.
+
 **Files:**
 
 - Create: `src/brain/storage/event-store.ts`
@@ -1182,6 +1184,8 @@ git commit -m "feat(brain): fail closed on live capabilities"
 ```
 
 ## Task 5: Add deterministic synthetic replay and seed data
+
+**Replay guidance (review update):** Preflight the whole fixture before its first append: validate IDs, revision dependencies, referenced evidence/drafts, targets, immutable uniqueness, and envelope timestamps. Replay and seed share one exclusive replay lock. Materialization checks exact immutable history payloads by ID/revision while permitting a newer current projection and unrelated later records; concurrent seeds resolve as one seeded and one already-seeded.
 
 **Files:**
 

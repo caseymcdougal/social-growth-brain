@@ -15,6 +15,7 @@ import type { BrainEventStore } from "../../../src/brain/storage/event-store";
 
 class RecordingEventStore implements BrainEventStore {
   readonly calls: string[] = [];
+  async withExclusiveLock<T>(_key: string, operation: (store: BrainEventStore) => Promise<T>): Promise<T> { return operation(this); }
   async appendOpportunityRevision(value: Opportunity) { this.calls.push(`opportunity_revision:${value.id}:${value.revision}`); }
   async appendSignalEvidence(value: SignalEvidence) { this.calls.push(`signal_evidence:${value.id}`); }
   async appendDraftVariant(value: DraftVariant) { this.calls.push(`draft_variant:${value.id}`); }
@@ -68,6 +69,22 @@ describe("synthetic replay", () => {
     const store = new RecordingEventStore();
 
     await expect(runReplay(store, bad)).rejects.toThrow("Synthetic replay cannot contain live opportunity provenance");
+    expect(store.calls).toEqual([]);
+  });
+
+  it.each([
+    ["a different primary opportunity", (value: typeof fixture) => ({ ...value, primaryOpportunityId: "20000000-0000-4000-8000-000000000099" })],
+    ["an evidence record without its revision", (value: typeof fixture) => ({ ...value, events: value.events.filter((event) => event.kind !== "opportunity_revision") })],
+    ["a missing recommended draft", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "opportunity_revision" ? { ...event, payload: { ...event.payload, recommendedDraftId: "40000000-0000-4000-8000-000000000099" } } : event) })],
+    ["a missing evidence id", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "opportunity_revision" ? { ...event, payload: { ...event.payload, evidenceIds: ["30000000-0000-4000-8000-000000000099"] } } : event) })],
+    ["an action target mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "draft_variant" ? { ...event, payload: { ...event.payload, targetPostId: "900000000000000099" } } : event) })],
+    ["duplicate immutable ids", (value: typeof fixture) => ({ ...value, events: value.events.map((event, index) => index === 2 && event.kind === "signal_evidence" ? { ...event, payload: { ...event.payload, id: "30000000-0000-4000-8000-000000000001" } } : event) })],
+    ["a dependency before its opportunity revision", (value: typeof fixture) => ({ ...value, events: [...value.events.slice(1), value.events[0]].map((event, index) => ({ ...event, sequence: index + 1 })) })],
+    ["a compliance target mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "compliance_check" ? { ...event, payload: { ...event.payload, retainedPostId: "900000000000000099" } } : event) })],
+    ["an envelope timestamp mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "draft_variant" ? { ...event, at: "2026-08-27T14:05:00.000Z" } : event) })]
+  ])("preflights and rejects %s before appending", async (_label, mutate) => {
+    const store = new RecordingEventStore();
+    await expect(runReplay(store, mutate(structuredClone(fixture)))).rejects.toThrow();
     expect(store.calls).toEqual([]);
   });
 });

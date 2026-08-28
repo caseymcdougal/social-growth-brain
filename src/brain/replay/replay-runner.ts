@@ -22,14 +22,16 @@ export async function runReplay(store: BrainEventStore, fixtureInput: unknown): 
   const fixture = replayFixtureSchema.parse(fixtureInput);
   assertSyntheticSources(fixture);
 
-  for (const event of fixture.events) {
-    switch (event.kind) {
-      case "opportunity_revision": await store.appendOpportunityRevision(event.payload); break;
-      case "signal_evidence": await store.appendSignalEvidence(event.payload); break;
-      case "draft_variant": await store.appendDraftVariant(event.payload); break;
-      case "decision_event": await store.appendDecisionEvent(event.payload); break;
-      case "outcome_snapshot": await store.appendOutcomeSnapshot(event.payload); break;
-      case "compliance_check": await store.appendComplianceCheck(event.payload); break;
+  await store.withExclusiveLock(`social-brain-replay:${fixture.replayId}`, async (transaction) => {
+    for (const event of fixture.events) {
+      switch (event.kind) {
+        case "opportunity_revision": await transaction.appendOpportunityRevision(event.payload); break;
+        case "signal_evidence": await transaction.appendSignalEvidence(event.payload); break;
+        case "draft_variant": await transaction.appendDraftVariant(event.payload); break;
+        case "decision_event": await transaction.appendDecisionEvent(event.payload); break;
+        case "outcome_snapshot": await transaction.appendOutcomeSnapshot(event.payload); break;
+        case "compliance_check": await transaction.appendComplianceCheck(event.payload); break;
+      }
     }
-  }
+  });
 }

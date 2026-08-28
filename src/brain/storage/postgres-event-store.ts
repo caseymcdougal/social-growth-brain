@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
   complianceCheckSchema, creatorArchiveSchema, decisionEventSchema, draftVariantSchema,
@@ -15,31 +15,46 @@ const opportunityQuerySchema = z.object({
 }).strict();
 
 export class PostgresBrainEventStore implements BrainEventStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly pool: Pool | PoolClient, private readonly transactionScoped = false) {}
+
+  async withExclusiveLock<T>(key: string, operation: (store: BrainEventStore) => Promise<T>): Promise<T> {
+    if (this.transactionScoped) return operation(this);
+    const client = await (this.pool as Pool).connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [key]);
+      const result = await operation(new PostgresBrainEventStore(client, true));
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally { client.release(); }
+  }
 
   async appendOpportunityRevision(opportunityInput: Opportunity): Promise<void> {
     const opportunity = opportunitySchema.parse(opportunityInput);
-    const client = await this.pool.connect();
+    if (this.transactionScoped) return this.appendOpportunityRevisionInTransaction(opportunity);
+    const client = await (this.pool as Pool).connect();
     try {
       await client.query("BEGIN");
-      await client.query(`INSERT INTO brain_opportunity_revisions
-       (opportunity_id, revision, revised_at, payload)
-       VALUES ($1, $2, $3, $4)`, [opportunity.id, opportunity.revision, opportunity.revisedAt, opportunity]);
-      await client.query(`INSERT INTO brain_opportunities
-       (id, creator_id, revision, status, publish_by, payload, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (id) DO UPDATE SET
-         revision = EXCLUDED.revision,
-         status = EXCLUDED.status,
-         publish_by = EXCLUDED.publish_by,
-         payload = EXCLUDED.payload,
-         updated_at = EXCLUDED.updated_at
-       WHERE brain_opportunities.revision < EXCLUDED.revision`, [opportunity.id, opportunity.creatorId, opportunity.revision, opportunity.status, opportunity.publishBy, opportunity, opportunity.revisedAt]);
+      await new PostgresBrainEventStore(client, true).appendOpportunityRevisionInTransaction(opportunity);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
     } finally { client.release(); }
+  }
+
+  private async appendOpportunityRevisionInTransaction(opportunity: Opportunity): Promise<void> {
+    await this.pool.query(`INSERT INTO brain_opportunity_revisions
+      (opportunity_id, revision, revised_at, payload) VALUES ($1, $2, $3, $4)`, [opportunity.id, opportunity.revision, opportunity.revisedAt, opportunity]);
+    await this.pool.query(`INSERT INTO brain_opportunities
+      (id, creator_id, revision, status, publish_by, payload, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (id) DO UPDATE SET revision = EXCLUDED.revision, status = EXCLUDED.status,
+        publish_by = EXCLUDED.publish_by, payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at
+      WHERE brain_opportunities.revision < EXCLUDED.revision`, [opportunity.id, opportunity.creatorId, opportunity.revision, opportunity.status, opportunity.publishBy, opportunity, opportunity.revisedAt]);
   }
 
   async getOpportunity(id: string): Promise<Opportunity | null> { return this.one("SELECT payload FROM brain_opportunities WHERE id = $1", [id], opportunitySchema); }

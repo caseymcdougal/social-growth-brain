@@ -15,6 +15,7 @@ export interface OpportunityQuery {
 }
 
 export interface BrainEventStore {
+  withExclusiveLock<T>(key: string, operation: (store: BrainEventStore) => Promise<T>): Promise<T>;
   appendOpportunityRevision(opportunity: Opportunity): Promise<void>;
   getOpportunity(id: string): Promise<Opportunity | null>;
   getOpportunityRevision(id: string, revision: number): Promise<Opportunity | null>;
