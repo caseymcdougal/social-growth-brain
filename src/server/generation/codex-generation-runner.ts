@@ -1,8 +1,13 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runLlmJob } from "../ai/llm-job";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
-import { generationOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
+import {
+  buildGenerationStrategyBrief,
+  buildSanitizedGenerationModelInput
+} from "../../shared/generation-context";
+import { generationBatchOutputSchema, type GenerationOutput } from "../../shared/generation-schema";
+import type { StrategyMemory } from "../../shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "../../shared/types";
 import type { GenerationRunner } from "./generation-runner";
 
@@ -15,7 +20,8 @@ const generationJsonSchema = {
   properties: {
     posts: {
       type: "array",
-      minItems: 1,
+      minItems: 3,
+      maxItems: 5,
       items: {
         type: "object",
         additionalProperties: false,
@@ -52,28 +58,68 @@ export function buildCodexGenerationArgs(paths: { jobDir: string; schemaPath: st
 
 export function writeGenerationJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; mode: "today" }
+  input: {
+    snapshot: CapturedAccountSnapshot;
+    analysis: AnalysisOutput;
+    mode: "today";
+    strategyMemory?: StrategyMemory | null;
+    direction?: string | null;
+    voiceBlock?: string;
+    priorDrafts?: string[];
+    repairNotes?: string | null;
+  }
 ) {
   mkdirSync(jobDir, { recursive: true });
   const inputPath = join(jobDir, "input.json");
   const promptPath = join(jobDir, "prompt.md");
   const schemaPath = join(jobDir, "schema.json");
   const outputPath = join(jobDir, "output.json");
-  const inputJson = JSON.stringify(input, null, 2);
+  const direction = typeof input.direction === "string" ? input.direction.trim() : "";
+  const repairNotes = typeof input.repairNotes === "string" ? input.repairNotes.trim() : "";
+  const generationBrief = buildGenerationStrategyBrief({
+    snapshot: input.snapshot,
+    analysis: input.analysis,
+    strategyMemory: input.strategyMemory ?? null,
+    direction,
+    priorDrafts: input.priorDrafts ?? []
+  });
+  const modelInput = buildSanitizedGenerationModelInput({
+    snapshot: input.snapshot,
+    analysis: input.analysis,
+    generationBrief,
+    mode: input.mode
+  });
+  const inputJson = JSON.stringify(modelInput, null, 2);
 
   writeFileSync(inputPath, inputJson);
   writeFileSync(
     promptPath,
     [
       "You are Casey McDougal's direct X/Twitter post strategist.",
-      "Generate today's ideas as copy-ready X posts based on the latest public-metric audit.",
-      "Use the provided strategy audit, top patterns, weak spots, and captured posts as evidence.",
+      "Generate exactly 3 copy-ready X posts based on the sanitized strategy brief and analysis mechanisms.",
+      "Learn TOPIC LANES and WRITING MOVES from topicMechanismWinners and toneMoves — never copy their content.",
+      "antiPatterns and avoidCorpus are hard negatives: do not reproduce, lightly rephrase, or re-angle any published post or prior draft.",
+      "Before finalizing each draft, compare it against avoidCorpus.publishedPosts and avoidCorpus.priorDrafts. If it shares the same core claim, hook, or example, discard it and invent a new idea in the same lane.",
+      "Write like a human operator, not an AI coach: short rhythm, concrete enemy or claim, one proof point, one decision/question. No tidy three-part listicles, no motivational filler, no 'here's the thing' transitions.",
+      "Each draft must be paste-ready with minimal editing: specific angle, strong hook, clear why_this tied to a working mechanism (not a weak post).",
+      "source_signal must be one plain-English phrase naming the mechanism or lane. No internal field names, no key: value syntax, never quote a published post.",
       "Do not summarize the audit. Produce new posts Casey can copy into X.",
       "Avoid generic creator advice, broad motivational posts, and placeholder claims.",
-      "Each draft should have a specific angle, a strong hook, and a clear reason tied to the audit.",
+      "FACTS RULE: never invent personal facts, events, numbers, or commitments. Anything Casey supposedly did, built, shipped, measured, or is offering must come from the input snapshot, brief, or strategy memory. If a draft needs a specific he hasn't stated, write it as a bracketed placeholder he fills in (e.g. [n] features, [component]) — a draft with a placeholder is fine, a draft with a made-up fact is not. Offers of his time or capacity are commitments: only include one if the brief explicitly calls for it, and mark its scope as a placeholder.",
+      ...(input.voiceBlock
+        ? [
+            input.voiceBlock,
+            "Every hook and draft must follow the voice profile above. The style excerpts show the sound only — reusing their content counts as duplication."
+          ]
+        : []),
+      ...(direction ? [`Casey's current creative direction (follow it): ${direction}`] : []),
+      ...(repairNotes ? ["", "Repair pass notes:", repairNotes] : []),
       "Return JSON only. Do not include markdown.",
       "",
-      "Input JSON:",
+      "Generation strategy brief:",
+      JSON.stringify(generationBrief, null, 2),
+      "",
+      "Sanitized input JSON:",
       inputJson
     ].join("\n")
   );
@@ -86,42 +132,23 @@ export class CodexGenerationRunner implements GenerationRunner {
   async generateToday(input: {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
+    strategyMemory?: StrategyMemory | null;
+    direction?: string | null;
+    voiceBlock?: string;
+    priorDrafts?: string[];
+    repairNotes?: string | null;
     jobDir: string;
   }): Promise<GenerationOutput> {
     const files = writeGenerationJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      mode: "today"
+      mode: "today",
+      strategyMemory: input.strategyMemory ?? null,
+      direction: input.direction ?? null,
+      voiceBlock: input.voiceBlock,
+      priorDrafts: input.priorDrafts,
+      repairNotes: input.repairNotes
     });
-    const args = buildCodexGenerationArgs({
-      jobDir: input.jobDir,
-      schemaPath: files.schemaPath,
-      outputPath: files.outputPath
-    });
-    const prompt = readFileSync(files.promptPath, "utf8");
-
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("codex", args, {
-        env: process.env,
-        stdio: ["pipe", "ignore", "pipe"]
-      });
-      let stderr = "";
-
-      child.stderr.on("data", (chunk) => {
-        stderr += String(chunk);
-      });
-      child.on("error", reject);
-      child.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(`codex exec failed with code ${code}: ${stderr.slice(0, 1000)}`));
-      });
-      child.stdin.end(prompt);
-    });
-
-    const output: unknown = JSON.parse(readFileSync(files.outputPath, "utf8"));
-    return generationOutputSchema.parse(output);
+    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => generationBatchOutputSchema.parse(raw));
   }
 }

@@ -1,0 +1,98 @@
+import fixture from "../../../src/brain/replay/fixtures/synthetic-replay.json";
+import { describe, expect, it } from "vitest";
+import { replayFixtureSchema } from "../../../src/brain/replay/replay-schema";
+import { runReplay } from "../../../src/brain/replay/replay-runner";
+import type {
+  ComplianceCheck,
+  CreatorArchive,
+  DecisionEvent,
+  DraftVariant,
+  Opportunity,
+  OutcomeSnapshot,
+  SignalEvidence
+} from "../../../src/brain/domain";
+import type { BrainEventStore } from "../../../src/brain/storage/event-store";
+
+class RecordingEventStore implements BrainEventStore {
+  readonly calls: string[] = [];
+  async withExclusiveLock<T>(_key: string, operation: (store: BrainEventStore) => Promise<T>): Promise<T> { return operation(this); }
+  async appendOpportunityRevision(value: Opportunity) { this.calls.push(`opportunity_revision:${value.id}:${value.revision}`); }
+  async appendSignalEvidence(value: SignalEvidence) { this.calls.push(`signal_evidence:${value.id}`); }
+  async appendDraftVariant(value: DraftVariant) { this.calls.push(`draft_variant:${value.id}`); }
+  async appendDecisionEvent(value: DecisionEvent) { this.calls.push(`decision_event:${value.id}`); }
+  async appendOutcomeSnapshot(value: OutcomeSnapshot) { this.calls.push(`outcome_snapshot:${value.id}`); }
+  async appendComplianceCheck(value: ComplianceCheck) { this.calls.push(`compliance_check:${value.id}`); }
+  async getOpportunity(): Promise<Opportunity | null> { return null; }
+  async getOpportunityRevision(): Promise<Opportunity | null> { return null; }
+  async listOpportunityRevisions(): Promise<Opportunity[]> { return []; }
+  async listOpportunities(): Promise<Opportunity[]> { return []; }
+  async listSignalEvidence(): Promise<SignalEvidence[]> { return []; }
+  async listDraftVariants(): Promise<DraftVariant[]> { return []; }
+  async listDecisionEvents(): Promise<DecisionEvent[]> { return []; }
+  async listOutcomeSnapshots(): Promise<OutcomeSnapshot[]> { return []; }
+  async listComplianceChecks(): Promise<ComplianceCheck[]> { return []; }
+  async appendCreatorArchive(_value: CreatorArchive) { throw new Error("not used"); }
+  async getCreatorArchiveByFingerprint(_sourceFingerprint: string): Promise<CreatorArchive | null> { return null; }
+  async getLatestCreatorArchive(): Promise<CreatorArchive | null> { return null; }
+  async healthCheck() {}
+}
+
+describe("synthetic replay", () => {
+  it("dispatches parsed events in declared sequence order deterministically", async () => {
+    const first = new RecordingEventStore();
+    const second = new RecordingEventStore();
+
+    await runReplay(first, fixture);
+    await runReplay(second, fixture);
+
+    expect(first.calls).toEqual([
+      "opportunity_revision:20000000-0000-4000-8000-000000000001:1",
+      "signal_evidence:30000000-0000-4000-8000-000000000001",
+      "signal_evidence:30000000-0000-4000-8000-000000000002",
+      "signal_evidence:30000000-0000-4000-8000-000000000003",
+      "draft_variant:40000000-0000-4000-8000-000000000001",
+      "decision_event:50000000-0000-4000-8000-000000000001",
+      "decision_event:50000000-0000-4000-8000-000000000002",
+      "compliance_check:70000000-0000-4000-8000-000000000001"
+    ]);
+    expect(JSON.stringify(second.calls)).toBe(JSON.stringify(first.calls));
+  });
+
+  it("rejects duplicate/non-increasing sequences and backward event times", () => {
+    const parsed = replayFixtureSchema.parse(fixture);
+    expect(() => replayFixtureSchema.parse({ ...parsed, events: [{ ...parsed.events[0], sequence: 2 }, ...parsed.events.slice(1)] })).toThrow();
+    expect(() => replayFixtureSchema.parse({ ...parsed, events: [{ ...parsed.events[0], at: "2026-08-27T15:00:00.000Z" }, ...parsed.events.slice(1)] })).toThrow();
+  });
+
+  it("rejects unknown replay fixture and event envelope fields", () => {
+    expect(() => replayFixtureSchema.parse({ ...fixture, unknown: true })).toThrow();
+    expect(() => replayFixtureSchema.parse({ ...fixture, events: [{ ...fixture.events[0], unknown: true }, ...fixture.events.slice(1)] })).toThrow();
+  });
+
+  it("rejects live provenance before materializing any event", async () => {
+    const bad = structuredClone(fixture);
+    (bad.events[0] as { payload: { provenance: { sourceKind: string } } }).payload.provenance.sourceKind = "official-x-api";
+    const store = new RecordingEventStore();
+
+    await expect(runReplay(store, bad)).rejects.toThrow("Synthetic replay cannot contain live opportunity provenance");
+    expect(store.calls).toEqual([]);
+  });
+
+  it.each([
+    ["a different primary opportunity", (value: typeof fixture) => ({ ...value, primaryOpportunityId: "20000000-0000-4000-8000-000000000099" })],
+    ["an evidence record without its revision", (value: typeof fixture) => ({ ...value, events: value.events.filter((event) => event.kind !== "opportunity_revision") })],
+    ["a missing recommended draft", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "opportunity_revision" ? { ...event, payload: { ...event.payload, recommendedDraftId: "40000000-0000-4000-8000-000000000099" } } : event) })],
+    ["a missing evidence id", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "opportunity_revision" ? { ...event, payload: { ...event.payload, evidenceIds: ["30000000-0000-4000-8000-000000000099"] } } : event) })],
+    ["an action target mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "draft_variant" ? { ...event, payload: { ...event.payload, targetPostId: "900000000000000099" } } : event) })],
+    ["duplicate immutable ids", (value: typeof fixture) => ({ ...value, events: value.events.map((event, index) => index === 2 && event.kind === "signal_evidence" ? { ...event, payload: { ...event.payload, id: "30000000-0000-4000-8000-000000000001" } } : event) })],
+    ["a dependency before its opportunity revision", (value: typeof fixture) => ({ ...value, events: [...value.events.slice(1), value.events[0]].map((event, index) => ({ ...event, sequence: index + 1 })) })],
+    ["a compliance target mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "compliance_check" ? { ...event, payload: { ...event.payload, retainedPostId: "900000000000000099" } } : event) })],
+    ["an outcome before its opportunity revision", (value: typeof fixture) => ({ ...value, events: [{ sequence: 1, at: "2026-08-27T14:00:00.000Z", kind: "outcome_snapshot" as const, payload: { schemaVersion: 1, id: "80000000-0000-4000-8000-000000000001", opportunityId: value.primaryOpportunityId, publishedPostId: "900000000000000001", publishedAt: "2026-08-27T13:00:00.000Z", observedAt: "2026-08-27T14:00:00.000Z", observationAgeMinutes: 60, publicMetrics: { views: 1, likes: 1, replies: 1, reposts: 1, bookmarks: 1 }, privateMetrics: null, source: "synthetic" as const, collectionStatus: "complete" as const } }, ...value.events].map((event, index) => ({ ...event, sequence: index + 1 })) })],
+    ["compliance before its matching opportunity target", (value: typeof fixture) => { const compliance = value.events.find((event) => event.kind === "compliance_check")!; return { ...value, events: [{ ...compliance, sequence: 1, at: "2026-08-27T14:00:00.000Z", payload: { ...compliance.payload, checkedAt: "2026-08-27T14:00:00.000Z", nextCheckAt: "2026-08-27T20:00:00.000Z" } }, ...value.events.filter((event) => event.kind !== "compliance_check")].map((event, index) => ({ ...event, sequence: index + 1 })) }; }],
+    ["an envelope timestamp mismatch", (value: typeof fixture) => ({ ...value, events: value.events.map((event) => event.kind === "draft_variant" ? { ...event, at: "2026-08-27T14:05:00.000Z" } : event) })]
+  ])("preflights and rejects %s before appending", async (_label, mutate) => {
+    const store = new RecordingEventStore();
+    await expect(runReplay(store, mutate(structuredClone(fixture)))).rejects.toThrow();
+    expect(store.calls).toEqual([]);
+  });
+});

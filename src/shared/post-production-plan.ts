@@ -1,7 +1,9 @@
 import type { AnalysisSummary } from "./analysis-schema";
 import { buildDraftReadiness, type DraftReadiness } from "./draft-readiness";
+import { evaluateDraftNovelty } from "./draft-novelty";
 import type { GenerationOutput } from "./generation-schema";
 import type { SelectedPostLabBrief } from "./post-lab";
+import type { PostSnapshotInput } from "./types";
 
 export type ProductionPlanSource = "selected-post" | "generated-draft" | "audit-idea";
 export type ProductionPlanStatus = "Ready to copy" | "Needs full audit";
@@ -19,6 +21,7 @@ export interface ProductionPlanSlot {
   sourceSignal: string;
   actionLabel: string;
   readiness: DraftReadiness;
+  noveltyLabel: string;
 }
 
 export interface PostProductionPlan {
@@ -28,6 +31,16 @@ export interface PostProductionPlan {
 }
 
 const MAX_PLAN_SLOTS = 5;
+
+// The generation prompt asks for plain English, but models still emit "strategy.strongestLanes: x; workingPatterns: y".
+// Strip key-path prefixes deterministically so raw field names never reach the UI or clipboard.
+export function humanizeSourceSignal(signal: string): string {
+  return signal
+    .split(/;\s*/)
+    .map((segment) => segment.replace(/^[\w$][\w.$]*\s*:\s*/, "").trim())
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function selectedHook(brief: SelectedPostLabBrief) {
   return brief.variantHooks[0] ?? brief.rewrite ?? brief.sourceText;
@@ -55,7 +68,7 @@ function planSummary({
       visibleGenerationCount === generationCount ? `${generationCount}` : `${visibleGenerationCount} of ${generationCount}`;
     return `Selected remix first, then ${generatedLabel} generated ${generationCount === 1 ? "draft" : "drafts"} as alternates.`;
   }
-  if (hasSelectedPost) return "Selected-post remix queue. Use the ranked winner as the next source object.";
+  if (hasSelectedPost) return "Selected-post remix queue. Start your next post from the ranked winner.";
   if (generationCount > 0) {
     const generatedLabel =
       visibleGenerationCount === generationCount ? `${generationCount}` : `${visibleGenerationCount} of ${generationCount}`;
@@ -69,14 +82,23 @@ function planSummary({
   return "No production queue yet. Run an audit or generate drafts to create posting slots.";
 }
 
+function noveltyLabelFor(draft: string, publishedPosts: PostSnapshotInput[]) {
+  return evaluateDraftNovelty(
+    draft,
+    publishedPosts.map((post) => post.text)
+  ).label;
+}
+
 export function buildPostProductionPlan({
   analysis,
   generation,
-  selectedPostBrief
+  selectedPostBrief,
+  capturedPosts = []
 }: {
   analysis: AnalysisSummary | null;
   generation: GenerationOutput | null;
   selectedPostBrief?: SelectedPostLabBrief | null;
+  capturedPosts?: PostSnapshotInput[];
 }): PostProductionPlan {
   const slots: ProductionPlanSlot[] = [];
 
@@ -97,7 +119,8 @@ export function buildPostProductionPlan({
       rationale: `${selectedPostBrief.performanceRead} ${selectedPostBrief.recommendation}`,
       sourceSignal,
       actionLabel: ready ? "Copy rewrite" : "Copy source",
-      readiness: buildDraftReadiness({ hook, draft, sourceSignal })
+      readiness: buildDraftReadiness({ hook, draft, sourceSignal }),
+      noveltyLabel: noveltyLabelFor(draft, capturedPosts)
     });
   }
 
@@ -114,9 +137,10 @@ export function buildPostProductionPlan({
         hook: post.hook,
         draft: post.draft,
         rationale: post.why_this,
-        sourceSignal: post.source_signal,
+        sourceSignal: humanizeSourceSignal(post.source_signal),
         actionLabel: "Copy draft",
-        readiness: buildDraftReadiness({ hook: post.hook, draft: post.draft, sourceSignal: post.source_signal })
+        readiness: buildDraftReadiness({ hook: post.hook, draft: post.draft, sourceSignal: post.source_signal }),
+        noveltyLabel: noveltyLabelFor(`${post.hook}\n${post.draft}`, capturedPosts)
       });
     });
   } else if (analysis) {
@@ -134,7 +158,8 @@ export function buildPostProductionPlan({
         rationale: idea.reason,
         sourceSignal: "Audit next-post idea",
         actionLabel: "Copy idea draft",
-        readiness: buildDraftReadiness({ hook: idea.hook, draft: idea.draft, sourceSignal: "Audit next-post idea" })
+        readiness: buildDraftReadiness({ hook: idea.hook, draft: idea.draft, sourceSignal: "Audit next-post idea" }),
+        noveltyLabel: noveltyLabelFor(`${idea.hook}\n${idea.draft}`, capturedPosts)
       });
     });
   }
@@ -154,7 +179,7 @@ export function buildPostProductionPlan({
 
 export function formatPostProductionPlanForClipboard(plan: PostProductionPlan) {
   return [
-    "Production queue",
+    "Draft queue",
     plan.summary,
     "",
     ...plan.slots.map((slot) =>
@@ -164,6 +189,7 @@ export function formatPostProductionPlanForClipboard(plan: PostProductionPlan) {
         `Hook: ${slot.hook}`,
         `Draft: ${slot.draft}`,
         `Readiness: ${slot.readiness.score} (${slot.readiness.verdict})`,
+        `Novelty: ${slot.noveltyLabel}`,
         `Why: ${slot.rationale}`,
         `Source: ${slot.sourceSignal}`
       ].join("\n")

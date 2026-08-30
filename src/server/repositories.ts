@@ -9,7 +9,8 @@ import {
   type StrategyMemoryProposalOutput,
   type TopicExplorationOutput
 } from "../shared/strategy-intelligence-schema";
-import type { CapturedAccountSnapshot } from "../shared/types";
+import type { CapturedAccountSnapshot, CaptureSource } from "../shared/types";
+import { voiceProfileSchema, type VoiceProfile } from "../shared/voice-profile";
 
 interface StoredProfile {
   id: number;
@@ -20,7 +21,7 @@ interface StoredProfile {
   followers_count: number | null;
   following_count: number | null;
   captured_at: string;
-  source: "browser" | "manual";
+  source: CaptureSource;
 }
 
 interface StoredPost {
@@ -36,7 +37,7 @@ interface StoredPost {
   replies_count: number | null;
   bookmarks_count: number | null;
   captured_at: string;
-  source: "browser" | "manual";
+  source: CaptureSource;
 }
 
 interface StoredAnalysisRun {
@@ -284,6 +285,26 @@ export function createRepositories(db: AppDatabase) {
       return this.getLatestAnalysisRecordForLatestSnapshot()?.analysis ?? null;
     },
 
+    // Unlike the method above, this survives a re-scan: it returns the newest successful
+    // analysis across ALL snapshots, so a fresh audit can reference the previous one.
+    getMostRecentAnalysis(): AnalysisOutput | null {
+      const run = db
+        .prepare("SELECT id, profile_snapshot_id FROM analysis_runs WHERE status = 'succeeded' ORDER BY finished_at DESC, id DESC LIMIT 1")
+        .get() as StoredAnalysisRun | undefined;
+      if (!run) return null;
+
+      const report = db
+        .prepare("SELECT * FROM strategy_reports WHERE analysis_run_id = ? LIMIT 1")
+        .get(run.id) as StoredStrategyReport | undefined;
+      if (!report) return null;
+
+      const postAnalyses = db
+        .prepare("SELECT * FROM post_analyses WHERE analysis_run_id = ? ORDER BY id ASC")
+        .all(run.id) as StoredPostAnalysis[];
+
+      return buildAnalysisOutput(report, postAnalyses);
+    },
+
     getLatestAnalysisSummaryForLatestSnapshot(): AnalysisSummary | null {
       const profile = db
         .prepare("SELECT id FROM profile_snapshots ORDER BY captured_at DESC, id DESC LIMIT 1")
@@ -362,6 +383,22 @@ export function createRepositories(db: AppDatabase) {
         .all(run.id) as StoredGeneratedPost[];
 
       return generationOutputSchema.parse({ posts });
+    },
+
+    /** Recent generated draft texts used as avoid-corpus negatives for the next run. */
+    getRecentGeneratedDraftSnippets(limit = 12): string[] {
+      const rows = db
+        .prepare(
+          `
+          SELECT hook, draft
+          FROM generated_posts
+          ORDER BY id DESC
+          LIMIT ?
+        `
+        )
+        .all(limit) as Array<{ hook: string; draft: string }>;
+
+      return rows.map((row) => `${row.hook}\n${row.draft}`.trim()).filter(Boolean);
     },
 
     getLatestStrategyMemory(): { id: number; memory: StrategyMemory; createdAt: string } | null {
@@ -494,6 +531,65 @@ export function createRepositories(db: AppDatabase) {
       if (!row) return null;
 
       return topicExplorationOutputSchema.parse(JSON.parse(row.output_json));
+    },
+
+    listCreativeDirections(): Array<{ id: number; text: string; updatedAt: string }> {
+      return db
+        .prepare("SELECT id, text, updated_at as updatedAt FROM creative_direction ORDER BY id DESC")
+        .all() as Array<{ id: number; text: string; updatedAt: string }>;
+    },
+
+    addCreativeDirection(text: string): { id: number; text: string; updatedAt: string } | null {
+      const trimmed = text.trim();
+      if (!trimmed) return null;
+      const updatedAt = new Date().toISOString();
+      const result = db
+        .prepare("INSERT INTO creative_direction (text, updated_at) VALUES (?, ?)")
+        .run(trimmed, updatedAt);
+      return { id: Number(result.lastInsertRowid), text: trimmed, updatedAt };
+    },
+
+    deleteCreativeDirection(id: number): void {
+      db.prepare("DELETE FROM creative_direction WHERE id = ?").run(id);
+    },
+
+    saveVoiceProfile(input: { profileSnapshotId: number; jobDir: string; profile: VoiceProfile }): number {
+      const createdAt = new Date().toISOString();
+      const result = db
+        .prepare("INSERT INTO voice_profiles (profile_snapshot_id, profile_json, created_at, job_dir) VALUES (?, ?, ?, ?)")
+        .run(input.profileSnapshotId, JSON.stringify(input.profile), createdAt, input.jobDir);
+      return Number(result.lastInsertRowid);
+    },
+
+    getLatestVoiceProfile(): { profile: VoiceProfile; derivedAt: string } | null {
+      const row = db
+        .prepare("SELECT profile_json, created_at FROM voice_profiles ORDER BY created_at DESC, id DESC LIMIT 1")
+        .get() as { profile_json: string; created_at: string } | undefined;
+      if (!row) return null;
+      return { profile: voiceProfileSchema.parse(JSON.parse(row.profile_json)), derivedAt: row.created_at };
+    },
+
+    getVoiceOverrides(): string {
+      const row = db.prepare("SELECT text FROM voice_overrides WHERE id = 1").get() as { text: string } | undefined;
+      return row?.text ?? "";
+    },
+
+    setVoiceOverrides(text: string): void {
+      db.prepare(
+        "INSERT INTO voice_overrides (id, text, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at"
+      ).run(text.trim(), new Date().toISOString());
+    },
+
+    getCreativeDirection(): { text: string; updatedAt: string } | null {
+      // Generation consumes every saved direction as one newline-joined brief.
+      const rows = db
+        .prepare("SELECT text, updated_at as updatedAt FROM creative_direction ORDER BY id ASC")
+        .all() as Array<{ text: string; updatedAt: string }>;
+      if (rows.length === 0) return null;
+      return {
+        text: rows.map((row) => row.text).join("\n"),
+        updatedAt: rows.reduce((latest, row) => (row.updatedAt > latest ? row.updatedAt : latest), rows[0].updatedAt)
+      };
     }
   };
 }

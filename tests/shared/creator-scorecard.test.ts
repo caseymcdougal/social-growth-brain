@@ -93,7 +93,7 @@ function memory(): StrategyMemory {
 }
 
 describe("creator scorecard", () => {
-  it("summarizes a compounding creator system from strong evidence, momentum, strategy, and production", () => {
+  it("scores profile quality, recent-post performance, and data confidence from a live snapshot", () => {
     const previous = snapshot({
       capturedAt: "2026-06-20T18:00:00.000Z",
       followersCount: 1200,
@@ -114,15 +114,14 @@ describe("creator scorecard", () => {
       memory: memory()
     });
 
-    expect(scorecard.overallScore).toBe(88);
-    expect(scorecard.statusLabel).toBe("Compounding");
-    expect(scorecard.summary).toBe("Creator system is compounding; keep the strongest loop active.");
-    expect(scorecard.primaryConstraint.label).toBe("Production");
+    expect(scorecard.overallScore).toBe(84);
+    expect(scorecard.statusLabel).toBe("On track");
+    expect(scorecard.summary).toBe("Your audit points to recent-post performance as the first thing to improve.");
+    expect(scorecard.primaryConstraint.label).toBe("Recent-post performance");
     expect(scorecard.dimensions.map((dimension) => dimension.label)).toEqual([
-      "Evidence",
-      "Momentum",
-      "Strategy",
-      "Production"
+      "Profile quality",
+      "Recent-post performance",
+      "How well we can see your posts",
     ]);
   });
 
@@ -136,13 +135,13 @@ describe("creator scorecard", () => {
       memory: null
     });
 
-    expect(scorecard.overallScore).toBe(19);
-    expect(scorecard.statusLabel).toBe("Setup required");
-    expect(scorecard.primaryConstraint.label).toBe("Evidence");
-    expect(scorecard.primaryConstraint.nextAction).toBe("Scan or paste the public profile before trusting any strategic read.");
+    expect(scorecard.overallScore).toBe(3);
+    expect(scorecard.statusLabel).toBe("Just getting started");
+    expect(scorecard.primaryConstraint.label).toBe("Profile quality");
+    expect(scorecard.primaryConstraint.nextAction).toBe("Run a scan to check your name, handle, and bio.");
   });
 
-  it("makes negative scan movement the main constraint even when drafts exist", () => {
+  it("does not score follower movement; it scores the currently captured posts", () => {
     const previous = snapshot({
       capturedAt: "2026-06-20T18:00:00.000Z",
       followersCount: 1200,
@@ -163,10 +162,10 @@ describe("creator scorecard", () => {
       memory: memory()
     });
 
-    expect(scorecard.statusLabel).toBe("Operational");
-    expect(scorecard.primaryConstraint.label).toBe("Momentum");
-    expect(scorecard.primaryConstraint.statusLabel).toBe("Down");
-    expect(scorecard.primaryConstraint.nextAction).toContain("weaker scan");
+    expect(scorecard.statusLabel).toBe("On track");
+    expect(scorecard.primaryConstraint.label).toBe("Recent-post performance");
+    expect(scorecard.primaryConstraint.statusLabel).toBe("Thin");
+    expect(scorecard.primaryConstraint.nextAction).toContain("one sharp claim");
   });
 
   it("formats a copyable scorecard brief", () => {
@@ -181,9 +180,9 @@ describe("creator scorecard", () => {
 
     const copied = formatCreatorScorecardForClipboard(scorecard);
 
-    expect(copied).toContain("Creator scorecard: 19/100 - Setup required");
-    expect(copied).toContain("Primary constraint: Evidence");
-    expect(copied).toContain("- Evidence [No capture] 10/100");
-    expect(copied).toContain("Next: Scan or paste the public profile before trusting any strategic read.");
+    expect(copied).toContain("Creator scorecard: 3/100 - Just getting started");
+    expect(copied).toContain("What to fix first: Profile quality");
+    expect(copied).toContain("- Profile quality [No profile] 0/100");
+    expect(copied).toContain("Next: Run a scan to check your name, handle, and bio.");
   });
 });

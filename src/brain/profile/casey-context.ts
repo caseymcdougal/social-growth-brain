@@ -1,0 +1,8 @@
+import type { CreatorArchive } from "../domain";
+import type { BrainEventStore } from "../storage/event-store";
+
+type DeepReadonly<T> = T extends (infer U)[] ? ReadonlyArray<DeepReadonly<U>> : T extends object ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
+export interface CaseyContext { readonly creatorId: "casey-mcdougal"; readonly version: string; readonly archiveId: string; readonly importedAt: string; readonly profile: DeepReadonly<CreatorArchive["profile"]>; readonly ownedPosts: DeepReadonly<CreatorArchive["posts"]>; readonly voiceProfile: DeepReadonly<CreatorArchive["voiceProfile"]>; readonly voiceOverrides: string; readonly strategyMemory: DeepReadonly<CreatorArchive["strategyMemory"]>; readonly creativeDirections: ReadonlyArray<string>; }
+function freeze<T>(value: T): DeepReadonly<T> { if (value && typeof value === "object") { for (const child of Object.values(value as object)) freeze(child); Object.freeze(value); } return value as DeepReadonly<T>; }
+export function buildCaseyContext(archive: CreatorArchive): CaseyContext { const copy = structuredClone(archive); return freeze({ creatorId: "casey-mcdougal", version: copy.sourceFingerprint, archiveId: copy.id, importedAt: copy.importedAt, profile: copy.profile, ownedPosts: copy.posts, voiceProfile: copy.voiceProfile, voiceOverrides: copy.voiceOverrides, strategyMemory: copy.strategyMemory, creativeDirections: copy.creativeDirections }); }
+export async function loadLatestCaseyContext(store: BrainEventStore): Promise<CaseyContext | null> { const archive = await store.getLatestCreatorArchive(); return archive ? buildCaseyContext(archive) : null; }

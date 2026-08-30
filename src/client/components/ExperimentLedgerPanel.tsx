@@ -46,8 +46,8 @@ export function ExperimentLedgerPanel({
     <section className="panel experiment-panel" aria-label="Experiment ledger">
       <div className="section-head">
         <div>
-          <p className="eyebrow">Experiment ledger</p>
-          <h2 id="experiment-ledger-title">Hypothesis tracker</h2>
+          <p className="eyebrow">Experiments</p>
+          <h2 id="experiment-ledger-title">Ideas you're testing</h2>
         </div>
         <span className="status-chip">{ledger.statusLabel}</span>
       </div>
@@ -64,7 +64,7 @@ export function ExperimentLedgerPanel({
       {ledger.items.length === 0 ? (
         <div className="memory-empty">
           <FlaskConical size={18} aria-hidden="true" />
-          <p>Run an audit or apply strategy memory to start tracking hypotheses against scans.</p>
+          <p>Run an audit to start tracking which ideas actually work across scans.</p>
         </div>
       ) : (
         <div className="experiment-list">

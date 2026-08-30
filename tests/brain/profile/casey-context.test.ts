@@ -1,0 +1,13 @@
+import { describe, expect, it } from "vitest";
+import { buildCaseyContext, loadLatestCaseyContext } from "../../../src/brain/profile/casey-context";
+import type { CreatorArchive } from "../../../src/brain/domain";
+
+const archive: CreatorArchive = { schemaVersion: 1, id: "00000000-0000-4000-8000-000000000001", creatorId: "casey-mcdougal", source: "legacy-sqlite", consentBasis: "casey-requested-import", consentRecordedAt: "2026-08-28T00:00:00.000Z", sourceFingerprint: "a".repeat(64), importedAt: "2026-08-28T00:00:00.000Z", profile: { handle: "caseymcdougal", displayName: "Casey", bio: "Builder", profileUrl: "https://x.com/caseymcdougal", followersCount: 4, followingCount: 2, capturedAt: "2026-08-28T00:00:00.000Z" }, posts: [{ xPostId: "100", url: "https://x.com/caseymcdougal/status/100", text: "hello", postedAt: null, capturedAt: "2026-08-28T00:00:00.000Z", viewsCount: 1, likesCount: 2, repostsCount: 3, repliesCount: 4, bookmarksCount: 5 }], voiceProfile: { summary: "direct", casing_and_punctuation: ["lower"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build it."] }, voiceOverrides: "keep it clear", strategyMemory: { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "direct", status: "active", evidence: "posts" }] }, creativeDirections: ["use examples"], importReport: { importedPosts: 1, omittedFields: [] } };
+describe("Casey context", () => {
+  it("returns null when no archive exists", async () => expect(await loadLatestCaseyContext({ getLatestCreatorArchive: async () => null } as never)).toBeNull());
+  it("maps every retrieval field unchanged and versions it by fingerprint", () => expect(buildCaseyContext(archive)).toEqual({ creatorId: "casey-mcdougal", version: archive.sourceFingerprint, archiveId: archive.id, importedAt: archive.importedAt, profile: archive.profile, ownedPosts: archive.posts, voiceProfile: archive.voiceProfile, voiceOverrides: archive.voiceOverrides, strategyMemory: archive.strategyMemory, creativeDirections: archive.creativeDirections }));
+  it("isolates and freezes the context snapshot", () => {
+    const context = buildCaseyContext(archive); archive.posts[0]!.text = "changed"; archive.voiceProfile!.vocabulary[0] = "changed";
+    expect(context.ownedPosts[0]!.text).toBe("hello"); expect(context.voiceProfile!.vocabulary[0]).toBe("build"); expect(() => { (context.ownedPosts[0] as { text: string }).text = "nope"; }).toThrow();
+  });
+});

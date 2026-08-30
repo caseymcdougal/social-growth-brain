@@ -22,7 +22,10 @@ export type DashboardState = {
     proposal: StrategyMemoryProposal | null;
   };
   topicExploration: TopicExplorationOutput | null;
+  directions: CreativeDirectionEntry[];
 };
+
+export type CreativeDirectionEntry = { id: number; text: string; updatedAt: string };
 
 declare global {
   interface Window {
@@ -54,7 +57,8 @@ function normalizeDashboardState(data: any): DashboardState {
       memory: data.strategyMemory?.memory ?? null,
       proposal: data.strategyMemory?.proposal ?? null
     },
-    topicExploration: data.topicExploration ?? null
+    topicExploration: data.topicExploration ?? null,
+    directions: Array.isArray(data.directions) ? data.directions : []
   };
   if (typeof window !== "undefined") storeDashboardState(dashboardState);
   return dashboardState;
@@ -224,4 +228,61 @@ export async function exploreNearbyTopics(): Promise<TopicExplorationOutput> {
     throw new Error(data?.errorMessage ?? "Topic exploration failed");
   }
   return data.exploration;
+}
+
+export type VoiceProfileState = {
+  profile: import("../shared/voice-profile").VoiceProfile | null;
+  derivedAt: string | null;
+  overrides: string;
+};
+
+export async function getVoiceProfile(): Promise<VoiceProfileState> {
+  const response = await fetch("/api/voice/latest");
+  if (!response.ok) throw new Error("Failed to load voice profile");
+  const data = await response.json();
+  return { profile: data.profile ?? null, derivedAt: data.derivedAt ?? null, overrides: data.overrides ?? "" };
+}
+
+export async function refreshVoiceProfile(): Promise<VoiceProfileState> {
+  const response = await fetch("/api/voice/refresh", { method: "POST" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Voice derivation failed");
+  }
+  return { profile: data.profile ?? null, derivedAt: data.derivedAt ?? null, overrides: data.overrides ?? "" };
+}
+
+export async function saveVoiceOverrides(text: string): Promise<string> {
+  const response = await fetch("/api/voice/overrides", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to save voice notes");
+  }
+  return data.overrides ?? "";
+}
+
+export async function saveCreativeDirection(text: string): Promise<CreativeDirectionEntry[]> {
+  const response = await fetch("/api/direction", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to save creative direction");
+  }
+  return Array.isArray(data?.directions) ? data.directions : [];
+}
+
+export async function deleteCreativeDirection(id: number): Promise<CreativeDirectionEntry[]> {
+  const response = await fetch(`/api/direction/${id}`, { method: "DELETE" });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.errorMessage ?? "Failed to delete creative direction");
+  }
+  return Array.isArray(data?.directions) ? data.directions : [];
 }

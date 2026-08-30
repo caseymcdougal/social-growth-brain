@@ -5,6 +5,9 @@ const apiProxy = {
   "/api": "http://127.0.0.1:4174"
 };
 
+// Hostnames the phone uses on the LAN; vite blocks unknown Host headers by default.
+const lanHosts = ["caseys-macbook-air.local"];
+
 const preactAliases = {
   react: "preact/compat",
   "react-dom": "preact/compat",
@@ -18,13 +21,16 @@ export default defineConfig(({ mode }) => ({
     alias: mode === "test" ? {} : preactAliases
   },
   server: {
-    host: "127.0.0.1",
+    // LAN-exposed so the phone can reach it; API stays on 127.0.0.1 behind the proxy
+    host: "0.0.0.0",
     port: 5173,
+    allowedHosts: lanHosts,
     proxy: apiProxy
   },
   preview: {
-    host: "127.0.0.1",
+    host: "0.0.0.0",
     port: 5175,
+    allowedHosts: lanHosts,
     proxy: apiProxy
   },
   test: {

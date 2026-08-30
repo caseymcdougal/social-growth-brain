@@ -1,4 +1,4 @@
-import { Check, Compass, Copy, Sparkles } from "lucide-react";
+import { Check, Compass, Copy, Search } from "lucide-react";
 import { useState } from "react";
 import type { AnalysisSummary } from "../../shared/analysis-schema";
 import type { TopicExplorationOutput } from "../../shared/strategy-intelligence-schema";
@@ -46,14 +46,14 @@ export function TopicExplorer({
 
       {!analysis && (
         <div className="memory-empty">
-          <Sparkles size={18} aria-hidden="true" />
+          <Search size={18} aria-hidden="true" />
           <p>Run an audit first so topic exploration can stay near your actual signal.</p>
         </div>
       )}
 
       {analysis && !exploration && (
         <div className="memory-empty">
-          <Sparkles size={18} aria-hidden="true" />
+          <Compass size={18} aria-hidden="true" />
           <p>Find adjacent ideas that stay close to the lanes already working in your posts.</p>
         </div>
       )}

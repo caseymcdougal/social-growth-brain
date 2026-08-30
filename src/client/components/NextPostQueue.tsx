@@ -8,17 +8,18 @@ import {
   ListPlus,
   PenLine,
   RotateCcw,
-  Sparkles,
   Target
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AnalysisSummary } from "../../shared/analysis-schema";
 import type { GenerationOutput } from "../../shared/generation-schema";
+import { draftLeadsWithHook } from "../../shared/draft-hook";
 import { formatSelectedPostLabBriefForClipboard, type SelectedPostLabBrief } from "../../shared/post-lab";
 import { buildProductionOutcomeLoop } from "../../shared/production-outcomes";
 import {
   buildPostProductionPlan,
   formatPostProductionPlanForClipboard,
+  humanizeSourceSignal,
   type ProductionPlanSlot
 } from "../../shared/post-production-plan";
 import {
@@ -34,7 +35,7 @@ import { formatPostingWindow } from "../postingWindow";
 
 const queue = [
   { icon: Target, label: "Audit", value: "Run strategy audit" },
-  { icon: Sparkles, label: "Generate", value: "Today's ideas" },
+  { icon: PenLine, label: "Generate", value: "Today's ideas" },
   { icon: Copy, label: "Export", value: "Copy drafts into X" }
 ];
 
@@ -99,22 +100,22 @@ export function NextPostQueue({
     : generation
       ? `${generation.posts.length} ${generation.posts.length === 1 ? "draft" : "drafts"}`
       : analysis
-        ? "Read ready"
+        ? "Ready to write"
         : "Locked";
   const lead = selectedPostBrief
-    ? "Use the selected ranked post as a source object: copy the rewrite, remix brief, or hook variants without leaving the cockpit."
+    ? "Start from the post you picked: copy the rewrite, the remix brief, or a hook variant."
     : generation
     ? "Review the hooks, pick the sharpest angle, and copy the draft into X when it feels true."
     : analysis
-      ? "The audit has enough signal to turn into a post. Use the brief below, then generate drafts from the top command."
-      : "Scan public metrics and run the strategy read before choosing the next post.";
+      ? "The audit found enough to write from. Use the brief below, then write draft ideas from the top button."
+      : "Scan your posts and find what's working before choosing the next post.";
   const featuredDraft = generation?.posts[0] ?? null;
   const featuredIdea = analysis?.next_post_ideas[0] ?? null;
   const leadAngle = featuredDraft?.angle ?? featuredIdea?.title ?? null;
   const leadHook = featuredDraft?.hook ?? featuredIdea?.hook ?? null;
   const leadWhy = featuredDraft?.why_this ?? featuredIdea?.reason ?? null;
   const postingWindow = formatPostingWindow();
-  const productionPlan = buildPostProductionPlan({ analysis, generation, selectedPostBrief });
+  const productionPlan = buildPostProductionPlan({ analysis, generation, selectedPostBrief, capturedPosts });
   const activeSlotIds = useMemo(
     () => productionPlan.slots.map((slot) => slot.id),
     [productionPlan.primarySlotId, productionPlan.slots.length]
@@ -137,11 +138,15 @@ export function NextPostQueue({
   const generatedDraftLabel = generation
     ? `${generation.posts.length} generated ${generation.posts.length === 1 ? "draft" : "drafts"}`
     : null;
-  const workflowTrackerLabel = `Open ${workflowSummary.open} · planned ${workflowSummary.planned} · used ${workflowSummary.used} · skipped ${workflowSummary.skipped}`;
+  const workflowCounts = [
+    { label: "open", count: workflowSummary.open },
+    { label: "planned", count: workflowSummary.planned },
+    { label: "used", count: workflowSummary.used },
+    { label: "skipped", count: workflowSummary.skipped }
+  ].filter((item) => item.count > 0);
+  const workflowTrackerLabel = workflowCounts.map((item) => `${item.count} ${item.label}`).join(" · ");
   const workflowTrackerOpen = workflowSummary.planned > 0 || workflowSummary.used > 0 || outcomeLoop.entries.length > 0;
-  const workflowTrackerGuidance = workflowTrackerOpen
-    ? "Open because this queue has active workflow history."
-    : "Closed until you plan, use, or measure a slot.";
+  const workflowHasActivity = workflowTrackerOpen || workflowSummary.skipped > 0;
 
   useEffect(() => {
     if (activeSlotIds.length === 0) return;
@@ -189,18 +194,20 @@ export function NextPostQueue({
           <div className="production-slot-topline">
             <span>{display.timing ?? slot.timing}</span>
             <span>{slot.status}</span>
+            <span>{slot.noveltyLabel}</span>
             <span>{workflowLabel(workflowStatus)}</span>
           </div>
           <strong>{slot.title}</strong>
-          <p className="production-hook">{slot.hook}</p>
+          {slot.sourceSignal && <p className="draft-based-on">Based on: {slot.sourceSignal}</p>}
+          {!draftLeadsWithHook(slot.draft, slot.hook) && <p className="production-hook">{slot.hook}</p>}
           <p className="production-draft">{slot.draft}</p>
-          <details className="draft-support" aria-label={`Draft support for ${slot.title}`}>
+          <details className="disclosure disclosure-compact draft-support" aria-label={`Draft support for ${slot.title}`}>
             <summary>
               <span>Draft support</span>
               <strong>
-                Readiness {slot.readiness.score} · {slot.readiness.verdict}
+                Readiness {slot.readiness.score} · {slot.readiness.verdict} · {slot.noveltyLabel}
               </strong>
-              <small>Open for source signal, rationale, checks, and fixes.</small>
+              <small>Where this draft came from and what to check before posting.</small>
             </summary>
             <small className="production-support-note">
               {slot.sourceSignal} · {slot.rationale}
@@ -289,7 +296,7 @@ export function NextPostQueue({
 
   const postingBrief = analysis ? (
     generation && !selectedPostBrief ? (
-      <details className="posting-brief-disclosure" aria-label="Recommended posting brief">
+      <details className="disclosure posting-brief-disclosure" aria-label="Recommended posting brief">
         <summary>
           <span>Posting brief</span>
           <strong>{leadAngle}</strong>
@@ -303,12 +310,12 @@ export function NextPostQueue({
   ) : null;
 
   const productionQueue =
-    productionPlan.slots.length > 0 ? (
-      <section className="production-queue" aria-label="Post production queue">
+    generation && productionPlan.slots.length > 0 ? (
+      <section className="production-queue" aria-label="Today's drafts">
         <div className="production-queue-head">
           <div>
-            <p className="eyebrow">Production Plan</p>
-            <h3>Production queue</h3>
+            <p className="eyebrow">Today's drafts</p>
+            <h3>Draft queue</h3>
             <p>{productionPlan.summary}</p>
           </div>
           <button
@@ -321,28 +328,23 @@ export function NextPostQueue({
               ? "Copied"
               : copyFailed === "production-plan"
                 ? "Copy unavailable"
-                : "Copy production plan"}
+                : "Copy today's plan"}
           </button>
         </div>
         <ol className="production-slot-list production-primary-slot-list">
           {primarySlot && renderProductionSlot(primarySlot, { position: 1, timing: "Next post" })}
         </ol>
-        <details className="production-workflow-panel" aria-label="Production workflow tracker" open={workflowTrackerOpen}>
+        {workflowHasActivity && (
+        <details className="disclosure disclosure-flush production-workflow-panel" aria-label="Draft status" open={workflowTrackerOpen}>
           <summary>
-            <span>Workflow tracker</span>
+            <span>Draft status</span>
             <strong>{workflowTrackerLabel}</strong>
-            <small>{workflowTrackerGuidance}</small>
+            <small>What happened to each draft.</small>
           </summary>
-          <div className="production-workboard" aria-label="Production workboard">
-            <span>Open {workflowSummary.open}</span>
-            <span>Planned {workflowSummary.planned}</span>
-            <span>Used {workflowSummary.used}</span>
-            <span>Skipped {workflowSummary.skipped}</span>
-          </div>
-          <section className="production-outcome-loop" aria-label="Production outcome loop">
+          <section className="production-outcome-loop" aria-label="What happened after posting">
             <div className="production-outcome-head">
               <div>
-                <span>Learning loop</span>
+                <span>After you post</span>
                 <strong>{outcomeLoop.summary}</strong>
               </div>
               <small>{outcomeLoop.nextAction}</small>
@@ -370,12 +372,13 @@ export function NextPostQueue({
             )}
           </section>
         </details>
+        )}
         {backlogSlots.length > 0 && (
-          <details className="production-backlog" aria-label="Queue backlog">
+          <details className="disclosure disclosure-flush production-backlog" aria-label="More drafts">
             <summary>
-              <span>Queue backlog</span>
+              <span>More drafts</span>
               <strong>{backlogLabel}</strong>
-              <small>Open when you want to inspect or work the alternates.</small>
+              <small>Other drafts you could post instead.</small>
             </summary>
             <ol className="production-slot-list production-backlog-list">
               {backlogSlots.map((slot, index) =>
@@ -499,7 +502,7 @@ export function NextPostQueue({
       )}
 
       {analysis && !generation && (
-        <details className="draft-library idea-backlog" aria-label="Audit idea backlog">
+        <details className="disclosure draft-library idea-backlog" aria-label="Audit idea backlog">
           <summary>
             <span>Idea backlog</span>
             <strong>{auditIdeaLabel}</strong>
@@ -511,7 +514,7 @@ export function NextPostQueue({
                 <Lightbulb size={17} aria-hidden="true" />
                 <div>
                   <span>{idea.title}</span>
-                  <p className="idea-hook">{idea.hook}</p>
+                  {!draftLeadsWithHook(idea.draft, idea.hook) && <p className="idea-hook">{idea.hook}</p>}
                   <p className="idea-draft idea-draft-preview">{idea.draft}</p>
                   <small>{idea.reason}</small>
                 </div>
@@ -522,7 +525,7 @@ export function NextPostQueue({
       )}
 
       {shouldShowDraftLibrary && generation && (
-        <details className="draft-library" aria-label="Draft library">
+        <details className="disclosure draft-library" aria-label="Draft library">
           <summary>
             <span>Draft library</span>
             <strong>{generatedDraftLabel}</strong>
@@ -541,11 +544,17 @@ export function NextPostQueue({
                   <PenLine size={17} aria-hidden="true" />
                   <div>
                     <span>{index === 0 ? `Recommended · ${post.title}` : post.title}</span>
-                    <p className="idea-hook">{post.hook}</p>
+                    {post.source_signal && <p className="draft-based-on">Based on: {humanizeSourceSignal(post.source_signal)}</p>}
+                    {!draftLeadsWithHook(post.draft, post.hook) && <p className="idea-hook">{post.hook}</p>}
                     <small>{post.angle}</small>
-                    <p className="source-signal">{post.source_signal}</p>
                     <p className="idea-draft">{post.draft}</p>
-                    <small>{post.why_this}</small>
+                    <small>
+                      {post.why_this} ·{" "}
+                      {
+                        productionPlan.slots.find((slot) => slot.id === `generated-${index + 1}`)?.noveltyLabel ??
+                          "Novel"
+                      }
+                    </small>
                     <button className="copy-button" type="button" onClick={() => void copyText(copyId, post.draft)}>
                       {copied === copyId ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                       {copied === copyId ? "Copied" : copyFailed === copyId ? "Copy unavailable" : "Copy draft"}

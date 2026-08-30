@@ -1,4 +1,3 @@
-import { Check, Copy, FileText, ListChecks, LockKeyhole, RefreshCcw, Sparkles, Upload, Wand2 } from "lucide-react";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   applyStrategyMemoryProposal,
@@ -9,28 +8,43 @@ import {
   getBootstrappedDashboardState,
   getDashboardState,
   getLatestAnalysis,
+  getLatestGeneration,
   getLatestStrategyMemory,
   getLatestTopicExploration,
   importSnapshot,
   isBootstrappedDashboardStateFromStorage,
   refreshStrategyMemory,
+  saveCreativeDirection,
+  deleteCreativeDirection,
+  type CreativeDirectionEntry,
   type DashboardState,
   type StrategyMemoryProposal
 } from "./client/api";
-import { CaptureBar } from "./client/components/CaptureBar";
+import { ActionProgressPanel, getActionState, type ActionProgressItem } from "./client/components/ActionProgressPanel";
+import { AuditCommandCenter } from "./client/components/AuditCommandCenter";
+import { AuditCompleteBanner } from "./client/components/AuditCompleteBanner";
 import { CoachReport } from "./client/components/CoachReport";
+import { CreativeDirectionCard } from "./client/components/CreativeDirectionCard";
+import { NextMoveHero } from "./client/components/NextMoveHero";
 import { NextPostQueue } from "./client/components/NextPostQueue";
-import { OpportunityDesk } from "./client/components/OpportunityDesk";
-import { ScanHistoryPanel } from "./client/components/ScanHistoryPanel";
+import { PreDraftBrief } from "./client/components/PreDraftBrief";
+import { RecoveryNoticePanel } from "./client/components/RecoveryNoticePanel";
+import { ReferenceShelf } from "./client/components/ReferenceShelf";
+import { ScoreStrip } from "./client/components/ScoreStrip";
+import { WorkspaceSidebar } from "./client/components/WorkspaceSidebar";
+import { PhaseLayout } from "./client/layout/PhaseLayout";
+import { scrollToSection } from "./client/utils/scroll-to-section";
+import { getCurrentStep } from "./client/utils/workflow-steps";
 import type { AnalysisOutput, AnalysisSummary } from "./shared/analysis-schema";
-import { buildCreatorScorecard, formatCreatorScorecardForClipboard, type CreatorScorecard } from "./shared/creator-scorecard";
+import { buildCreatorScorecard } from "./shared/creator-scorecard";
 import type { GenerationOutput } from "./shared/generation-schema";
-import { buildOpportunityBrief, type OpportunityBrief } from "./shared/opportunities";
+import { buildOpportunityBrief } from "./shared/opportunities";
 import { buildSelectedPostLabBrief, type PostAnalysis, type SelectedPostLabBrief } from "./shared/post-lab";
 import { rankPostsByVisibleSignal, summarizeMetricCompleteness } from "./shared/performance";
 import { buildScanHistoryBrief } from "./shared/scan-history";
 import type { StrategyMemory, TopicExplorationOutput } from "./shared/strategy-intelligence-schema";
 import type { CapturedAccountSnapshot } from "./shared/types";
+import { getWorkflowPhase } from "./shared/workflow-phase";
 
 const DeferredManualImportPanel = lazy(() =>
   import("./client/components/ManualImportPanel").then((module) => ({ default: module.ManualImportPanel }))
@@ -44,397 +58,14 @@ const DeferredStrategyMemoryPanel = lazy(() =>
 const DeferredExperimentLedgerPanel = lazy(() =>
   import("./client/components/ExperimentLedgerPanel").then((module) => ({ default: module.ExperimentLedgerPanel }))
 );
+const DeferredVoiceProfilePanel = lazy(() =>
+  import("./client/components/VoiceProfilePanel").then((module) => ({ default: module.VoiceProfilePanel }))
+);
 const DeferredTopicExplorer = lazy(() =>
   import("./client/components/TopicExplorer").then((module) => ({ default: module.TopicExplorer }))
 );
 
-const auditSteps = [
-  { key: "scan", label: "Scan", detail: "Public X metrics" },
-  { key: "rank", label: "Rank", detail: "Visible signal" },
-  { key: "diagnose", label: "Diagnose", detail: "Why it moved" },
-  { key: "write", label: "Write", detail: "Next posts" }
-] as const;
-
-type AuditStepKey = (typeof auditSteps)[number]["key"];
-type StepState = "idle" | "current" | "complete";
-type ActionProgressState = "locked" | "ready" | "running" | "complete" | "issue";
-type StrategyEngineView = "experiments" | "memory" | "topics";
-type ActionProgressItem = {
-  label: string;
-  detail: string;
-  state: ActionProgressState;
-};
-type RecoveryNotice = {
-  kind: "analysis" | "generation" | "memory" | "topic";
-  message: string;
-};
-
-const stepOrder: AuditStepKey[] = ["scan", "rank", "diagnose", "write"];
-const actionProgressValue: Record<ActionProgressState, number> = {
-  locked: 8,
-  ready: 28,
-  running: 68,
-  complete: 100,
-  issue: 100
-};
-const actionProgressLabel: Record<ActionProgressState, string> = {
-  locked: "Locked",
-  ready: "Ready",
-  running: "Running",
-  complete: "Complete",
-  issue: "Needs attention"
-};
-
-function getCurrentStep(snapshot: CapturedAccountSnapshot | null, analysis: AnalysisSummary | null, generation: GenerationOutput | null) {
-  if (generation) return "write";
-  if (analysis) return "write";
-  if (snapshot) return "diagnose";
-  return "scan";
-}
-
-function getStepState(step: AuditStepKey, currentStep: AuditStepKey, generation: GenerationOutput | null): StepState {
-  if (generation) return "complete";
-  const stepIndex = stepOrder.indexOf(step);
-  const currentIndex = stepOrder.indexOf(currentStep);
-  if (stepIndex < currentIndex) return "complete";
-  if (stepIndex === currentIndex) return "current";
-  return "idle";
-}
-
-function getActionState({
-  blocked,
-  complete,
-  error,
-  ready,
-  running
-}: {
-  blocked?: boolean;
-  complete?: boolean;
-  error?: boolean;
-  ready?: boolean;
-  running?: boolean;
-}): ActionProgressState {
-  if (running) return "running";
-  if (error) return "issue";
-  if (complete) return "complete";
-  if (blocked) return "locked";
-  if (ready) return "ready";
-  return "locked";
-}
-
-function ActionProgressPanel({ actions }: { actions: ActionProgressItem[] }) {
-  const runningCount = actions.filter((action) => action.state === "running").length;
-  const issueCount = actions.filter((action) => action.state === "issue").length;
-  const completeCount = actions.filter((action) => action.state === "complete").length;
-  const readyCount = actions.filter((action) => action.state === "ready").length;
-  const lockedCount = actions.filter((action) => action.state === "locked").length;
-  const shouldOpen = runningCount > 0 || issueCount > 0;
-  const statusLabel = runningCount
-    ? `${runningCount} running`
-    : issueCount
-      ? `${issueCount} needs attention`
-      : "All systems idle";
-  const detailLabel = runningCount
-    ? "Live actions are expanded so progress stays visible."
-    : issueCount
-      ? "Open the run log to see which action needs a retry."
-      : `${completeCount} complete · ${readyCount} ready · ${lockedCount} locked`;
-
-  return (
-    <details className="action-progress-panel" aria-label="Action progress" aria-live="polite" open={shouldOpen}>
-      <summary className="action-progress-summary">
-        <div>
-          <p className="eyebrow">Run activity</p>
-          <h2>Run log</h2>
-          <p>{detailLabel}</p>
-        </div>
-        <span className="status-chip">{statusLabel}</span>
-      </summary>
-      <ol className="action-progress-list">
-        {actions.map((action) => {
-          const value = actionProgressValue[action.state];
-          return (
-            <li className="action-progress-row" data-state={action.state} key={action.label}>
-              <div>
-                <strong>{action.label}</strong>
-                <small>{action.detail}</small>
-              </div>
-              <span className="action-state-label">{actionProgressLabel[action.state]}</span>
-              <span
-                aria-label={`${action.label} progress`}
-                aria-valuemax={100}
-                aria-valuemin={0}
-                aria-valuenow={value}
-                className="action-meter"
-                role="progressbar"
-              >
-                <span style={{ width: `${value}%` }} />
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </details>
-  );
-}
-
-const recoveryNoticeCopy: Record<RecoveryNotice["kind"], { title: string; nextStep: string }> = {
-  analysis: {
-    title: "Strategy audit did not finish",
-    nextStep: "Keep the snapshot in place and run the strategy audit again. If it keeps failing, paste a fresh snapshot first."
-  },
-  generation: {
-    title: "Today's ideas did not generate",
-    nextStep: "Keep the audit in place and try Generate today's ideas again. If the model is unavailable, use the Post Lab queue already on screen."
-  },
-  memory: {
-    title: "Strategy memory did not update",
-    nextStep: "Keep the current accepted context and retry the memory action after the latest audit is stable."
-  },
-  topic: {
-    title: "Topic exploration did not finish",
-    nextStep: "Keep the current audit and retry topic exploration later. The priority signals and post queue are still usable."
-  }
-};
-
-function RecoveryNoticePanel({ kind, message }: RecoveryNotice) {
-  const copy = recoveryNoticeCopy[kind];
-  return (
-    <section className="panel error-panel" role="alert">
-      <div>
-        <p className="eyebrow">Recovery needed</p>
-        <h2>{copy.title}</h2>
-        <p>{message}</p>
-      </div>
-      <div className="recovery-next-step">
-        <span>What to do next</span>
-        <p>{copy.nextStep}</p>
-      </div>
-    </section>
-  );
-}
-
-function AuditCommandCenter({
-  activeAction,
-  analyzing,
-  capturing,
-  coveragePercent,
-  draftCount,
-  generating,
-  isGenerated,
-  isBusy,
-  onAnalyze,
-  onCapture,
-  onGenerateToday,
-  onOpenImport,
-  onReviewDraftQueue,
-  opportunityBrief,
-  postCount,
-  scorecard
-}: {
-  activeAction: ActionProgressItem | null;
-  analyzing: boolean;
-  capturing: boolean;
-  coveragePercent: number;
-  draftCount: number;
-  generating: boolean;
-  isGenerated: boolean;
-  isBusy: boolean;
-  onAnalyze: () => void;
-  onCapture: () => void;
-  onGenerateToday: () => void;
-  onOpenImport: () => void;
-  onReviewDraftQueue: () => void;
-  opportunityBrief: OpportunityBrief;
-  postCount: number;
-  scorecard: CreatorScorecard;
-}) {
-  const [scorecardCopied, setScorecardCopied] = useState(false);
-  const [scorecardCopyFailed, setScorecardCopyFailed] = useState(false);
-  const bestOpportunity = opportunityBrief.priorityCards[0] ?? null;
-  const sourcePostLabel = `${postCount} ${postCount === 1 ? "post" : "posts"}`;
-  const draftLabel = `${draftCount} ${draftCount === 1 ? "draft" : "drafts"}`;
-  const stagedDraftLabel = `${draftLabel} staged`;
-  const readinessLabel = activeAction
-    ? `${activeAction.label} running`
-    : isGenerated
-      ? `${draftLabel} · ${coveragePercent}% evidence`
-      : `${sourcePostLabel} · ${coveragePercent}% evidence`;
-  const commandSignals = [
-    {
-      label: "Health",
-      title: `${scorecard.statusLabel} · ${scorecard.overallScore}`,
-      detail: `${sourcePostLabel} · ${coveragePercent}% evidence`
-    },
-    {
-      label: "Constraint",
-      title: scorecard.primaryConstraint.label,
-      detail: scorecard.primaryConstraint.nextAction
-    },
-    {
-      label: "Opportunity",
-      title: bestOpportunity?.title ?? "Create the first evidence base",
-      detail: bestOpportunity?.detail ?? "Scan or paste a snapshot so the dashboard can rank what matters."
-    }
-  ];
-
-  async function copyScorecardBrief() {
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(formatCreatorScorecardForClipboard(scorecard));
-      setScorecardCopyFailed(false);
-      setScorecardCopied(true);
-      window.setTimeout(() => setScorecardCopied(false), 1400);
-    } catch {
-      setScorecardCopied(false);
-      setScorecardCopyFailed(true);
-      window.setTimeout(() => setScorecardCopyFailed(false), 1800);
-    }
-  }
-
-  return (
-    <section
-      className={isGenerated ? "panel command-center-panel is-generated" : "panel command-center-panel"}
-      data-mode={isGenerated ? "draft" : "audit"}
-      aria-label="Audit command center"
-      aria-labelledby="command-center-title"
-    >
-      <div className="command-center-lead">
-        <div>
-          <p className="eyebrow">{isGenerated ? "Draft handoff" : "Audit summary"}</p>
-          <h2 id="command-center-title">{isGenerated ? "Ready-to-write command center" : "Audit command center"}</h2>
-          <p>{scorecard.summary}</p>
-        </div>
-        <span className="status-chip">{readinessLabel}</span>
-      </div>
-
-      {isGenerated ? (
-        <div className="command-center-handoff" aria-label="Draft handoff priorities">
-          <article className="command-center-primary-action">
-            <span>Draft queue</span>
-            <strong>{stagedDraftLabel}</strong>
-            <p>Copy the top draft or refresh ideas.</p>
-          </article>
-          <div className="command-center-actions">
-            <button className="primary-button" type="button" disabled={isBusy} onClick={onReviewDraftQueue}>
-              <ListChecks size={16} aria-hidden="true" /> Review draft queue
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={isBusy}
-              onClick={onGenerateToday}
-              aria-busy={generating || undefined}
-            >
-              <Sparkles size={16} aria-hidden="true" /> {generating ? "Generating" : "Generate fresh ideas"}
-            </button>
-            <details className="capture-maintenance command-center-maintenance" aria-label="Update source actions">
-              <summary>
-                <span>Update source</span>
-              </summary>
-              <div className="capture-maintenance-actions">
-                <button
-                  className="secondary-button"
-                  type="button"
-                  disabled={isBusy}
-                  onClick={onAnalyze}
-                  aria-busy={analyzing || undefined}
-                >
-                  <Wand2 size={16} aria-hidden="true" /> {analyzing ? "Auditing" : "Re-run audit"}
-                </button>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={onCapture}
-                  disabled={isBusy}
-                  aria-busy={capturing || undefined}
-                >
-                  <RefreshCcw size={16} aria-hidden="true" /> {capturing ? "Scanning X" : "Rescan public metrics"}
-                </button>
-                <button className="secondary-button" type="button" onClick={onOpenImport} disabled={isBusy}>
-                  <Upload size={16} aria-hidden="true" /> Paste snapshot
-                </button>
-              </div>
-            </details>
-          </div>
-          <details className="command-center-signal-disclosure" aria-label="Status signals">
-            <summary>
-              <span>Status signals</span>
-              <strong>
-                {scorecard.statusLabel} · {scorecard.primaryConstraint.label}
-              </strong>
-              <small>Open for health, constraint, and opportunity context.</small>
-            </summary>
-            <div className="command-center-signals" aria-label="Command signals">
-              {commandSignals.map((signal) => (
-                <article className="command-center-signal" key={signal.label}>
-                  <span>{signal.label}</span>
-                  <strong>{signal.title}</strong>
-                  <p>{signal.detail}</p>
-                </article>
-              ))}
-            </div>
-          </details>
-        </div>
-      ) : (
-        <div className="command-center-grid">
-          <article className="command-center-card is-primary">
-            <span>Overall status</span>
-            <strong>
-              {scorecard.statusLabel} · {scorecard.overallScore}
-            </strong>
-            <p>{scorecard.primaryConstraint.detail}</p>
-          </article>
-          <article className="command-center-card">
-            <span>Next action</span>
-            <strong>{opportunityBrief.command.title}</strong>
-            <p>{opportunityBrief.command.detail}</p>
-          </article>
-          <article className="command-center-card">
-            <span>Biggest constraint</span>
-            <strong>{scorecard.primaryConstraint.label}</strong>
-            <p>{scorecard.primaryConstraint.nextAction}</p>
-          </article>
-          <article className="command-center-card">
-            <span>Best opportunity</span>
-            <strong>{bestOpportunity?.title ?? "Create the first evidence base"}</strong>
-            <p>{bestOpportunity?.detail ?? "Scan or paste a snapshot so the dashboard can rank what matters."}</p>
-          </article>
-        </div>
-      )}
-
-      <details className="scorecard-breakdown command-score-breakdown" aria-label="Score breakdown">
-        <summary>
-          <span>Score breakdown</span>
-          <strong>{scorecard.dimensions.length} operating signals</strong>
-          <small>Open for the supporting evidence, momentum, strategy, and production scores.</small>
-        </summary>
-
-        <div className="scorecard-breakdown-body">
-          <div className="scorecard-dimensions" aria-label="Creator scorecard dimensions">
-            {scorecard.dimensions.map((dimension) => (
-              <article data-key={dimension.key} key={dimension.key}>
-                <div className="scorecard-dimension-top">
-                  <span>{dimension.label}</span>
-                  <strong>{dimension.score}</strong>
-                </div>
-                <div className="scorecard-meter" aria-hidden="true">
-                  <span style={{ width: `${dimension.score}%` }} />
-                </div>
-                <p>{dimension.statusLabel}</p>
-                <small>{dimension.detail}</small>
-              </article>
-            ))}
-          </div>
-          <button className="copy-button scorecard-copy" type="button" onClick={() => void copyScorecardBrief()}>
-            {scorecardCopied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-            {scorecardCopied ? "Copied brief" : scorecardCopyFailed ? "Copy unavailable" : "Copy scorecard brief"}
-          </button>
-        </div>
-      </details>
-    </section>
-  );
-}
+type StrategyEngineView = "experiments" | "memory" | "voice" | "topics";
 
 export function App() {
   const [bootstrappedDashboard] = useState<DashboardState | null>(() => getBootstrappedDashboardState());
@@ -470,11 +101,15 @@ export function App() {
   const [exploringTopics, setExploringTopics] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [directions, setDirections] = useState<CreativeDirectionEntry[]>(() => bootstrappedDashboard?.directions ?? []);
   const [strategyEngineView, setStrategyEngineView] = useState<StrategyEngineView>("experiments");
   const [deferredPanelsReady, setDeferredPanelsReady] = useState(false);
+  const [dockSheetOpen, setDockSheetOpen] = useState(false);
   const [initialDashboardState] = useState<Promise<DashboardState>>(() =>
     bootstrappedDashboard ? Promise.resolve(bootstrappedDashboard) : getDashboardState({ force: true })
   );
+
+  const phase = getWorkflowPhase(snapshot, analysis, generation);
   const postCount = snapshot?.posts.length ?? 0;
   const postLabel = postCount === 1 ? "post" : "posts";
   const posts = useMemo(() => snapshot?.posts ?? [], [snapshot]);
@@ -515,17 +150,18 @@ export function App() {
   const currentStep = getCurrentStep(snapshot, analysis, generation);
   const coveragePercent = Math.round(metricSummary.completenessRatio * 100);
   const metricHealth =
-    coveragePercent >= 85 ? "High-confidence read" : coveragePercent >= 55 ? "Usable partial read" : "Thin signal";
+    coveragePercent >= 85 ? "Strong data" : coveragePercent >= 55 ? "Partial data" : "Not enough data yet";
+
   const actionProgressItems = useMemo<ActionProgressItem[]>(
     () => [
       {
-        label: "Dashboard load",
-        detail: "Latest local state",
+        label: "Loading your dashboard",
+        detail: "Reading your saved state",
         state: getActionState({ running: loading, error: Boolean(loadError), complete: !loading && !loadError })
       },
       {
-        label: "Public scan",
-        detail: "Capture visible X metrics",
+        label: "Scanning your posts",
+        detail: "Reading your public X metrics",
         state: getActionState({
           running: capturing,
           error: Boolean(captureError),
@@ -534,13 +170,13 @@ export function App() {
         })
       },
       {
-        label: "Snapshot paste",
-        detail: "Manual JSON fallback",
+        label: "Paste a snapshot",
+        detail: "Manual fallback if a scan won't load",
         state: getActionState({ running: importingSnapshot, complete: Boolean(snapshot), ready: true })
       },
       {
-        label: "Strategy audit",
-        detail: "Rank patterns and constraints",
+        label: "Finding patterns",
+        detail: "Ranking what's working and what's not",
         state: getActionState({
           running: analyzing,
           error: Boolean(analysisError),
@@ -550,8 +186,8 @@ export function App() {
         })
       },
       {
-        label: "Today's ideas",
-        detail: "Generate draft candidates",
+        label: "Writing draft ideas",
+        detail: "Drafting post candidates",
         state: getActionState({
           running: generating,
           error: Boolean(generationError),
@@ -561,8 +197,8 @@ export function App() {
         })
       },
       {
-        label: "Memory refresh",
-        detail: "Propose reusable context",
+        label: "Updating memory",
+        detail: "Suggesting what to remember",
         state: getActionState({
           running: updatingMemory,
           error: Boolean(memoryError),
@@ -572,8 +208,8 @@ export function App() {
         })
       },
       {
-        label: "Memory apply",
-        detail: "Accept context updates",
+        label: "Saving memory",
+        detail: "Saving what to remember",
         state: getActionState({
           running: applyingMemory,
           error: Boolean(memoryError),
@@ -583,8 +219,8 @@ export function App() {
         })
       },
       {
-        label: "Topic explore",
-        detail: "Find adjacent lanes",
+        label: "Finding related topics",
+        detail: "Looking for nearby content lanes",
         state: getActionState({
           running: exploringTopics,
           error: Boolean(topicError),
@@ -617,6 +253,7 @@ export function App() {
       updatingMemory
     ]
   );
+
   const activeAction = actionProgressItems.find((action) => action.state === "running") ?? null;
   const isDashboardActionBusy = loading || capturing || analyzing || generating;
   const evidenceDetailsOpen = Boolean(activeAction || loadError || captureError);
@@ -626,39 +263,45 @@ export function App() {
   const strategyEngineStatus = updatingMemory
     ? "Updating memory"
     : applyingMemory
-      ? "Applying memory"
+      ? "Saving memory"
       : exploringTopics
-        ? "Exploring topics"
+        ? "Finding related topics"
         : memoryProposal
-          ? "Memory proposal waiting"
+          ? "Memory suggestion ready"
           : memoryError || topicError
-            ? "Needs attention"
+            ? "Needs a retry"
             : topicExploration
-              ? `${topicExploration.topics.length} topic ${topicExploration.topics.length === 1 ? "lane" : "lanes"} saved`
+              ? `${topicExploration.topics.length} related ${topicExploration.topics.length === 1 ? "topic" : "topics"} saved`
               : strategyMemory
-                ? "Memory context saved"
+                ? "Memory saved"
                 : analysis
-                  ? "3 optional tools ready"
-                  : "Run audit to unlock";
+                  ? "Ready when you are"
+                  : "Find patterns first";
+
   const strategyEngineViews = useMemo(
     () =>
       [
         {
-          key: "experiments",
-          label: "Hypotheses",
-          detail: strategyMemory ? "Validate active bets" : analysis ? "Track what to test" : "Run audit first"
+          key: "experiments" as const,
+          label: "Experiments",
+          detail: strategyMemory ? "Test your active bets" : analysis ? "Track what to try" : "Find patterns first"
         },
         {
-          key: "memory",
+          key: "memory" as const,
           label: "Memory",
-          detail: memoryProposal ? "Proposal waiting" : strategyMemory ? "Context accepted" : analysis ? "Ready to update" : "Run audit first"
+          detail: memoryProposal ? "Suggestion ready" : strategyMemory ? "Saved" : analysis ? "Ready to update" : "Find patterns first"
         },
         {
-          key: "topics",
+          key: "voice" as const,
+          label: "Voice",
+          detail: snapshot ? "How you write" : "Scan posts first"
+        },
+        {
+          key: "topics" as const,
           label: "Topics",
-          detail: topicExploration ? `${topicExploration.topics.length} nearby lanes` : analysis ? "Explore adjacent lanes" : "Run audit first"
+          detail: topicExploration ? `${topicExploration.topics.length} related topics` : analysis ? "Find related topics" : "Find patterns first"
         }
-      ] satisfies Array<{ key: StrategyEngineView; label: string; detail: string }>,
+      ],
     [analysis, memoryProposal, strategyMemory, topicExploration]
   );
 
@@ -679,6 +322,7 @@ export function App() {
       setStrategyMemory(dashboard.strategyMemory.memory);
       setMemoryProposal(dashboard.strategyMemory.proposal);
       setTopicExploration(dashboard.topicExploration);
+      setDirections(dashboard.directions);
       if (!dashboard.snapshot?.posts.some((post) => post.xPostId === selectedPostId)) {
         setSelectedPostId(null);
       }
@@ -725,6 +369,21 @@ export function App() {
   useEffect(() => {
     if (!deferredPanelsReady || !analysis) return;
     let canceled = false;
+    void getLatestGeneration()
+      .then((latestGeneration) => {
+        if (!canceled && latestGeneration) setGeneration(latestGeneration);
+      })
+      .catch(() => {
+        // Keep whatever generation the dashboard bootstrap already provided.
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [analysis, deferredPanelsReady]);
+
+  useEffect(() => {
+    if (!deferredPanelsReady || !analysis) return;
+    let canceled = false;
     void Promise.allSettled([getLatestStrategyMemory(), getLatestTopicExploration()]).then(
       ([latestMemory, latestTopics]) => {
         if (canceled) return;
@@ -742,31 +401,9 @@ export function App() {
     };
   }, [analysis, deferredPanelsReady]);
 
-  async function handleImport(rawJson: string) {
-    setImportingSnapshot(true);
-    try {
-      await importSnapshot(JSON.parse(rawJson));
-      setAnalysis(null);
-      setFullAnalysis(null);
-      setAnalysisError(null);
-      setGeneration(null);
-      setGenerationError(null);
-      setMemoryProposal(null);
-      setMemoryError(null);
-      setTopicExploration(null);
-      setTopicError(null);
-      setCaptureError(null);
-      setSelectedPostId(null);
-      await refresh();
-    } finally {
-      setImportingSnapshot(false);
-    }
-  }
-
-  async function handleCapture() {
-    setCapturing(true);
-    setCaptureError(null);
-    setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
+  // Clear derived state only AFTER a new snapshot lands: a failed scan/import must never
+  // destroy the audit and drafts the user already has.
+  function clearDerivedState() {
     setAnalysis(null);
     setFullAnalysis(null);
     setAnalysisError(null);
@@ -777,59 +414,95 @@ export function App() {
     setTopicExploration(null);
     setTopicError(null);
     setSelectedPostId(null);
+  }
+
+  async function handleImport(rawJson: string) {
+    setImportingSnapshot(true);
+    try {
+      await importSnapshot(JSON.parse(rawJson));
+      clearDerivedState();
+      setCaptureError(null);
+      await refresh();
+    } finally {
+      setImportingSnapshot(false);
+    }
+  }
+
+  async function handleCapture(): Promise<boolean> {
+    setCapturing(true);
+    setCaptureError(null);
+    setCaptureStatus("Opening X in Chrome and reading visible posts. This should finish in under a minute.");
     try {
       const capturedSnapshot = await captureSnapshot();
+      clearDerivedState();
       setSnapshot(capturedSnapshot);
       setHistory((currentHistory) => [
         capturedSnapshot,
         ...currentHistory.filter((item) => item.profile.capturedAt !== capturedSnapshot.profile.capturedAt)
       ].slice(0, 6));
       setCaptureStatus(null);
+      return true;
     } catch (error) {
       setCaptureError(error instanceof Error ? error.message : "Capture failed");
+      return false;
     } finally {
       setCapturing(false);
     }
   }
 
-  async function handleAnalyze() {
+  async function handleAnalyze(options: { scroll?: boolean } = {}): Promise<boolean> {
     setAnalyzing(true);
     setAnalysisError(null);
-    setGeneration(null);
-    setGenerationError(null);
-    setMemoryProposal(null);
-    setMemoryError(null);
-    setTopicExploration(null);
-    setTopicError(null);
-    setSelectedPostId(null);
     try {
       const latestAnalysis = await analyzeLatestSnapshot();
+      setGeneration(null);
+      setGenerationError(null);
+      setMemoryProposal(null);
+      setMemoryError(null);
+      setTopicExploration(null);
+      setTopicError(null);
+      setSelectedPostId(null);
       setAnalysis(latestAnalysis);
       setFullAnalysis(latestAnalysis);
+      if (options.scroll ?? true) {
+        window.setTimeout(() => scrollToSection("coach-report-title", { expand: true }), 400);
+      }
+      return true;
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "Analysis failed");
+      return false;
     } finally {
       setAnalyzing(false);
     }
   }
 
-  async function handleGenerateToday() {
+  async function handleGenerateToday(): Promise<boolean> {
     setGenerating(true);
     setGenerationError(null);
     try {
       setGeneration(await generateTodaysIdeas());
+      window.setTimeout(() => scrollToSection("next-posts-title", { expand: true }), 400);
+      return true;
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : "Generation failed");
+      return false;
     } finally {
       setGenerating(false);
     }
   }
 
-  function handleReviewDraftQueue() {
-    const target = document.getElementById("next-posts-title") ?? document.querySelector(".next-posts");
-    if (target && "scrollIntoView" in target && typeof target.scrollIntoView === "function") {
-      target.scrollIntoView({ block: "center", behavior: "smooth" });
+  // One-button pipeline: run every remaining step in order, stopping at the first
+  // failure (the per-step recovery panel takes over from there).
+  async function handleRunFullAudit(options: { rescan?: boolean } = {}) {
+    if (!snapshot || options.rescan) {
+      if (!(await handleCapture())) return;
     }
+    if (!(await handleAnalyze({ scroll: false }))) return;
+    await handleGenerateToday();
+  }
+
+  function handleReviewDraftQueue() {
+    scrollToSection("next-posts-title", { expand: true });
   }
 
   async function handleRefreshMemory() {
@@ -881,253 +554,240 @@ export function App() {
     });
   }
 
-  const nextPostWorkspace = (
-    <NextPostQueue
+  const hero = (
+    <NextMoveHero
+      snapshot={snapshot}
+      metricSummary={metricSummary}
+      scorecard={creatorScorecard}
+      loading={loading}
+      capturing={capturing}
+      analyzing={analyzing}
+      generating={generating}
+      hasAnalysis={Boolean(analysis)}
       analysis={analysis}
-      capturedPosts={posts}
       generation={generation}
-      selectedPostBrief={selectedPostBrief}
+      error={loadError ?? captureError}
+      status={capturing ? captureStatus : null}
+      onAnalyze={() => void handleAnalyze()}
+      onCapture={() => void handleCapture()}
+      onGenerateToday={() => void handleGenerateToday()}
+      onOpenImport={() => setImportOpen(true)}
+      onRunFullAudit={() => void handleRunFullAudit()}
     />
   );
-  const coachReport = <CoachReport analysis={analysis} postCount={postCount} />;
-  const deferredCoachReport = <CoachReport analysis={analysis} postCount={postCount} deferred />;
-  const pairedPostWorkspace = (
-    <div className="dashboard-grid">
-      {nextPostWorkspace}
-      {coachReport}
-    </div>
-  );
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="Audit workflow">
-        <div className="brand-lockup">
-          <div className="brand-mark">
-            <FileText size={18} aria-hidden="true" />
-          </div>
-          <div>
-            <strong>Social Audit</strong>
-            <span>Casey / X</span>
-          </div>
-        </div>
-        <ol className="step-rail" aria-label="Audit sequence">
-          {auditSteps.map((item, index) => {
-            const stepState = getStepState(item.key, currentStep, generation);
-            return (
-              <li
-                aria-current={stepState === "current" ? "step" : undefined}
-                className="step-row"
-                data-state={stepState}
-                key={item.label}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-        <div className="privacy-note">
-          <LockKeyhole size={16} aria-hidden="true" />
-          <div>
-            <strong>Local run</strong>
-            <span>Public profile metrics. No scheduler.</span>
-          </div>
-        </div>
-      </aside>
+  const commandCenter =
+    phase === "drafted" ? (
+      <AuditCommandCenter
+        activeAction={activeAction}
+        analyzing={analyzing}
+        capturing={capturing}
+        coveragePercent={coveragePercent}
+        draftCount={generation?.posts.length ?? 0}
+        generating={generating}
+        isGenerated
+        isBusy={isDashboardActionBusy}
+        onAnalyze={() => void handleAnalyze()}
+        onCapture={() => void handleCapture()}
+        onGenerateToday={() => void handleGenerateToday()}
+        onOpenImport={() => setImportOpen(true)}
+        onReviewDraftQueue={handleReviewDraftQueue}
+        onRunFullAudit={() => void handleRunFullAudit({ rescan: true })}
+        opportunityBrief={opportunityBrief}
+        postCount={postCount}
+        scorecard={creatorScorecard}
+      />
+    ) : null;
 
-      <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Local creator intelligence</p>
-            <h1>Social Audit Studio</h1>
-            <p className="topbar-copy">
-              Decide the next X post from public signal: scan the account, read the pattern, draft the move, and copy it out.
-            </p>
-          </div>
-          <div className={activeAction ? "run-status is-running" : "run-status"} aria-live="polite">
-            <span className={activeAction ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
-            {activeAction ? `${activeAction.label} running` : snapshot ? `${postCount} ${postLabel} ready` : "No capture"}
-          </div>
-        </header>
+  const scannedPreview =
+    deferredPanelsReady && rankedPosts.length > 0 ? (
+      <Suspense fallback={null}>
+        <DeferredPostBreakdown rankedPosts={rankedPosts} analysis={null} preview />
+      </Suspense>
+    ) : null;
 
-        <AuditCommandCenter
-          activeAction={activeAction}
-          analyzing={analyzing}
-          capturing={capturing}
-          coveragePercent={coveragePercent}
-          draftCount={generation?.posts.length ?? 0}
-          generating={generating}
-          isGenerated={Boolean(generation)}
-          isBusy={isDashboardActionBusy}
-          onAnalyze={() => void handleAnalyze()}
-          onCapture={() => void handleCapture()}
-          onGenerateToday={() => void handleGenerateToday()}
-          onOpenImport={() => setImportOpen(true)}
-          onReviewDraftQueue={handleReviewDraftQueue}
-          opportunityBrief={opportunityBrief}
-          postCount={postCount}
-          scorecard={creatorScorecard}
-        />
-
-        {!generation && (
-          <CaptureBar
-            snapshot={snapshot}
-            metricSummary={metricSummary}
-            loading={loading}
-            capturing={capturing}
-            analyzing={analyzing}
-            generating={generating}
-            hasAnalysis={Boolean(analysis)}
-            analysis={analysis}
-            generation={generation}
-            error={loadError ?? captureError}
-            status={capturing ? captureStatus : null}
-            onAnalyze={() => void handleAnalyze()}
-            onCapture={() => void handleCapture()}
-            onGenerateToday={() => void handleGenerateToday()}
-            onOpenImport={() => setImportOpen(true)}
-          />
-        )}
-
-        {analysisError && <RecoveryNoticePanel kind="analysis" message={analysisError} />}
-        {generationError && <RecoveryNoticePanel kind="generation" message={generationError} />}
-        {memoryError && <RecoveryNoticePanel kind="memory" message={memoryError} />}
-        {topicError && <RecoveryNoticePanel kind="topic" message={topicError} />}
-
-        {generation ? (
-          <>
-            {nextPostWorkspace}
-            <OpportunityDesk brief={opportunityBrief} deferred />
-            {deferredCoachReport}
-          </>
-        ) : (
-          <>
-            <OpportunityDesk brief={opportunityBrief} />
-            {pairedPostWorkspace}
-          </>
-        )}
-
-        <details className="evidence-details-panel" aria-label="Evidence details" open={evidenceDetailsOpen}>
-          <summary>
-            <span>Evidence details</span>
-            <strong>
-              {metricHealth} · {coveragePercent}% coverage
-            </strong>
-            <small>{scanHistoryBrief.summary}</small>
-          </summary>
-          <div className="operations-grid" aria-label="Operational telemetry">
-            <ScanHistoryPanel history={history} />
-            <section className="panel signal-panel" aria-label="Public metric signal">
-              <p className="eyebrow">Evidence quality</p>
-              <h2>{metricHealth}</h2>
-              <div className="signal-meter" aria-hidden="true">
-                <span style={{ width: `${coveragePercent}%` }} />
-              </div>
-              <dl className="signal-list">
-                <div>
-                  <dt>Metric coverage</dt>
-                  <dd>
-                    {coveragePercent}% · {metricSummary.capturedFields}/{metricSummary.totalFields || 0}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Ranked sample</dt>
-                  <dd>
-                    {metricSummary.postsWithAnyMetrics}/{postCount}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Top public signal</dt>
-                  <dd>{topPost ? topPost.text.slice(0, 42) : "Awaiting scan"}</dd>
-                </div>
-              </dl>
-            </section>
-            <ActionProgressPanel actions={actionProgressItems} />
-          </div>
-        </details>
-
-        {deferredPanelsReady && (
+  const auditedInsightGrid =
+    analysis && deferredPanelsReady ? (
+      <>
+        <div className="dashboard-grid audited-insight-grid">
           <Suspense fallback={null}>
-            <details
-              className="strategy-engine-section"
-              aria-label="Advanced strategy tools"
-              open={strategyEngineDetailsOpen}
-            >
-              <summary className="strategy-engine-summary">
-                <span>
-                  <span className="eyebrow">Advanced loop</span>
-                  <strong>Strategy engine</strong>
-                  <small>Optional hypotheses, memory, and topic tools. Open when you need deeper strategy work.</small>
-                </span>
-                <strong>{strategyEngineStatus}</strong>
-              </summary>
-
-              <div className="strategy-engine-body">
-                <div className="strategy-engine-tabs" role="tablist" aria-label="Strategy engine views">
-                  {strategyEngineViews.map((view) => {
-                    const selected = strategyEngineView === view.key;
-                    return (
-                      <button
-                        aria-controls={`strategy-engine-panel-${view.key}`}
-                        aria-selected={selected}
-                        className="strategy-engine-tab"
-                        id={`strategy-engine-tab-${view.key}`}
-                        key={view.key}
-                        onClick={() => handleStrategyEngineTabChange(view.key)}
-                        role="tab"
-                        type="button"
-                      >
-                        <span>{view.label}</span>
-                        <small>{view.detail}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  aria-labelledby={`strategy-engine-tab-${strategyEngineView}`}
-                  className="strategy-engine-panel-slot"
-                  id={`strategy-engine-panel-${strategyEngineView}`}
-                  role="tabpanel"
-                >
-                  {strategyEngineView === "experiments" && (
-                    <DeferredExperimentLedgerPanel analysis={analysis} memory={strategyMemory} scanHistory={scanHistoryBrief} />
-                  )}
-                  {strategyEngineView === "memory" && (
-                    <DeferredStrategyMemoryPanel
-                      analysis={analysis}
-                      memory={strategyMemory}
-                      proposal={memoryProposal}
-                      updating={updatingMemory}
-                      applying={applyingMemory}
-                      onRefresh={() => void handleRefreshMemory()}
-                      onApply={(proposalId) => void handleApplyMemory(proposalId)}
-                    />
-                  )}
-                  {strategyEngineView === "topics" && (
-                    <DeferredTopicExplorer
-                      analysis={analysis}
-                      exploration={topicExploration}
-                      exploring={exploringTopics}
-                      onExplore={() => void handleExploreTopics()}
-                    />
-                  )}
-                </div>
-              </div>
-            </details>
-
             <DeferredPostBreakdown
               rankedPosts={rankedPosts}
               analysis={fullAnalysis}
-              deferred={Boolean(generation)}
               selectedPostId={selectedPostId}
               onSelectPost={setSelectedPostId}
             />
           </Suspense>
+          <PreDraftBrief analysis={analysis} />
+        </div>
+        {selectedPostBrief && (
+          <NextPostQueue
+            analysis={analysis}
+            capturedPosts={posts}
+            generation={null}
+            selectedPostBrief={selectedPostBrief}
+          />
         )}
+      </>
+    ) : null;
+
+  const strategyEngineSection = deferredPanelsReady ? (
+    <details className="strategy-engine-section" aria-label="Advanced tools" open={strategyEngineDetailsOpen}>
+      <summary className="strategy-engine-summary">
+        <span>
+          <span className="eyebrow">Advanced</span>
+          <strong>Strategy tools</strong>
+          <small>Test ideas, save memory, and explore related topics when you're ready.</small>
+        </span>
+        <strong>{strategyEngineStatus}</strong>
+      </summary>
+
+      <div className="strategy-engine-body">
+        <CreativeDirectionCard
+          directions={directions}
+          onAdd={async (text) => {
+            setDirections(await saveCreativeDirection(text));
+          }}
+          onDelete={async (id) => {
+            setDirections(await deleteCreativeDirection(id));
+          }}
+        />
+        <div className="strategy-engine-tabs" role="group" aria-label="Strategy engine views">
+          {strategyEngineViews.map((view) => {
+            const selected = strategyEngineView === view.key;
+            return (
+              <button
+                aria-controls={`strategy-engine-panel-${view.key}`}
+                aria-pressed={selected}
+                className="strategy-engine-tab"
+                id={`strategy-engine-tab-${view.key}`}
+                key={view.key}
+                onClick={() => handleStrategyEngineTabChange(view.key)}
+                type="button"
+              >
+                <span>{view.label}</span>
+                <small>{view.detail}</small>
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          aria-labelledby={`strategy-engine-tab-${strategyEngineView}`}
+          className="strategy-engine-panel-slot"
+          id={`strategy-engine-panel-${strategyEngineView}`}
+        >
+          {strategyEngineView === "experiments" && (
+            <DeferredExperimentLedgerPanel analysis={analysis} memory={strategyMemory} scanHistory={scanHistoryBrief} />
+          )}
+          {strategyEngineView === "memory" && (
+            <DeferredStrategyMemoryPanel
+              analysis={analysis}
+              memory={strategyMemory}
+              proposal={memoryProposal}
+              updating={updatingMemory}
+              applying={applyingMemory}
+              onRefresh={() => void handleRefreshMemory()}
+              onApply={(proposalId) => void handleApplyMemory(proposalId)}
+            />
+          )}
+          {strategyEngineView === "voice" && (
+            <DeferredVoiceProfilePanel hasSnapshot={Boolean(snapshot)} />
+          )}
+          {strategyEngineView === "topics" && (
+            <DeferredTopicExplorer
+              analysis={analysis}
+              exploration={topicExploration}
+              exploring={exploringTopics}
+              onExplore={() => void handleExploreTopics()}
+            />
+          )}
+        </div>
+      </div>
+    </details>
+  ) : null;
+
+  const postBreakdownDeferred =
+    deferredPanelsReady && phase === "drafted" ? (
+      <DeferredPostBreakdown
+        rankedPosts={rankedPosts}
+        analysis={fullAnalysis}
+        deferred
+        selectedPostId={selectedPostId}
+        onSelectPost={setSelectedPostId}
+      />
+    ) : null;
+
+  return (
+    <div className="app-shell">
+      <WorkspaceSidebar
+        currentStep={currentStep}
+        generation={generation}
+        dockSheetOpen={dockSheetOpen}
+        onToggleDockSheet={() => setDockSheetOpen((open) => !open)}
+      />
+
+      <main className="workspace" data-phase={phase}>
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Casey on X</p>
+            <h1>
+              Social Audit <span className="title-accent">Studio</span>
+            </h1>
+            <p className="topbar-copy">Scan your posts, read the pattern, write the next one.</p>
+          </div>
+          <div className={activeAction ? "run-status is-running" : "run-status"} aria-live="polite">
+            <span className={activeAction ? "status-dot is-loading" : snapshot ? "status-dot" : "status-dot is-empty"} />
+            {activeAction ? `${activeAction.label}…` : snapshot ? `${postCount} ${postLabel} loaded` : "No posts yet"}
+          </div>
+        </header>
+
+        <PhaseLayout
+          phase={phase}
+          hero={hero}
+          commandCenter={commandCenter}
+          auditBanner={analysis ? <AuditCompleteBanner analysis={analysis} scorecard={creatorScorecard} /> : null}
+          scoreStrip={analysis ? <ScoreStrip scorecard={creatorScorecard} /> : null}
+          scannedPreview={scannedPreview}
+          auditedCoach={analysis ? <CoachReport analysis={analysis} postCount={postCount} /> : null}
+          auditedInsightGrid={auditedInsightGrid}
+          draftedWorkspace={
+            <NextPostQueue
+              analysis={analysis}
+              capturedPosts={posts}
+              generation={generation}
+              selectedPostBrief={selectedPostBrief}
+            />
+          }
+          referenceShelf={
+            <ReferenceShelf
+              phase={phase}
+              postCount={postCount}
+              topPostText={topPost ? topPost.text : null}
+              metricHealth={metricHealth}
+              coveragePercent={coveragePercent}
+              metricSummary={metricSummary}
+              scanHistoryBrief={scanHistoryBrief}
+              history={history}
+              opportunityBrief={opportunityBrief}
+              evidenceDetailsOpen={evidenceDetailsOpen}
+              deferredCoachReport={
+                analysis ? <CoachReport analysis={analysis} postCount={postCount} deferred /> : null
+              }
+              strategyEngineSection={strategyEngineSection}
+              postBreakdownPanel={postBreakdownDeferred}
+              actionProgressItems={actionProgressItems}
+            />
+          }
+          recoveryNotices={
+            <>
+              {analysisError && <RecoveryNoticePanel kind="analysis" message={analysisError} />}
+              {generationError && <RecoveryNoticePanel kind="generation" message={generationError} />}
+              {memoryError && <RecoveryNoticePanel kind="memory" message={memoryError} />}
+              {topicError && <RecoveryNoticePanel kind="topic" message={topicError} />}
+            </>
+          }
+        />
       </main>
 
       {importOpen && (

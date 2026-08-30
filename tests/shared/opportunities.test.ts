@@ -122,7 +122,7 @@ describe("opportunity brief", () => {
 
     expect(brief.command.action).toBe("audit");
     expect(brief.command.detail).toContain("2 captured posts");
-    expect(brief.priorityCards.find((card) => card.kind === "repeat")?.title).toBe("Repeat the public winner");
+    expect(brief.priorityCards.find((card) => card.kind === "repeat")?.title).toBe("Repeat the winning mechanism");
   });
 
   it("surfaces repeat and repair opportunities once analysis exists", () => {
@@ -187,7 +187,7 @@ describe("opportunity brief", () => {
     });
 
     expect(formatOpportunityBriefForClipboard(brief)).toContain("Next command: Generate the next draft set");
-    expect(formatOpportunityBriefForClipboard(brief)).toContain("Repeat the public winner");
+    expect(formatOpportunityBriefForClipboard(brief)).toContain("Repeat the winning mechanism");
     expect(formatOpportunityBriefForClipboard(brief)).toContain("Rewrite the buried useful post");
   });
 });

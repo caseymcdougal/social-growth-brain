@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runLlmJob } from "../ai/llm-job";
 import type { AnalysisOutput } from "../../shared/analysis-schema";
 import {
   strategyMemoryProposalOutputSchema,
@@ -131,9 +131,14 @@ function writeJobFiles(jobDir: string, input: unknown, promptLines: string[], sc
   return { inputPath, promptPath, schemaPath, outputPath };
 }
 
+function directionLines(direction?: string | null): string[] {
+  const trimmed = typeof direction === "string" ? direction.trim() : "";
+  return trimmed ? [`Casey's current creative direction (follow it): ${trimmed}`] : [];
+}
+
 export function writeStrategyMemoryJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown }
+  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown; direction?: string | null }
 ) {
   return writeJobFiles(
     jobDir,
@@ -144,6 +149,7 @@ export function writeStrategyMemoryJobFiles(
       "Do not silently mutate memory. Return a proposed full memory and a concise list of evidence-backed updates.",
       "Preserve useful existing memory when it remains supported by the latest evidence.",
       "Prefer specific lanes, voice rules, audience assumptions, and experiments over generic creator advice.",
+      ...directionLines(input.direction),
       "Return JSON only. Do not include markdown."
     ],
     strategyMemoryProposalJsonSchema
@@ -152,7 +158,7 @@ export function writeStrategyMemoryJobFiles(
 
 export function writeTopicExplorerJobFiles(
   jobDir: string,
-  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown }
+  input: { snapshot: unknown; analysis: unknown; currentMemory: unknown; direction?: string | null }
 ) {
   return writeJobFiles(
     jobDir,
@@ -164,36 +170,11 @@ export function writeTopicExplorerJobFiles(
       "Explain why each topic is near Casey's lane and cite evidence from the audit, memory, or recent posts.",
       "Make every topic actionable with hooks and one copy-ready X draft.",
       "do not drift into generic AI news, vague productivity advice, or broad motivational content.",
+      ...directionLines(input.direction),
       "Return JSON only. Do not include markdown."
     ],
     topicExplorationJsonSchema
   );
-}
-
-async function runCodexJob(files: { promptPath: string; schemaPath: string; outputPath: string }, jobDir: string) {
-  const args = buildCodexStrategyArgs({ jobDir, schemaPath: files.schemaPath, outputPath: files.outputPath });
-  const prompt = readFileSync(files.promptPath, "utf8");
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("codex", args, {
-      env: process.env,
-      stdio: ["pipe", "ignore", "pipe"]
-    });
-    let stderr = "";
-
-    child.stderr.on("data", (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      reject(new Error(`codex exec failed with code ${code}: ${stderr.slice(0, 1000)}`));
-    });
-    child.stdin.end(prompt);
-  });
 }
 
 export class CodexStrategyIntelligenceRunner implements StrategyIntelligenceRunner {
@@ -201,29 +182,31 @@ export class CodexStrategyIntelligenceRunner implements StrategyIntelligenceRunn
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<StrategyMemoryProposalOutput> {
     const files = writeStrategyMemoryJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      currentMemory: input.currentMemory
+      currentMemory: input.currentMemory,
+      direction: input.direction ?? null
     });
-    await runCodexJob(files, input.jobDir);
-    return strategyMemoryProposalOutputSchema.parse(JSON.parse(readFileSync(files.outputPath, "utf8")));
+    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => strategyMemoryProposalOutputSchema.parse(raw));
   }
 
   async exploreTopics(input: {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<TopicExplorationOutput> {
     const files = writeTopicExplorerJobFiles(input.jobDir, {
       snapshot: input.snapshot,
       analysis: input.analysis,
-      currentMemory: input.currentMemory
+      currentMemory: input.currentMemory,
+      direction: input.direction ?? null
     });
-    await runCodexJob(files, input.jobDir);
-    return topicExplorationOutputSchema.parse(JSON.parse(readFileSync(files.outputPath, "utf8")));
+    return runLlmJob({ jobDir: input.jobDir, ...files }, (raw) => topicExplorationOutputSchema.parse(raw));
   }
 }

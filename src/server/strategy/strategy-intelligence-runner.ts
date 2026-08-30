@@ -11,6 +11,7 @@ export interface StrategyIntelligenceRunner {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<StrategyMemoryProposalOutput>;
 
@@ -18,6 +19,7 @@ export interface StrategyIntelligenceRunner {
     snapshot: CapturedAccountSnapshot;
     analysis: AnalysisOutput;
     currentMemory: StrategyMemory | null;
+    direction?: string | null;
     jobDir: string;
   }): Promise<TopicExplorationOutput>;
 }

@@ -15,7 +15,7 @@ function extractionScript(handle: string) {
   const safeHandleJson = JSON.stringify(safeHandle);
 
   return `
-new_tab(${JSON.stringify(profileUrl)})
+_tab = new_tab(${JSON.stringify(profileUrl)})
 wait_for_element("main", timeout=10.0, visible=True)
 wait(2.0)
 for _ in range(14):
@@ -135,6 +135,10 @@ data = js(r"""
 """)
 import json
 print(json.dumps(data))
+try:
+  close_tab(_tab)
+except Exception:
+  pass
 `;
 }
 

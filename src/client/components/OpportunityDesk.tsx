@@ -46,17 +46,17 @@ export function OpportunityDesk({ brief, deferred = false }: { brief: Opportunit
     <>
       <div className="opportunity-command">
         <div>
-          <p className="eyebrow">Decision support</p>
-          <h2 id="priority-signals-title">Priority signals</h2>
-          <p>Use these cards to see what to repeat, what to repair, and how much to trust the current read.</p>
+          <p className="eyebrow">What to do next</p>
+          <h2 id="priority-signals-title">Your next moves</h2>
+          <p>What to repeat, what to fix, and how much to trust this read.</p>
         </div>
         <button className="copy-button opportunity-copy" type="button" onClick={() => void copyBrief()}>
           {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-          {copied ? "Copied brief" : copyFailed ? "Copy unavailable" : "Copy priority brief"}
+          {copied ? "Copied brief" : copyFailed ? "Copy unavailable" : "Copy next moves"}
         </button>
       </div>
 
-      <div className="opportunity-grid" aria-label="Priority signals">
+      <div className="opportunity-grid" aria-label="Your next moves">
         {brief.priorityCards.map((card) => (
           <OpportunityCardView card={card} key={`${card.kind}-${card.postId ?? card.title}`} />
         ))}
@@ -66,11 +66,11 @@ export function OpportunityDesk({ brief, deferred = false }: { brief: Opportunit
 
   if (deferred) {
     return (
-      <details className="panel opportunity-desk opportunity-disclosure" aria-label="Decision support">
+      <details className="panel disclosure disclosure-panel opportunity-desk opportunity-disclosure" aria-label="What to do next">
         <summary>
-          <span>Decision support</span>
-          <strong>{brief.priorityCards.length} priority signals</strong>
-          <small>Open for repeat, repair, and evidence confidence after you review the draft.</small>
+          <span>Next moves</span>
+          <strong>{brief.priorityCards.length} {brief.priorityCards.length === 1 ? "move" : "moves"}</strong>
+          <small>What to repeat, what to fix, and how much to trust this read.</small>
         </summary>
         {priorityContent}
       </details>

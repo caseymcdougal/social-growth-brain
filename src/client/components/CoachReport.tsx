@@ -1,3 +1,4 @@
+import { Lightbulb } from "lucide-react";
 import type { AnalysisSummary } from "../../shared/analysis-schema";
 
 export function CoachReport({
@@ -14,30 +15,32 @@ export function CoachReport({
       <section className="panel coach-report" aria-labelledby="coach-report-title">
         <div className="section-head">
           <div>
-            <p className="eyebrow">Coach read</p>
-            <h2 id="coach-report-title">Awaiting strategy audit</h2>
+            <p className="eyebrow">Your coach</p>
+            <h2 id="coach-report-title">Run an audit to get your coach</h2>
           </div>
-          <span className="status-chip">{postCount ? "Ready" : "No scan"}</span>
+          <span className="status-chip">{postCount ? "Ready" : "No posts yet"}</span>
         </div>
         <div className="report-stack">
           <article>
-            <span>Rank</span>
-            <p>Sort the public posts by visible signal.</p>
+            <span>Find what worked</span>
+            <p>See which of your posts resonated most.</p>
           </article>
           <article>
-            <span>Diagnose</span>
-            <p>Explain the hook, clarity, and audience fit.</p>
+            <span>Understand why</span>
+            <p>Learn the pattern behind your best posts.</p>
           </article>
           <article>
-            <span>Write</span>
-            <p>Draft the next move from the read.</p>
+            <span>Write your next post</span>
+            <p>Draft something that fits the pattern.</p>
           </article>
         </div>
       </section>
     );
   }
 
-  const winningPattern = analysis.top_patterns[0] ?? analysis.what_is_working[0] ?? "Repeat the clearest specific take.";
+  // Read the literally-named "what's working" field first so a failure statement that leaks into
+  // top_patterns can never surface as a win. top_patterns is only a fallback.
+  const winningPattern = analysis.what_is_working[0] ?? analysis.top_patterns[0] ?? "Repeat the clearest specific take.";
   const mainRisk = analysis.what_is_holding_back[0] ?? "Avoid abstract claims that hide the reader benefit.";
   const contentLane = analysis.recommended_content_pillars[0] ?? "Use the strongest current lane for the next post.";
   const detailCount =
@@ -46,84 +49,116 @@ export function CoachReport({
     analysis.what_is_holding_back.length +
     analysis.recommended_content_pillars.length;
 
+  const lesson = winningPattern
+    ? {
+        title: winningPattern,
+        why: "Repeat it in your next post before you experiment with anything new."
+      }
+    : mainRisk
+      ? {
+          title: mainRisk,
+          why: "This is the biggest thing holding you back. Fixing it first is your quickest win."
+        }
+      : {
+          title: "Post consistently and watch what gets replies",
+          why: "You need enough posts before patterns show up. Aim for one a day this week, then come back and audit."
+        };
+
+  const coachDetailsBody = (
+    <div className="coach-details-body">
+      <p className="executive-summary">{analysis.executive_summary}</p>
+      <div className="pattern-strip">
+        {analysis.top_patterns.map((pattern) => (
+          <span key={pattern}>{pattern}</span>
+        ))}
+      </div>
+      <div className="coach-columns">
+        <div>
+          <h3>What's working</h3>
+          <ul>
+            {analysis.what_is_working.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3>What's holding you back</h3>
+          <ul>
+            {analysis.what_is_holding_back.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="pillar-row">
+        {analysis.recommended_content_pillars.map((pillar) => (
+          <span key={pillar}>{pillar}</span>
+        ))}
+      </div>
+    </div>
+  );
+
   const strategyBrief = (
     <>
       <div className="section-head">
         <div>
-          <p className="eyebrow">Coach read</p>
-          <h2 id="coach-report-title">Strategy brief</h2>
+          <p className="eyebrow">Your coach</p>
+          <h2 id="coach-report-title">Your strategy</h2>
         </div>
         <span className="status-chip">Latest audit</span>
       </div>
+
+      <article className="coach-lesson" aria-label="This week's lesson">
+        <div className="coach-lesson-head">
+          <Lightbulb size={14} aria-hidden="true" />
+          <span>This week's lesson</span>
+        </div>
+        <p className="coach-lesson-title">{lesson.title}</p>
+        <p className="coach-lesson-why">{lesson.why}</p>
+      </article>
+
       <p className="positioning-read">{analysis.account_positioning_read}</p>
 
-      <div className="coach-brief-grid" aria-label="Strategy brief highlights">
+      <div className="coach-brief-grid" aria-label="Strategy highlights">
         <article>
-          <span>Winning pattern</span>
+          <span>What's working</span>
           <strong>{winningPattern}</strong>
-          <p>Repeat this signal before changing the whole content lane.</p>
+          <p>Your fastest growth is repeating this, not trying something brand new.</p>
         </article>
         <article data-kind="risk">
-          <span>Main risk</span>
+          <span>What to fix</span>
           <strong>{mainRisk}</strong>
-          <p>Fix this before drafting so the next post has a sharper reader stake.</p>
+          <p>The thing most likely to hold back your next post. Fix it first.</p>
         </article>
         <article>
-          <span>Content lane</span>
+          <span>Your content lane</span>
           <strong>{contentLane}</strong>
-          <p>Use this as the default lane for the next draft set.</p>
+          <p>Stay here for a few posts so your audience knows what to expect from you.</p>
         </article>
       </div>
 
-      <details className="coach-details" aria-label="Full coach read">
-        <summary>
-          <span>Full coach read</span>
-          <strong>{detailCount} audit notes</strong>
-          <small>Open for the full summary, all patterns, constraints, and content pillars.</small>
-        </summary>
-
-        <div className="coach-details-body">
-          <p className="executive-summary">{analysis.executive_summary}</p>
-          <div className="pattern-strip">
-            {analysis.top_patterns.map((pattern) => (
-              <span key={pattern}>{pattern}</span>
-            ))}
-          </div>
-          <div className="coach-columns">
-            <div>
-              <h3>Working</h3>
-              <ul>
-                {analysis.what_is_working.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Holding Back</h3>
-              <ul>
-                {analysis.what_is_holding_back.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="pillar-row">
-            {analysis.recommended_content_pillars.map((pillar) => (
-              <span key={pillar}>{pillar}</span>
-            ))}
-          </div>
-        </div>
-      </details>
+      {deferred ? (
+        coachDetailsBody
+      ) : (
+        <details className="disclosure coach-details" aria-label="Full coach read">
+          <summary>
+            <span>See the full breakdown</span>
+            <strong>{detailCount} notes</strong>
+            <small>Open for the full summary, every pattern, and content ideas.</small>
+          </summary>
+          {coachDetailsBody}
+        </details>
+      )}
     </>
   );
 
   if (deferred) {
     return (
-      <details className="panel coach-report coach-context-disclosure" aria-label="Strategy context">
+      <details className="panel disclosure disclosure-panel coach-report coach-context-disclosure" aria-label="Why these suggestions">
         <summary>
-          <span>Strategy context</span>
-          <strong>Latest audit read</strong>
-          <small>Open for winning pattern, main risk, content lane, and the full coach read.</small>
+          <span>Why these suggestions</span>
+          <strong>Latest audit</strong>
+          <small>Open for the lesson, what's working, what to fix, and your content lane.</small>
         </summary>
         <div className="coach-context-body">{strategyBrief}</div>
       </details>

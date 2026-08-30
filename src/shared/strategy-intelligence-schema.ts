@@ -6,7 +6,7 @@ export const strategyExperimentSchema = z.object({
   hypothesis: requiredText,
   status: z.enum(["active", "watching", "retired"]),
   evidence: requiredText
-});
+}).strict();
 
 export const strategyMemorySchema = z.object({
   positioning: requiredText,
@@ -16,7 +16,7 @@ export const strategyMemorySchema = z.object({
   voice_rules: z.array(requiredText).min(1),
   proof_points: z.array(requiredText).min(1),
   active_experiments: z.array(strategyExperimentSchema).min(1)
-});
+}).strict();
 
 export const memoryUpdateSchema = z.object({
   area: requiredText,
