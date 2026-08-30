@@ -11,7 +11,7 @@
     "preview:web": "vite preview --port 5175",
     "local:open": "./scripts/open-dashboard.command",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "brain:db:up": "docker compose up -d brain-postgres",

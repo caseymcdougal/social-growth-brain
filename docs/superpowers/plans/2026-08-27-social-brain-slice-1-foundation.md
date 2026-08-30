@@ -2141,7 +2141,7 @@ git commit -m "feat(brain): package portable agent skill"
 - Create: `docs/social-brain/slice-1-runbook.md`
 - Create: `docs/superpowers/verification/2026-08-27-social-brain-slice-1.md`
 
-- [ ] **Step 1: Write the operator runbook**
+- [x] **Step 1: Write the operator runbook**
 
 Create `docs/social-brain/slice-1-runbook.md` with these exact sections:
 
@@ -2153,7 +2153,7 @@ Create `docs/social-brain/slice-1-runbook.md` with these exact sections:
 
 Include command blocks using only the scripts defined in Task 1. Do not include real credentials or suggest switching to production mode.
 
-- [ ] **Step 2: Run the complete test and exit sequence**
+- [x] **Step 2: Run the complete test and exit sequence**
 
 ```bash
 npm run brain:db:up
@@ -2168,7 +2168,7 @@ npm run brain:verify:slice1
 
 Expected: every command exits `0`. The last command reports five read-only tools, Opportunity revision `1`, three complete evidence records, synthetic mode, and no allowed live capability.
 
-- [ ] **Step 3: Verify append-only enforcement manually**
+- [x] **Step 3: Verify append-only enforcement manually**
 
 Run the focused integration test again after the full suite:
 
@@ -2178,7 +2178,7 @@ npm run test:brain:integration -- tests/brain/integration/postgres-event-store.t
 
 Expected: PASS, including direct mutation rejection and stale-revision protection.
 
-- [ ] **Step 4: Record exit evidence only after every command passes**
+- [x] **Step 4: Record exit evidence only after every command passes**
 
 Create `docs/superpowers/verification/2026-08-27-social-brain-slice-1.md` with this final content:
 
@@ -2214,7 +2214,7 @@ Result: Passed
 
 If any command fails, do not create a `Result: Passed` document. Fix the failure, rerun the entire sequence, then record evidence.
 
-- [ ] **Step 5: Confirm user-owned working-tree changes were not staged**
+- [x] **Step 5: Confirm user-owned working-tree changes were not staged**
 
 Run:
 
@@ -2225,7 +2225,7 @@ git diff -- scripts/open-dashboard.command src/server/index.ts vite.config.ts
 
 Expected: the pre-existing user changes and screenshots remain unstaged and unchanged by Social Brain commits.
 
-- [ ] **Step 6: Commit the runbook and verified exit evidence**
+- [x] **Step 6: Commit the runbook and verified exit evidence**
 
 ```bash
 git add docs/social-brain/slice-1-runbook.md docs/superpowers/verification/2026-08-27-social-brain-slice-1.md
