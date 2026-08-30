@@ -10,7 +10,7 @@ export const voiceProfileSchema = z.object({
   hook_moves: z.array(requiredText).min(1),
   banned_moves: z.array(requiredText).min(1),
   style_excerpts: z.array(requiredText).min(1).max(3)
-});
+}).strict();
 
 export type VoiceProfile = z.infer<typeof voiceProfileSchema>;
 

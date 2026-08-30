@@ -40,7 +40,7 @@
 - Modify: `.env.example`
 - Create: `compose.yaml`
 
-- [ ] **Step 1: Install the production PostgreSQL driver and its TypeScript declarations**
+- [x] **Step 1: Install the production PostgreSQL driver and its TypeScript declarations**
 
 Run:
 
@@ -51,7 +51,7 @@ npm install --save-dev @types/pg
 
 Expected: `pg` is under `dependencies`, `@types/pg` is under `devDependencies`, and the lockfile changes without upgrading unrelated packages.
 
-- [ ] **Step 2: Add only Slice 1 scripts**
+- [x] **Step 2: Add only Slice 1 scripts**
 
 Add these keys to `package.json` under `scripts`, preserving every existing script:
 
@@ -69,7 +69,7 @@ Add these keys to `package.json` under `scripts`, preserving every existing scri
 }
 ```
 
-- [ ] **Step 3: Define a local PostgreSQL 18 service**
+- [x] **Step 3: Define a local PostgreSQL 18 service**
 
 Create `compose.yaml`:
 
@@ -97,7 +97,7 @@ volumes:
 
 PostgreSQL 18 is the current stable major version as of this plan. Keep the major tag rather than a floating `latest` tag.
 
-- [ ] **Step 4: Document fail-closed environment variables**
+- [x] **Step 4: Document fail-closed environment variables**
 
 Append to `.env.example`:
 
@@ -114,7 +114,7 @@ SOCIAL_BRAIN_DAILY_SPEND_LIMIT_USD=
 SOCIAL_BRAIN_MONTHLY_SPEND_LIMIT_USD=
 ```
 
-- [ ] **Step 5: Validate the infrastructure definition**
+- [x] **Step 5: Validate the infrastructure definition**
 
 Run:
 
@@ -125,7 +125,7 @@ npm run lint
 
 Expected: both commands exit `0`.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 git add package.json package-lock.json .env.example compose.yaml
@@ -143,7 +143,7 @@ git commit -m "build: add social brain postgres runtime"
 - Create: `src/brain/domain/index.ts`
 - Create: `tests/brain/domain/contracts.test.ts`
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 Create `tests/brain/domain/contracts.test.ts` with valid builders and these assertions:
 
@@ -262,7 +262,7 @@ Expected: FAIL because the domain modules do not exist.
 
 The contract suite must also parse valid `SignalEvidence`, `DraftVariant`, `DecisionEvent`, `OutcomeSnapshot`, and `ComplianceCheck` records. Add negative regressions that reject empty signal evidence features, inconsistent draft action/target pairs, decision payload or nested actor raw text and unknown keys, type/payload mismatches, approval expiry at or before the event timestamp, pre-publication or forged-age outcome snapshots, invalid compliance disposition/schedules, and archive count mismatches.
 
-- [ ] **Step 2: Implement common identifiers and enums**
+- [x] **Step 2: Implement common identifiers and enums**
 
 Create `src/brain/domain/common.ts`:
 
@@ -296,7 +296,7 @@ export type ActionType = z.infer<typeof actionTypeSchema>;
 export type OpportunityStatus = z.infer<typeof opportunityStatusSchema>;
 ```
 
-- [ ] **Step 3: Implement the Opportunity revision schema**
+- [x] **Step 3: Implement the Opportunity revision schema**
 
 Create `src/brain/domain/opportunity.ts`:
 
@@ -378,7 +378,7 @@ export type OpportunityForecast = z.infer<typeof opportunityForecastSchema>;
 export type Opportunity = z.infer<typeof opportunitySchema>;
 ```
 
-- [ ] **Step 4: Implement immutable evidence, draft, decision, outcome, and compliance schemas**
+- [x] **Step 4: Implement immutable evidence, draft, decision, outcome, and compliance schemas**
 
 Create `src/brain/domain/records.ts` with these exported schemas and inferred types:
 
@@ -544,7 +544,7 @@ export type OutcomeSnapshot = z.infer<typeof outcomeSnapshotSchema>;
 export type ComplianceCheck = z.infer<typeof complianceCheckSchema>;
 ```
 
-- [ ] **Step 5: Implement the Casey-owned archive schema**
+- [x] **Step 5: Implement the Casey-owned archive schema**
 
 Create `src/brain/domain/creator-archive.ts`. Reuse `voiceProfileSchema` and `strategyMemorySchema`; do not duplicate them.
 
@@ -613,7 +613,7 @@ export const creatorArchiveSchema = z.object({
 export type CreatorArchive = z.infer<typeof creatorArchiveSchema>;
 ```
 
-- [ ] **Step 6: Export the public domain API and rerun tests**
+- [x] **Step 6: Export the public domain API and rerun tests**
 
 Create `src/brain/domain/index.ts`:
 
@@ -633,7 +633,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add src/brain/domain tests/brain/domain
@@ -654,7 +654,7 @@ git commit -m "feat(brain): define versioned domain contracts"
 - Create: `tests/brain/integration/postgres-test-harness.ts`
 - Create: `tests/brain/integration/postgres-event-store.test.ts`
 
-- [ ] **Step 1: Write the failing PostgreSQL contract test**
+- [x] **Step 1: Write the failing PostgreSQL contract test**
 
 In `tests/brain/integration/postgres-test-harness.ts`, use this exact test-only guard before any cleanup:
 
@@ -719,7 +719,7 @@ npm run test:brain:integration -- tests/brain/integration/postgres-event-store.t
 
 Expected: FAIL because storage modules and tables do not exist.
 
-- [ ] **Step 2: Define the storage interface around domain records**
+- [x] **Step 2: Define the storage interface around domain records**
 
 Create `src/brain/storage/event-store.ts`:
 
@@ -762,7 +762,7 @@ export interface BrainEventStore {
 }
 ```
 
-- [ ] **Step 3: Add pool construction with one bounded pool per process**
+- [x] **Step 3: Add pool construction with one bounded pool per process**
 
 Create `src/brain/storage/postgres.ts`:
 
@@ -776,7 +776,7 @@ export function createPostgresPool(databaseUrl: string): PoolType {
 }
 ```
 
-- [ ] **Step 4: Create the first migration**
+- [x] **Step 4: Create the first migration**
 
 Create `src/brain/storage/migrations/0001_brain_foundation.sql`. Use `JSONB` payloads as the versioned contract source of truth and typed columns only for identity, ordering, constraints, and indexes.
 
@@ -890,7 +890,7 @@ END;
 $$;
 ```
 
-- [ ] **Step 5: Implement ordered, advisory-locked migrations**
+- [x] **Step 5: Implement ordered, advisory-locked migrations**
 
 Create `src/brain/storage/migrations.ts` with a fixed migration manifest, `brain_schema_migrations`, and a transaction-scoped advisory lock:
 
@@ -937,7 +937,7 @@ export async function runMigrations(pool: Pool): Promise<void> {
 }
 ```
 
-- [ ] **Step 6: Implement the PostgreSQL adapter**
+- [x] **Step 6: Implement the PostgreSQL adapter**
 
 Create `src/brain/storage/postgres-event-store.ts` as `PostgresBrainEventStore implements BrainEventStore`.
 
@@ -1010,7 +1010,7 @@ Implement the remaining methods with these exact query rules:
 | `getLatestCreatorArchive` | current creator only | `imported_at DESC, id DESC LIMIT 1` | `creatorArchiveSchema` |
 | `healthCheck` | `SELECT 1` | single row | none |
 
-- [ ] **Step 7: Run the storage and type tests**
+- [x] **Step 7: Run the storage and type tests**
 
 ```bash
 npm run test:brain:integration -- tests/brain/integration/postgres-event-store.test.ts
@@ -1019,7 +1019,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 3**
+- [x] **Step 8: Commit Task 3**
 
 ```bash
 git add src/brain/storage tests/brain/integration/postgres-test-harness.ts tests/brain/integration/postgres-event-store.test.ts
@@ -1037,7 +1037,7 @@ git commit -m "feat(brain): add immutable postgres event store"
 - Create: `tests/brain/policy/policy-gate.test.ts`
 - Modify: `docs/superpowers/plans/2026-08-27-social-brain-slice-1-foundation.md`
 
-- [ ] **Step 1: Write failing runtime configuration tests**
+- [x] **Step 1: Write failing runtime configuration tests**
 
 Create `tests/brain/config/runtime-config.test.ts` and assert:
 
@@ -1084,7 +1084,7 @@ Expected: FAIL because the module does not exist.
 
 The test suite must also cover every runtime boundary: malformed hand-built production configs, unknown modes, unknown installed/requested capabilities, unsafe database URLs, and strict USD parsing. USD input must be plain base-10 positive text with at most two fractional digits; parse decimal text into integer cents, reject cents above `Number.MAX_SAFE_INTEGER`, and compare daily/monthly limits by cents. Tests must cover hex, exponent, signs, NaN, Infinity, blank input, excessive precision, exact two-decimal acceptance, and daily/monthly values that differ by one cent.
 
-- [ ] **Step 2: Implement the hardened discriminated runtime parser**
+- [x] **Step 2: Implement the hardened discriminated runtime parser**
 
 The original illustrative parser below is superseded by these required boundaries and must not be copied as-is:
 
@@ -1095,7 +1095,7 @@ The original illustrative parser below is superseded by these required boundarie
 
 Create `src/brain/config/runtime-config.ts` with exported `runtimeConfigSchema`, `syntheticConfigSchema`, and `productionConfigSchema`. The production branch may transform internal validated cents into public dollar-number fields only after the cent-level comparison. `loadRuntimeConfig` first parses the environment mode, maps only the matching mode's variables, and returns `runtimeConfigSchema.parse(...)`.
 
-- [ ] **Step 3: Add the now-type-safe migration CLI**
+- [x] **Step 3: Add the now-type-safe migration CLI**
 
 Create `src/brain/storage/run-migrations.ts`:
 
@@ -1115,7 +1115,7 @@ try {
 }
 ```
 
-- [ ] **Step 4: Write failing policy-gate tests**
+- [x] **Step 4: Write failing policy-gate tests**
 
 Use a synthetic URL ending in `_test` and a dummy production URL such as `postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full`; never use real credentials. In addition to the decisions below, require construction to reject blank approval references, invalid limits/URLs, and `{ mode: "staging" } as any`. Require unknown installed/requested strings such as `future-unreviewed-operation` to throw (or otherwise return an unambiguously denied decision).
 
@@ -1159,7 +1159,7 @@ npm run test:brain -- tests/brain/policy/policy-gate.test.ts
 
 Expected: FAIL because the gate does not exist.
 
-- [ ] **Step 5: Implement the auditable policy gate**
+- [x] **Step 5: Implement the auditable policy gate**
 
 The gate must export `liveCapabilitySchema = z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"])` and infer `LiveCapability` from it. Re-parse config with `runtimeConfigSchema` at construction, use a strict options schema to parse `installedCapabilities`, and parse every capability passed to `check` or `assertAllowed`. Preserve the listed order and decisions, but use explicit synthetic and production branches with an exhaustive impossible-mode failure; no malformed mode may reach an allow path.
 
@@ -1167,7 +1167,7 @@ Create `src/brain/policy/policy-gate.ts` with `CapabilityDecision` and `PolicyDe
 
 Later slices must pass each adapter's exact capability in `installedCapabilities`. Production configuration alone cannot enable live behavior.
 
-- [ ] **Step 6: Run policy, migration, and type tests**
+- [x] **Step 6: Run policy, migration, and type tests**
 
 ```bash
 npm run test:brain -- tests/brain/config/runtime-config.test.ts tests/brain/policy/policy-gate.test.ts
@@ -1176,7 +1176,7 @@ npm run lint
 
 Expected: PASS, including `src/brain/storage/run-migrations.ts`.
 
-- [ ] **Step 7: Commit Task 4**
+- [x] **Step 7: Commit Task 4**
 
 ```bash
 git add src/brain/config src/brain/policy src/brain/storage/run-migrations.ts tests/brain/config tests/brain/policy
@@ -1196,7 +1196,7 @@ git commit -m "feat(brain): fail closed on live capabilities"
 - Create: `tests/brain/replay/replay-runner.test.ts`
 - Create: `tests/brain/dev/seed-synthetic.test.ts`
 
-- [ ] **Step 1: Write the failing deterministic replay tests**
+- [x] **Step 1: Write the failing deterministic replay tests**
 
 Create a minimal `RecordingEventStore` test double that implements `BrainEventStore` and records method names plus IDs. Assert that:
 
@@ -1214,7 +1214,7 @@ npm run test:brain -- tests/brain/replay/replay-runner.test.ts
 
 Expected: FAIL because replay modules do not exist.
 
-- [ ] **Step 2: Define the replay envelope**
+- [x] **Step 2: Define the replay envelope**
 
 Create `src/brain/replay/replay-schema.ts`:
 
@@ -1263,7 +1263,7 @@ export const replayFixtureSchema = z
 export type ReplayFixture = z.infer<typeof replayFixtureSchema>;
 ```
 
-- [ ] **Step 3: Implement the policy-aware dispatcher**
+- [x] **Step 3: Implement the policy-aware dispatcher**
 
 Create `src/brain/replay/replay-runner.ts`:
 
@@ -1297,7 +1297,7 @@ export async function runReplay(store: BrainEventStore, fixtureInput: ReplayFixt
 }
 ```
 
-- [ ] **Step 4: Create one complete synthetic Opportunity fixture**
+- [x] **Step 4: Create one complete synthetic Opportunity fixture**
 
 Create `src/brain/replay/fixtures/synthetic-replay.json` with stable UUIDs and timestamps. Tests and the development seed command must read this one canonical fixture. It must contain, in this order:
 
@@ -1319,7 +1319,7 @@ target Post ID: 900000000000000001
 
 Do not store third-party text in the fixture. Evidence is derived, synthetic feature data only.
 
-- [ ] **Step 5: Write the failing partial-seed safety test**
+- [x] **Step 5: Write the failing partial-seed safety test**
 
 Create `tests/brain/dev/seed-synthetic.test.ts` with a test store that already contains the fixture Opportunity but only one of the three evidence records. Assert the seed service rejects with `Partial synthetic replay detected` and never reports `already-seeded`.
 
@@ -1331,7 +1331,7 @@ npm run test:brain -- tests/brain/dev/seed-synthetic.test.ts
 
 Expected: FAIL because the seed service does not exist.
 
-- [ ] **Step 6: Add an idempotent seed command**
+- [x] **Step 6: Add an idempotent seed command**
 
 Create `src/brain/dev/seed-synthetic.ts`. It must:
 
@@ -1395,7 +1395,7 @@ async function isReplayMaterialized(store: BrainEventStore, fixture: ReplayFixtu
 }
 ```
 
-- [ ] **Step 7: Run replay and seed verification**
+- [x] **Step 7: Run replay and seed verification**
 
 ```bash
 npm run test:brain -- tests/brain/replay/replay-runner.test.ts
@@ -1407,7 +1407,7 @@ npm run brain:seed
 
 Expected: tests pass; the first seed prints `seeded`; the second prints `already-seeded`.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```bash
 git add src/brain/replay src/brain/dev/seed-synthetic.ts tests/brain/replay tests/brain/dev/seed-synthetic.test.ts

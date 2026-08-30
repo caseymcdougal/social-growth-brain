@@ -18,7 +18,7 @@ export const featureEvidenceSchema = z.object({
   baselineId: z.string().trim().min(1).nullable(),
   observedAt: isoTimestampSchema,
   featureCodeVersion: z.string().trim().min(1)
-});
+}).strict();
 
 export const signalEvidenceSchema = z.object({
   schemaVersion: z.literal(SOCIAL_BRAIN_SCHEMA_VERSION),
@@ -30,7 +30,7 @@ export const signalEvidenceSchema = z.object({
   retainedPostId: xPostIdSchema.nullable(),
   capturedAt: isoTimestampSchema,
   features: z.array(featureEvidenceSchema).min(1)
-});
+}).strict();
 
 export const draftVariantSchema = z
   .object({
@@ -49,6 +49,7 @@ export const draftVariantSchema = z
     noveltyScore: z.number().min(0).max(1),
     createdAt: isoTimestampSchema
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.actionType === "original" && value.targetPostId !== null) {
       context.addIssue({ code: "custom", path: ["targetPostId"], message: "original drafts cannot target a Post" });
@@ -91,57 +92,57 @@ export const decisionEventSchema = z.discriminatedUnion("type", [
   decisionEventEnvelopeSchema.extend({
     type: z.literal("detected"),
     payload: z.object({ pipelineRunId: uuidSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("surfaced"),
     payload: z.object({ deliveryId: uuidSchema.optional() }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("approved"),
     payload: z.object({ draftId: uuidSchema, draftContentHash: sha256Schema, approvalExpiresAt: isoTimestampSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("revised"),
     payload: z
       .object({ previousDraftId: uuidSchema, draftId: uuidSchema, draftContentHash: sha256Schema })
       .strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("rejected"),
     payload: z.object({ reasonCode: machineCodeSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("expired"),
     payload: z.object({ reasonCode: machineCodeSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("publishing"),
     payload: z
       .object({ publishIntentId: uuidSchema, draftContentHash: sha256Schema, idempotencyKeyHash: sha256Schema })
       .strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("published"),
     payload: z.object({ publishIntentId: uuidSchema, publishedPostId: xPostIdSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("publish_uncertain"),
     payload: z.object({ publishIntentId: uuidSchema, reasonCode: machineCodeSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("failed"),
     payload: z.object({ publishIntentId: uuidSchema.nullable(), errorCode: machineCodeSchema, retryable: z.boolean() }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("measuring"),
     payload: z.object({ publishedPostId: xPostIdSchema }).strict()
-  }),
+  }).strict(),
   decisionEventEnvelopeSchema.extend({
     type: z.literal("matured"),
     payload: z
       .object({ publishedPostId: xPostIdSchema, outcomeSnapshotId: uuidSchema, qualifiesForProof: z.boolean() })
       .strict()
-  })
+  }).strict()
 ]).superRefine((value, context) => {
   if (value.type === "approved" && Date.parse(value.payload.approvalExpiresAt) <= Date.parse(value.occurredAt)) {
     context.addIssue({
@@ -167,11 +168,12 @@ export const outcomeSnapshotSchema = z
       replies: z.number().int().nonnegative().nullable(),
       reposts: z.number().int().nonnegative().nullable(),
       bookmarks: z.number().int().nonnegative().nullable()
-    }),
+    }).strict(),
     privateMetrics: z.record(z.string(), z.number().nonnegative()).nullable(),
     source: z.enum(["synthetic", "official-x-api"]),
     collectionStatus: z.enum(["complete", "partial", "unavailable"])
   })
+  .strict()
   .superRefine((value, context) => {
     const publishedAt = Date.parse(value.publishedAt);
     const observedAt = Date.parse(value.observedAt);
@@ -198,6 +200,7 @@ export const complianceCheckSchema = z
     requiredAction: z.enum(["retain", "rehydrate", "purge"]),
     source: z.enum(["synthetic", "x-batch-compliance", "direct-removal-notice"])
   })
+  .strict()
   .superRefine((value, context) => {
     const checkedAt = Date.parse(value.checkedAt);
     const nextCheckAt = Date.parse(value.nextCheckAt);

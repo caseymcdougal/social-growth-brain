@@ -120,6 +120,11 @@ describe("PostgresBrainEventStore", () => {
     expect(creatorArchiveSchema.parse(await store.getLatestCreatorArchive())).toEqual(archive);
   });
 
+  it("rejects unknown append-only data instead of silently stripping it", async () => {
+    await expect(store.appendCreatorArchive({ ...archive, unexpectedAppendOnlyData: true } as unknown as CreatorArchive)).rejects.toThrow();
+    await expect(store.getCreatorArchiveByFingerprint(HASH)).resolves.toBeNull();
+  });
+
   it("binds an archive payload fingerprint to its indexed fingerprint", async () => {
     await expect(pool.query(
       "INSERT INTO brain_creator_archives (id, creator_id, source_fingerprint, imported_at, payload) VALUES ($1, $2, $3, $4, $5)",

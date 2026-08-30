@@ -341,4 +341,29 @@ describe("Social Brain domain contracts", () => {
       })
     ).toThrow();
   });
+
+  it.each([
+    ["Opportunity", opportunitySchema, validOpportunity],
+    ["SignalEvidence", signalEvidenceSchema, validSignalEvidence],
+    ["DraftVariant", draftVariantSchema, validDraftVariant],
+    ["DecisionEvent", decisionEventSchema, validDecisionEvent],
+    ["OutcomeSnapshot", outcomeSnapshotSchema, validOutcomeSnapshot],
+    ["ComplianceCheck", complianceCheckSchema, validComplianceCheck],
+    ["CreatorArchive", creatorArchiveSchema, validCreatorArchive]
+  ] as const)("rejects unknown top-level fields on versioned %s", (_name, schema, valid) => {
+    expect(() => schema.parse({ ...valid(), unexpectedAppendOnlyData: true })).toThrow();
+  });
+
+  it("rejects unknown fields in versioned record nested objects while preserving open metric maps", () => {
+    expect(() => opportunitySchema.parse({ ...validOpportunity(), forecast: { ...validOpportunity().forecast, unknown: true } })).toThrow();
+    expect(() => opportunitySchema.parse({ ...validOpportunity(), provenance: { ...validOpportunity().provenance, unknown: true } })).toThrow();
+    expect(() => signalEvidenceSchema.parse({ ...validSignalEvidence(), features: [{ ...validSignalEvidence().features[0], unknown: true }] })).toThrow();
+    expect(() => outcomeSnapshotSchema.parse({ ...validOutcomeSnapshot(), publicMetrics: { ...validOutcomeSnapshot().publicMetrics, unknown: true } })).toThrow();
+    expect(outcomeSnapshotSchema.parse({ ...validOutcomeSnapshot(), privateMetrics: { customMetric: 1 } }).privateMetrics).toEqual({ customMetric: 1 });
+    expect(() => creatorArchiveSchema.parse({ ...validCreatorArchive(), profile: { handle: "caseymcdougal", displayName: "Casey", bio: "Builder", profileUrl: "https://x.com/caseymcdougal", followersCount: 1, followingCount: 1, capturedAt: "2026-08-27T14:00:00.000Z", unknown: true } })).toThrow();
+    expect(() => creatorArchiveSchema.parse({ ...validCreatorArchive(), posts: [{ ...validCreatorArchive().posts[0], unknown: true }] })).toThrow();
+    expect(() => creatorArchiveSchema.parse({ ...validCreatorArchive(), importReport: { importedPosts: 1, omittedFields: [], unknown: true } })).toThrow();
+    expect(() => creatorArchiveSchema.parse({ ...validCreatorArchive(), voiceProfile: { summary: "direct", casing_and_punctuation: ["lower"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build it."], unknown: true } })).toThrow();
+    expect(() => creatorArchiveSchema.parse({ ...validCreatorArchive(), strategyMemory: { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "direct", status: "active", evidence: "posts", unknown: true }] } })).toThrow();
+  });
 });

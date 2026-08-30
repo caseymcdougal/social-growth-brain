@@ -10,12 +10,12 @@ import {
 } from "../domain";
 
 const replayEventSchema = z.discriminatedUnion("kind", [
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("opportunity_revision"), payload: opportunitySchema }),
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("signal_evidence"), payload: signalEvidenceSchema }),
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("draft_variant"), payload: draftVariantSchema }),
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("decision_event"), payload: decisionEventSchema }),
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("outcome_snapshot"), payload: outcomeSnapshotSchema }),
-  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("compliance_check"), payload: complianceCheckSchema })
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("opportunity_revision"), payload: opportunitySchema }).strict(),
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("signal_evidence"), payload: signalEvidenceSchema }).strict(),
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("draft_variant"), payload: draftVariantSchema }).strict(),
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("decision_event"), payload: decisionEventSchema }).strict(),
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("outcome_snapshot"), payload: outcomeSnapshotSchema }).strict(),
+  z.object({ sequence: z.number().int().positive(), at: z.string().datetime({ offset: true }), kind: z.literal("compliance_check"), payload: complianceCheckSchema }).strict()
 ]);
 
 export const replayFixtureSchema = z.object({
@@ -24,7 +24,7 @@ export const replayFixtureSchema = z.object({
   name: z.string().trim().min(1),
   primaryOpportunityId: uuidSchema,
   events: z.array(replayEventSchema).min(1)
-}).superRefine((fixture, context) => {
+}).strict().superRefine((fixture, context) => {
   const issue = (index: number, message: string) => context.addIssue({ code: "custom", path: ["events", index], message });
   const revisions = new Map<string, { index: number; payload: Extract<ReplayFixture["events"][number], { kind: "opportunity_revision" }> ["payload"] }>();
   const immutableIds = new Set<string>();

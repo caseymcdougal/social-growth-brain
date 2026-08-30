@@ -20,6 +20,7 @@ export const opportunityForecastSchema = z
     predictedAt: isoTimestampSchema,
     calibrationVersion: z.string().trim().min(1)
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.probability1k24h > value.probability1k48h) {
       context.addIssue({ code: "custom", message: "24h probability cannot exceed 48h probability" });
@@ -39,7 +40,7 @@ export const scorerProvenanceSchema = z.object({
   judgeModel: z.string().trim().min(1),
   promptTemplateVersion: z.string().trim().min(1),
   forecastPolicyVersion: z.string().trim().min(1)
-});
+}).strict();
 
 export const opportunitySchema = z
   .object({
@@ -59,6 +60,7 @@ export const opportunitySchema = z
     createdAt: isoTimestampSchema,
     revisedAt: isoTimestampSchema
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.actionType === "original" && value.targetPostId !== null) {
       context.addIssue({ code: "custom", path: ["targetPostId"], message: "original posts cannot target a Post" });

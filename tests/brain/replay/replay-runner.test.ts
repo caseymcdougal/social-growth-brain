@@ -64,6 +64,11 @@ describe("synthetic replay", () => {
     expect(() => replayFixtureSchema.parse({ ...parsed, events: [{ ...parsed.events[0], at: "2026-08-27T15:00:00.000Z" }, ...parsed.events.slice(1)] })).toThrow();
   });
 
+  it("rejects unknown replay fixture and event envelope fields", () => {
+    expect(() => replayFixtureSchema.parse({ ...fixture, unknown: true })).toThrow();
+    expect(() => replayFixtureSchema.parse({ ...fixture, events: [{ ...fixture.events[0], unknown: true }, ...fixture.events.slice(1)] })).toThrow();
+  });
+
   it("rejects live provenance before materializing any event", async () => {
     const bad = structuredClone(fixture);
     (bad.events[0] as { payload: { provenance: { sourceKind: string } } }).payload.provenance.sourceKind = "official-x-api";

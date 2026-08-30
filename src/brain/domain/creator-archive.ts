@@ -30,6 +30,7 @@ export const creatorArchiveSchema = z.object({
       followingCount: nullableCount,
       capturedAt: isoTimestampSchema
     })
+    .strict()
     .nullable(),
   posts: z.array(
     z.object({
@@ -43,7 +44,7 @@ export const creatorArchiveSchema = z.object({
       repostsCount: nullableCount,
       repliesCount: nullableCount,
       bookmarksCount: nullableCount
-    })
+    }).strict()
   ),
   voiceProfile: voiceProfileSchema.nullable(),
   voiceOverrides: z.string(),
@@ -52,8 +53,8 @@ export const creatorArchiveSchema = z.object({
   importReport: z.object({
     importedPosts: z.number().int().nonnegative(),
     omittedFields: z.array(z.string().trim().min(1))
-  })
-}).superRefine((value, context) => {
+  }).strict()
+}).strict().superRefine((value, context) => {
   if (value.importReport.importedPosts !== value.posts.length) {
     context.addIssue({
       code: "custom",

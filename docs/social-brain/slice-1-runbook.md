@@ -20,7 +20,7 @@ npm run brain:verify:slice1
 Pass an absolute SQLite path. The importer is fixed to Casey-owned material: it filters to Casey and omits ambiguous global fields rather than importing them. The source database is read-only.
 
 ```bash
-npm run brain:import:legacy -- /absolute/path/to/casey-owned-legacy.sqlite
+npm run brain:import:legacy -- --sqlite /absolute/path/to/file.sqlite
 ```
 
 ## Agent connection
