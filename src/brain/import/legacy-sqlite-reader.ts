@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { creatorArchiveSchema, type CreatorArchive } from "../domain";
@@ -19,14 +19,14 @@ function parseJson(value: unknown, label: string): unknown { try { return JSON.p
 
 /** Never opens user-owned SQLite in place. WAL sidecars mean the source is not quiescent and fail closed. */
 function capturePrivateSnapshot(sqlitePath: string): { path: string; cleanup(): void } {
-  const source = resolve(sqlitePath); const sourceStat = lstatSync(source);
+  const source = resolve(sqlitePath); const sourceStat = fs.lstatSync(source);
   if (sourceStat.isSymbolicLink()) throw new Error("Legacy SQLite source must not be a symlink");
   if (!sourceStat.isFile()) throw new Error("Legacy SQLite source must be a regular file");
-  const assertNoSidecars = () => { for (const suffix of ["-wal", "-shm"]) { try { lstatSync(`${source}${suffix}`); throw new Error("Legacy SQLite source has active WAL sidecars; close and checkpoint it before import"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } } };
+  const assertNoSidecars = () => { for (const suffix of ["-wal", "-shm"]) { try { fs.lstatSync(`${source}${suffix}`); throw new Error("Legacy SQLite source has active WAL sidecars; close and checkpoint it before import"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } } };
   assertNoSidecars();
-  const directory = mkdtempSync(join(tmpdir(), "social-brain-legacy-")); const snapshotPath = join(directory, basename(source)); let fd: number | undefined;
-  try { fd = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW); const before = fstatSync(fd); if (!before.isFile() || before.dev !== sourceStat.dev || before.ino !== sourceStat.ino) throw new Error("Legacy SQLite source changed before capture; retry after it is quiescent"); writeFileSync(snapshotPath, readFileSync(fd), { mode: 0o600 }); const after = fstatSync(fd); const finalPath = lstatSync(source); assertNoSidecars(); if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || finalPath.dev !== before.dev || finalPath.ino !== before.ino) throw new Error("Legacy SQLite source changed while capturing; retry after it is quiescent"); return { path: snapshotPath, cleanup: () => rmSync(directory, { recursive: true, force: true }) }; }
-  catch (error) { rmSync(directory, { recursive: true, force: true }); throw error; } finally { if (fd !== undefined) closeSync(fd); }
+  const directory = fs.mkdtempSync(join(tmpdir(), "social-brain-legacy-")); const snapshotPath = join(directory, basename(source)); let fd: number | undefined;
+  try { fd = fs.openSync(source, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW); const before = fs.fstatSync(fd); if (!before.isFile() || before.dev !== sourceStat.dev || before.ino !== sourceStat.ino) throw new Error("Legacy SQLite source changed before capture; retry after it is quiescent"); fs.writeFileSync(snapshotPath, fs.readFileSync(fd), { mode: 0o600 }); const after = fs.fstatSync(fd); const finalPath = fs.lstatSync(source); assertNoSidecars(); if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || finalPath.dev !== before.dev || finalPath.ino !== before.ino) throw new Error("Legacy SQLite source changed while capturing; retry after it is quiescent"); return { path: snapshotPath, cleanup: () => fs.rmSync(directory, { recursive: true, force: true }) }; }
+  catch (error) { fs.rmSync(directory, { recursive: true, force: true }); throw error; } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 
 function readSnapshot(snapshotPath: string, now: () => Date): CreatorArchive {

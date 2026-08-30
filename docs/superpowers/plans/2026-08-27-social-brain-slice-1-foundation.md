@@ -1464,285 +1464,55 @@ In the same adapter, change `appendCreatorArchive` to `INSERT ... ON CONFLICT (s
 
 - [ ] **Step 3: Implement a read-only, Casey-fixed SQLite reader**
 
-**Authoritative implementation flow (replaces the legacy illustrative block below):**
+**Authoritative implementation flow:**
+
+Create `src/brain/import/legacy-sqlite-reader.ts`. Its only public entry point is `readLegacyCreatorArchive({ sqlitePath, now? })`; callers cannot choose a creator handle.
+
+The reader must:
+
+- call internal `capturePrivateSnapshot(sqlitePath)`, which returns `{ path, cleanup }`; it rejects symlinks and non-regular files, opens with `O_NOFOLLOW`, verifies initial pathname `lstat`, opened-fd `fstat`, and final pathname `lstat` identity (`dev`/`ino`), checks for `-wal`/`-shm` before and after copying, and always removes its private `0700` snapshot directory;
+- open only that snapshot as readonly, enable `query_only`, and read required schema and selected columns inside one explicit transaction;
+- validate every non-null text field as a string and every metric as a safe nonnegative integer; parse voice and strategy JSON through their schemas; and copy only validated, schema-owned fields into the candidate;
+- retain only Casey-linked rows, use ordered last-row-wins post deduplication, sort posts by `xPostId`, and omit unlinked global fields whenever any distinct normalized handle is not Casey;
+- parse the complete candidate through `creatorArchiveSchema` with a placeholder ID and fingerprint, then hash this explicitly defined normalized payload (not the placeholder ID, fingerprint, or timestamps):
 
 ```ts
-type Candidate = CreatorArchive;
-function strictText(value: unknown, field: string): string {
-  if (typeof value !== "string") throw new Error(`Invalid legacy text field: ${field}`);
-  return value;
-}
-function metric(value: unknown, field: string): number | null {
-  if (value === null) return null;
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
-  throw new Error(`Invalid legacy numeric field: ${field}`);
-}
-function capturePrivateSnapshot(path: string) {
-  // lstat rejects symlinks; open with O_NOFOLLOW; require regular file.
-  // Compare initial pathname lstat, opened-fd fstat, and final pathname lstat
-  // dev+ino. Compare fd size/mtime/ctime before/after copy. Reject any WAL or
-  // SHM directory entry before and after copying. Always close fd and remove
-  // the private 0700 snapshot directory on failure/final cleanup.
-}
-function readLegacyCreatorArchive({ sqlitePath, now = () => new Date() }: ReadLegacyArchiveOptions): Candidate {
-  const snapshot = capturePrivateSnapshot(sqlitePath);
-  try {
-    const db = new Database(snapshot.path, { readonly: true, fileMustExist: true });
-    try {
-      db.pragma("query_only = ON"); db.exec("BEGIN");
-      // Read required schema and every selected column in this one transaction.
-      // Use strictText for every text field, metric for every count, and parse JSON.
-      // Last ordered duplicate wins; sort retained posts by xPostId.
-      const normalized = creatorArchiveSchema.parse(candidateWithPlaceholderIdAndFingerprint);
-      const fingerprint = sha256(JSON.stringify(normalizedPayloadFieldsOnly(normalized)));
-      return creatorArchiveSchema.parse({ ...normalized, id: randomUUID(), sourceFingerprint: fingerprint });
-    } finally { try { db.exec("ROLLBACK"); } catch {} db.close(); }
-  } finally { snapshot.cleanup(); }
-}
-// CLI: candidate = captureLegacyCreatorArchive(absolutePath) BEFORE loadRuntimeConfig,
-// pool creation, or migrations; then persistLegacyCreatorArchive(store, candidate).
+const normalizedPayload = {
+  profile: normalized.profile,
+  posts: normalized.posts,
+  voiceProfile: normalized.voiceProfile,
+  voiceOverrides: normalized.voiceOverrides,
+  strategyMemory: normalized.strategyMemory,
+  creativeDirections: normalized.creativeDirections,
+  omittedFields: normalized.importReport.omittedFields
+};
+const sourceFingerprint = createHash("sha256")
+  .update(JSON.stringify(normalizedPayload))
+  .digest("hex");
 ```
 
-The following retained historical sketch is non-normative; do not use it for implementation.
-
-Create `src/brain/import/legacy-sqlite-reader.ts`. The public API must not accept a creator handle, which makes cross-creator import impossible through normal use:
-
-```ts
-import Database from "better-sqlite3";
-import { createHash, randomUUID } from "node:crypto";
-import { creatorArchiveSchema, type CreatorArchive } from "../domain";
-import { strategyMemorySchema } from "../../shared/strategy-intelligence-schema";
-import { voiceProfileSchema } from "../../shared/voice-profile";
-
-interface LegacyProfileRow {
-  handle: string;
-  display_name: string;
-  bio: string;
-  profile_url: string;
-  followers_count: unknown;
-  following_count: unknown;
-  captured_at: string;
-}
-
-interface LegacyPostRow {
-  x_post_id: string;
-  url: string;
-  text: string;
-  posted_at: string | null;
-  captured_at: string;
-  views_count: unknown;
-  likes_count: unknown;
-  reposts_count: unknown;
-  replies_count: unknown;
-  bookmarks_count: unknown;
-}
-
-function requiredLegacyNumber(value: unknown, field: string): number | null {
-  if (value === null) return null;
-  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
-  throw new Error(`Invalid legacy numeric field: ${field}`);
-}
-
-function mapLegacyProfile(row: LegacyProfileRow | undefined) {
-  if (!row) return null;
-  return {
-    handle: "caseymcdougal" as const,
-    displayName: row.display_name,
-    bio: row.bio,
-    profileUrl: row.profile_url,
-    followersCount: requiredLegacyNumber(row.followers_count, "followers_count"),
-    followingCount: requiredLegacyNumber(row.following_count, "following_count"),
-    capturedAt: row.captured_at
-  };
-}
-
-function mapLegacyPost(row: LegacyPostRow) {
-  return {
-    xPostId: row.x_post_id,
-    url: row.url,
-    text: row.text,
-    postedAt: row.posted_at,
-    capturedAt: row.captured_at,
-    viewsCount: requiredLegacyNumber(row.views_count, "views_count"),
-    likesCount: requiredLegacyNumber(row.likes_count, "likes_count"),
-    repostsCount: requiredLegacyNumber(row.reposts_count, "reposts_count"),
-    repliesCount: requiredLegacyNumber(row.replies_count, "replies_count"),
-    bookmarksCount: requiredLegacyNumber(row.bookmarks_count, "bookmarks_count")
-  };
-}
-
-export interface ReadLegacyArchiveOptions {
-  sqlitePath: string;
-  now?: () => Date;
-}
-
-export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive {
-  // Capture a private O_NOFOLLOW copy first. Compare initial lstat, opened-fd
-  // fstat, and final lstat dev+ino; check WAL/SHM absence both before and after
-  // copying. Reject any sidecar type or identity/stability change, then always
-  // close the fd and remove the private directory in finally.
-  const snapshot = capturePrivateSnapshot(options.sqlitePath);
-  const db = new Database(snapshot.path, { readonly: true, fileMustExist: true });
-  try {
-    db.pragma("query_only = ON");
-    db.exec("BEGIN"); // all schema/data reads and canonical construction share one snapshot
-    const requiredTables = [
-      "profile_snapshots",
-      "post_snapshots",
-      "voice_profiles",
-      "voice_overrides",
-      "strategy_memories",
-      "strategy_memory_proposals",
-      "creative_direction"
-    ];
-    const existingTables = new Set(
-      (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(
-        (row) => row.name
-      )
-    );
-    for (const table of requiredTables) {
-      if (!existingTables.has(table)) throw new Error(`Legacy database is missing required table: ${table}`);
-    }
-
-    const handles = (
-      db.prepare("SELECT DISTINCT lower(trim(handle)) AS handle FROM profile_snapshots ORDER BY handle").all() as Array<{
-        handle: string | null;
-      }>
-    ).map((row) => row.handle);
-    // Do not filter falsy normalized handles: blank, whitespace-only, and NULL
-    // values are distinct unattributable creators and therefore make globals unsafe.
-    const globalFieldsAreAttributable = handles.length === 1 && handles[0] === "caseymcdougal";
-
-    const profile = db
-      .prepare(
-        `SELECT handle, display_name, bio, profile_url, followers_count, following_count, captured_at
-         FROM profile_snapshots
-         WHERE lower(trim(handle)) = 'caseymcdougal'
-         ORDER BY captured_at DESC, id DESC
-         LIMIT 1`
-      )
-      .get() as LegacyProfileRow | undefined;
-
-    const postRows = db
-      .prepare(
-        `SELECT p.x_post_id, p.url, p.text, p.posted_at, p.captured_at,
-                p.views_count, p.likes_count, p.reposts_count, p.replies_count, p.bookmarks_count
-         FROM post_snapshots p
-         JOIN profile_snapshots s ON s.id = p.profile_snapshot_id
-         WHERE lower(trim(s.handle)) = 'caseymcdougal'
-         ORDER BY p.captured_at ASC, p.id ASC`
-      )
-      .all() as LegacyPostRow[];
-
-    const voiceRow = db
-      .prepare(
-        `SELECT v.profile_json
-         FROM voice_profiles v
-         JOIN profile_snapshots s ON s.id = v.profile_snapshot_id
-         WHERE lower(trim(s.handle)) = 'caseymcdougal'
-         ORDER BY v.created_at DESC, v.id DESC
-         LIMIT 1`
-      )
-      .get() as { profile_json: string } | undefined;
-
-    const linkedStrategyRow = db
-      .prepare(
-        `SELECT m.memory_json
-         FROM strategy_memories m
-         JOIN strategy_memory_proposals p ON p.id = m.source_proposal_id
-         JOIN profile_snapshots s ON s.id = p.profile_snapshot_id
-         WHERE lower(trim(s.handle)) = 'caseymcdougal'
-         ORDER BY m.created_at DESC, m.id DESC
-         LIMIT 1`
-      )
-      .get() as { memory_json: string } | undefined;
-
-    const attributableUnlinkedStrategyRow = globalFieldsAreAttributable
-      ? (db
-          .prepare("SELECT memory_json FROM strategy_memories ORDER BY created_at DESC, id DESC LIMIT 1")
-          .get() as { memory_json: string } | undefined)
-      : undefined;
-    const strategyRow = linkedStrategyRow ?? attributableUnlinkedStrategyRow;
-
-    const omittedFields: string[] = [];
-    if (!globalFieldsAreAttributable) {
-      omittedFields.push("voiceOverrides: legacy field is globally scoped", "creativeDirections: legacy field is globally scoped");
-      if (!linkedStrategyRow) omittedFields.push("strategyMemory: no Casey-linked source exists");
-    }
-
-    const postsById = new Map<string, LegacyPostRow>();
-    for (const row of postRows) postsById.set(row.x_post_id, row);
-
-    const canonical = {
-      profile,
-      posts: [...postsById.values()],
-      voiceProfile: voiceRow ? voiceProfileSchema.parse(JSON.parse(voiceRow.profile_json)) : null,
-      voiceOverrides: globalFieldsAreAttributable
-        ? ((db.prepare("SELECT text FROM voice_overrides WHERE id = 1").get() as { text: string } | undefined)?.text ?? "")
-        : "",
-      strategyMemory: strategyRow ? strategyMemorySchema.parse(JSON.parse(strategyRow.memory_json)) : null,
-      creativeDirections: globalFieldsAreAttributable
-        ? (db.prepare("SELECT text FROM creative_direction ORDER BY id ASC").all() as Array<{ text: string }>).map(
-            (row) => row.text
-          )
-        : [],
-      omittedFields
-    };
-    // Parse through creatorArchiveSchema first (including trim normalization),
-    // then sort last-row-wins deduplicated posts by xPostId and hash only that
-    // normalized canonical payload, never IDs or import timestamps.
-    const sourceFingerprint = createHash("sha256").update(JSON.stringify(normalizedCanonical)).digest("hex");
-    const importedAt = (options.now ?? (() => new Date()))().toISOString();
-
-    return creatorArchiveSchema.parse({
-      schemaVersion: 1,
-      id: randomUUID(),
-      creatorId: "casey-mcdougal",
-      source: "legacy-sqlite",
-      consentBasis: "casey-requested-import",
-      consentRecordedAt: importedAt,
-      sourceFingerprint,
-      importedAt,
-      profile: mapLegacyProfile(canonical.profile),
-      posts: canonical.posts.map(mapLegacyPost),
-      voiceProfile: canonical.voiceProfile,
-      voiceOverrides: canonical.voiceOverrides,
-      strategyMemory: canonical.strategyMemory,
-      creativeDirections: canonical.creativeDirections,
-      importReport: { importedPosts: canonical.posts.length, omittedFields }
-    });
-  } finally {
-    try { db.exec("ROLLBACK"); } catch {}
-    db.close();
-    snapshot.cleanup();
-  }
-}
-```
-
-The explicit mappers copy only fields present in `creatorArchiveSchema`; raw rows are never spread into the archive.
+Return one final `creatorArchiveSchema.parse({ ...normalized, id: randomUUID(), sourceFingerprint })`. Never open or modify the user-owned database in place.
 
 - [ ] **Step 4: Add an idempotent import service and explicit CLI**
 
-Create `src/brain/import/import-legacy.ts`. Keep capture/read candidate separate from persistence so the CLI can capture a secure candidate before loading runtime config, opening PostgreSQL, or running migrations; persist only that immutable candidate.
+Keep immutable capture separate from persistence:
 
 ```ts
-import type { BrainEventStore } from "../storage/event-store";
-import { readLegacyCreatorArchive } from "./legacy-sqlite-reader";
+export function captureLegacyCreatorArchive(sqlitePath: string): CreatorArchive {
+  return readLegacyCreatorArchive({ sqlitePath });
+}
 
-export async function importLegacyCreatorArchive(store: BrainEventStore, sqlitePath: string) {
-  const archive = readLegacyCreatorArchive({ sqlitePath });
-  const existing = await store.getCreatorArchiveByFingerprint(archive.sourceFingerprint);
+export async function persistLegacyCreatorArchive(store: BrainEventStore, candidate: CreatorArchive) {
+  const existing = await store.getCreatorArchiveByFingerprint(candidate.sourceFingerprint);
   if (existing) return { status: "already-imported" as const, archive: existing };
-  await store.appendCreatorArchive(archive);
-  const persisted = await store.getCreatorArchiveByFingerprint(archive.sourceFingerprint);
+  await store.appendCreatorArchive(candidate);
+  const persisted = await store.getCreatorArchiveByFingerprint(candidate.sourceFingerprint);
   if (!persisted) throw new Error("Legacy archive insert was not observable");
-  return persisted.id === archive.id
-    ? { status: "imported" as const, archive: persisted }
-    : { status: "already-imported" as const, archive: persisted };
+  return { status: persisted.id === candidate.id ? "imported" as const : "already-imported" as const, archive: persisted };
 }
 ```
 
-Create `src/brain/import/cli.ts`. Require `--sqlite /absolute/path/to/file.sqlite`; reject missing, relative, or nonexistent paths before opening PostgreSQL. Parse runtime config, run migrations, call the service, print only status, archive ID, fingerprint, and imported post count, then close the pool in `finally`.
+The CLI requires `--sqlite /absolute/path/to/file.sqlite` and rejects missing, relative, nonexistent, symlink, or non-file paths. Its order is mandatory: `candidate = captureLegacyCreatorArchive(absolutePath)` **before** `loadRuntimeConfig`, pool creation, or migrations; then load configuration, open the pool, run migrations, call `persistLegacyCreatorArchive(store, candidate)`, print only status/archive ID/fingerprint/imported post count, and close the pool in `finally`.
 
 - [ ] **Step 5: Add the versioned Casey context module**
 
