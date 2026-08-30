@@ -5,10 +5,10 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../../../src/server/db";
 import { createRepositories } from "../../../src/server/repositories";
-import { readLegacyCreatorArchive } from "../../../src/brain/import/legacy-sqlite-reader";
+import { __setLegacyCaptureHookForTest, readLegacyCreatorArchive } from "../../../src/brain/import/legacy-sqlite-reader";
 
 const dirs: string[] = [];
-afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => { __setLegacyCaptureHookForTest(undefined); for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 const voice = { summary: "Direct", casing_and_punctuation: ["lowercase"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build the useful thing."] };
 const strategy = { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "direct works", status: "active", evidence: "posts" }] };
 function sourceSnapshot(sqlitePath: string) {
@@ -64,8 +64,8 @@ describe("readLegacyCreatorArchive", () => {
   });
   it("rejects path replacement and newly-created sidecars during private capture", () => {
     const { sqlitePath } = fixture(); const replacement = `${sqlitePath}.replacement`; copyFileSync(sqlitePath, replacement);
-    expect(() => readLegacyCreatorArchive({ sqlitePath, onCapturedForTest: () => { rmSync(sqlitePath); copyFileSync(replacement, sqlitePath); } })).toThrow("changed while capturing");
-    const second = fixture().sqlitePath; expect(() => readLegacyCreatorArchive({ sqlitePath: second, onCapturedForTest: () => writeFileSync(`${second}-wal`, "sidecar") })).toThrow("active WAL sidecars");
+    __setLegacyCaptureHookForTest(() => { rmSync(sqlitePath); copyFileSync(replacement, sqlitePath); }); expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("changed while capturing");
+    const second = fixture().sqlitePath; __setLegacyCaptureHookForTest(() => writeFileSync(`${second}-wal`, "sidecar")); expect(() => readLegacyCreatorArchive({ sqlitePath: second })).toThrow("active WAL sidecars");
   });
   it("hashes normalized creative directions and stable retained-post order", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.prepare("UPDATE creative_direction SET text = '  write more examples  '").run(); db.close();

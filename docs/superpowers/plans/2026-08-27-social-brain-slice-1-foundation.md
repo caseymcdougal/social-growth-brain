@@ -1464,6 +1464,47 @@ In the same adapter, change `appendCreatorArchive` to `INSERT ... ON CONFLICT (s
 
 - [ ] **Step 3: Implement a read-only, Casey-fixed SQLite reader**
 
+**Authoritative implementation flow (replaces the legacy illustrative block below):**
+
+```ts
+type Candidate = CreatorArchive;
+function strictText(value: unknown, field: string): string {
+  if (typeof value !== "string") throw new Error(`Invalid legacy text field: ${field}`);
+  return value;
+}
+function metric(value: unknown, field: string): number | null {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
+  throw new Error(`Invalid legacy numeric field: ${field}`);
+}
+function capturePrivateSnapshot(path: string) {
+  // lstat rejects symlinks; open with O_NOFOLLOW; require regular file.
+  // Compare initial pathname lstat, opened-fd fstat, and final pathname lstat
+  // dev+ino. Compare fd size/mtime/ctime before/after copy. Reject any WAL or
+  // SHM directory entry before and after copying. Always close fd and remove
+  // the private 0700 snapshot directory on failure/final cleanup.
+}
+function readLegacyCreatorArchive({ sqlitePath, now = () => new Date() }: ReadLegacyArchiveOptions): Candidate {
+  const snapshot = capturePrivateSnapshot(sqlitePath);
+  try {
+    const db = new Database(snapshot.path, { readonly: true, fileMustExist: true });
+    try {
+      db.pragma("query_only = ON"); db.exec("BEGIN");
+      // Read required schema and every selected column in this one transaction.
+      // Use strictText for every text field, metric for every count, and parse JSON.
+      // Last ordered duplicate wins; sort retained posts by xPostId.
+      const normalized = creatorArchiveSchema.parse(candidateWithPlaceholderIdAndFingerprint);
+      const fingerprint = sha256(JSON.stringify(normalizedPayloadFieldsOnly(normalized)));
+      return creatorArchiveSchema.parse({ ...normalized, id: randomUUID(), sourceFingerprint: fingerprint });
+    } finally { try { db.exec("ROLLBACK"); } catch {} db.close(); }
+  } finally { snapshot.cleanup(); }
+}
+// CLI: candidate = captureLegacyCreatorArchive(absolutePath) BEFORE loadRuntimeConfig,
+// pool creation, or migrations; then persistLegacyCreatorArchive(store, candidate).
+```
+
+The following retained historical sketch is non-normative; do not use it for implementation.
+
 Create `src/brain/import/legacy-sqlite-reader.ts`. The public API must not accept a creator handle, which makes cross-creator import impossible through normal use:
 
 ```ts

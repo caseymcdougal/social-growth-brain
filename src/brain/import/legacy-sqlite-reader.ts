@@ -10,22 +10,25 @@ import { voiceProfileSchema } from "../../shared/voice-profile";
 const CASEY_HANDLE = "caseymcdougal";
 const REQUIRED_TABLES = ["profile_snapshots", "post_snapshots", "voice_profiles", "voice_overrides", "strategy_memories", "strategy_memory_proposals", "creative_direction"];
 const FIXED_ID = "00000000-0000-4000-8000-000000000001";
-export interface ReadLegacyArchiveOptions { sqlitePath: string; now?: () => Date; /** Test-only hook used to exercise capture race rejection. */ onCapturedForTest?: () => void; }
+export interface ReadLegacyArchiveOptions { sqlitePath: string; now?: () => Date; }
 type Row = Record<string, unknown>;
+let captureHookForTest: (() => void) | undefined;
+/** @internal Test seam; not part of the reader options/public import API. */
+export function __setLegacyCaptureHookForTest(hook: (() => void) | undefined): void { captureHookForTest = hook; }
 const requiredText = (value: unknown, field: string) => { if (typeof value !== "string") throw new Error(`Invalid legacy text field: ${field}`); return value; };
 const nullableText = (value: unknown, field: string) => value === null ? null : requiredText(value, field);
 const metric = (value: unknown, field: string): number | null => { if (value === null) return null; if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value; throw new Error(`Invalid legacy numeric field: ${field}`); };
 function parseJson(value: unknown, label: string): unknown { try { return JSON.parse(requiredText(value, `${label}_json`)); } catch { throw new Error(`Invalid archived ${label} JSON`); } }
 
 /** Never opens user-owned SQLite in place. WAL sidecars mean the source is not quiescent and fail closed. */
-function capturePrivateSnapshot(sqlitePath: string, onCapturedForTest?: () => void): { path: string; cleanup(): void } {
+function capturePrivateSnapshot(sqlitePath: string): { path: string; cleanup(): void } {
   const source = resolve(sqlitePath); const sourceStat = lstatSync(source);
   if (sourceStat.isSymbolicLink()) throw new Error("Legacy SQLite source must not be a symlink");
   if (!sourceStat.isFile()) throw new Error("Legacy SQLite source must be a regular file");
   const assertNoSidecars = () => { for (const suffix of ["-wal", "-shm"]) { try { lstatSync(`${source}${suffix}`); throw new Error("Legacy SQLite source has active WAL sidecars; close and checkpoint it before import"); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; } } };
   assertNoSidecars();
   const directory = mkdtempSync(join(tmpdir(), "social-brain-legacy-")); const snapshotPath = join(directory, basename(source)); let fd: number | undefined;
-  try { fd = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW); const before = fstatSync(fd); if (!before.isFile() || before.dev !== sourceStat.dev || before.ino !== sourceStat.ino) throw new Error("Legacy SQLite source changed before capture; retry after it is quiescent"); writeFileSync(snapshotPath, readFileSync(fd), { mode: 0o600 }); onCapturedForTest?.(); const after = fstatSync(fd); const finalPath = lstatSync(source); assertNoSidecars(); if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || finalPath.dev !== before.dev || finalPath.ino !== before.ino) throw new Error("Legacy SQLite source changed while capturing; retry after it is quiescent"); return { path: snapshotPath, cleanup: () => rmSync(directory, { recursive: true, force: true }) }; }
+  try { fd = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW); const before = fstatSync(fd); if (!before.isFile() || before.dev !== sourceStat.dev || before.ino !== sourceStat.ino) throw new Error("Legacy SQLite source changed before capture; retry after it is quiescent"); writeFileSync(snapshotPath, readFileSync(fd), { mode: 0o600 }); captureHookForTest?.(); const after = fstatSync(fd); const finalPath = lstatSync(source); assertNoSidecars(); if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs || finalPath.dev !== before.dev || finalPath.ino !== before.ino) throw new Error("Legacy SQLite source changed while capturing; retry after it is quiescent"); return { path: snapshotPath, cleanup: () => rmSync(directory, { recursive: true, force: true }) }; }
   catch (error) { rmSync(directory, { recursive: true, force: true }); throw error; } finally { if (fd !== undefined) closeSync(fd); }
 }
 
@@ -54,4 +57,4 @@ function readSnapshot(snapshotPath: string, now: () => Date): CreatorArchive {
   } finally { if (transaction) { try { db.exec("ROLLBACK"); } catch {} } db.close(); }
 }
 
-export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive { const snapshot = capturePrivateSnapshot(options.sqlitePath, options.onCapturedForTest); try { return readSnapshot(snapshot.path, options.now ?? (() => new Date())); } finally { snapshot.cleanup(); } }
+export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive { const snapshot = capturePrivateSnapshot(options.sqlitePath); try { return readSnapshot(snapshot.path, options.now ?? (() => new Date())); } finally { snapshot.cleanup(); } }
