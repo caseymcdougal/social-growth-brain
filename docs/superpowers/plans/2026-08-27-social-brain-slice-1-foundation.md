@@ -1684,7 +1684,7 @@ git commit -m "feat(brain): add compliance retention policy"
 - Create: `tests/brain/interfaces/mcp-server.test.ts`
 - Create: `tests/brain/integration/mcp-seeded-inspection.test.ts`
 
-- [ ] **Step 1: Write failing query-service tests**
+- [x] **Step 1: Write failing query-service tests**
 
 Use a deterministic `BrainEventStore` test double and assert:
 
@@ -1702,7 +1702,7 @@ npm run test:brain -- tests/brain/query/brain-query-service.test.ts
 
 Expected: FAIL because the query service does not exist.
 
-- [ ] **Step 2: Implement the transport-neutral query service**
+- [x] **Step 2: Implement the transport-neutral query service**
 
 Create `src/brain/query/brain-query-service.ts` with these public methods:
 
@@ -1787,7 +1787,7 @@ export class BrainQueryService {
 }
 ```
 
-- [ ] **Step 3: Write a failing MCP protocol test**
+- [x] **Step 3: Write a failing MCP protocol test**
 
 Use the SDK's in-process transport:
 
@@ -1821,7 +1821,7 @@ npm run test:brain -- tests/brain/interfaces/mcp-server.test.ts
 
 Expected: FAIL because the MCP server factory does not exist.
 
-- [ ] **Step 4: Register five read-only MCP tools**
+- [x] **Step 4: Register five read-only MCP tools**
 
 Create `src/brain/interfaces/mcp/create-server.ts`:
 
@@ -1948,7 +1948,7 @@ export function createReadOnlyMcpServer(queryService: BrainQueryService): McpSer
 
 Do not register `nominate_post`, `revise_draft`, `approve_opportunity`, or `reject_opportunity` in Slice 1.
 
-- [ ] **Step 5: Add the stdio composition root**
+- [x] **Step 5: Add the stdio composition root**
 
 Create `src/brain/interfaces/mcp/stdio.ts`:
 
@@ -1978,7 +1978,9 @@ try {
 
 Never write diagnostics to stdout because stdout is the MCP protocol stream.
 
-- [ ] **Step 6: Prove seeded inspection against real PostgreSQL**
+The composition root must also treat stdin EOF and stdin errors as lifecycle events: close the MCP server/transport and PostgreSQL pool exactly once, emit any error diagnostic only to stderr, and allow the process to exit naturally.
+
+- [x] **Step 6: Prove seeded inspection against real PostgreSQL**
 
 Create `tests/brain/integration/mcp-seeded-inspection.test.ts`. In setup, migrate, truncate, parse the stable fixture, and run replay. Connect a real `BrainQueryService` to an in-memory MCP client/server pair. Assert:
 
@@ -1997,7 +1999,7 @@ npm run test:brain:integration -- tests/brain/integration/mcp-seeded-inspection.
 
 Expected: PASS.
 
-- [ ] **Step 7: Add a one-command exit verifier**
+- [x] **Step 7: Add a one-command exit verifier**
 
 Create `src/brain/dev/verify-slice-1.ts`. It must connect to the same read-only MCP factory through `InMemoryTransport`, call `listTools`, `inspect_opportunity`, and `get_system_health`, then validate these invariants:
 
@@ -2015,7 +2017,9 @@ const expectedEvidenceCount = 3;
 
 Exit nonzero when any invariant fails. On success, output one JSON object containing `result: "passed"`, the five tool names, Opportunity ID, revision, evidence count, mode, and live capability decisions. Close client and pool in `finally`.
 
-- [ ] **Step 8: Run query, protocol, and integration tests**
+The verifier must require the exact synthetic health contract: `mode: "synthetic"`, `storage: "healthy"`, no installed live adapters or configured approval, the seeded latest compliance timestamp, and the four ordered live capabilities all denied with their synthetic-mode reason.
+
+- [x] **Step 8: Run query, protocol, and integration tests**
 
 ```bash
 npm run test:brain -- tests/brain/query/brain-query-service.test.ts tests/brain/interfaces/mcp-server.test.ts
@@ -2025,7 +2029,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit Task 8**
+- [x] **Step 9: Commit Task 8**
 
 ```bash
 git add src/brain/query src/brain/interfaces src/brain/dev/verify-slice-1.ts tests/brain/query tests/brain/interfaces tests/brain/integration/mcp-seeded-inspection.test.ts
