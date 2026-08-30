@@ -7,6 +7,17 @@ describe("Batch Compliance policy", () => {
   });
 
   it.each([
+    ["2026-08-27T12:00:00.000+05:30", "2026-08-27T18:30:00.000Z"],
+    ["2026-03-08T01:30:00.000-06:00", "2026-03-08T19:30:00.000Z"]
+  ])("uses the explicit offset and schedules exactly 12 hours later", (checkedAt, expected) => {
+    expect(nextComplianceCheckAt(checkedAt)).toBe(expected);
+  });
+
+  it.each(["2026-08-27T12:00:00.000", "not-a-timestamp"])("rejects a non-offset or invalid checked time", (checkedAt) => {
+    expect(() => nextComplianceCheckAt(checkedAt)).toThrow();
+  });
+
+  it.each([
     ["active", "retain"],
     ["edited", "rehydrate"],
     ["deleted", "purge"],

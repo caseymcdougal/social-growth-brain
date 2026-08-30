@@ -1585,7 +1585,7 @@ git commit -m "feat(brain): import validated Casey-owned history"
 - Create: `src/brain/compliance/policy.ts`
 - Create: `tests/brain/compliance/policy.test.ts`
 
-- [ ] **Step 1: Write failing retention-policy tests**
+- [x] **Step 1: Write failing retention-policy tests**
 
 Create `tests/brain/compliance/policy.test.ts`:
 
@@ -1627,17 +1627,18 @@ npm run test:brain -- tests/brain/compliance/policy.test.ts
 
 Expected: FAIL because the policy module does not exist.
 
-- [ ] **Step 2: Implement deterministic scheduling and disposition**
+- [x] **Step 2: Implement deterministic scheduling and disposition**
 
 Create `src/brain/compliance/policy.ts`:
 
 ```ts
-import { complianceCheckSchema, type ComplianceCheck } from "../domain";
+import { complianceCheckSchema, isoTimestampSchema, type ComplianceCheck } from "../domain";
 
 export const COMPLIANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export function nextComplianceCheckAt(checkedAt: string): string {
-  return new Date(Date.parse(checkedAt) + COMPLIANCE_INTERVAL_MS).toISOString();
+  const parsedCheckedAt = isoTimestampSchema.parse(checkedAt);
+  return new Date(Date.parse(parsedCheckedAt) + COMPLIANCE_INTERVAL_MS).toISOString();
 }
 
 type CheckStatus = ComplianceCheck["status"];
@@ -1662,7 +1663,7 @@ export function buildComplianceCheck(
 
 This task creates scheduling and persistence support only. Do not implement Batch Compliance API calls until the Slice 2 policy gate is rechecked.
 
-- [ ] **Step 3: Run tests and commit**
+- [x] **Step 3: Run tests and commit**
 
 ```bash
 npm run test:brain -- tests/brain/compliance/policy.test.ts

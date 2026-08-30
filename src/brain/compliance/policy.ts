@@ -1,9 +1,10 @@
-import { complianceCheckSchema, type ComplianceCheck } from "../domain";
+import { complianceCheckSchema, isoTimestampSchema, type ComplianceCheck } from "../domain";
 
 export const COMPLIANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export function nextComplianceCheckAt(checkedAt: string): string {
-  return new Date(Date.parse(checkedAt) + COMPLIANCE_INTERVAL_MS).toISOString();
+  const parsedCheckedAt = isoTimestampSchema.parse(checkedAt);
+  return new Date(Date.parse(parsedCheckedAt) + COMPLIANCE_INTERVAL_MS).toISOString();
 }
 
 type CheckStatus = ComplianceCheck["status"];
