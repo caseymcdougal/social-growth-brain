@@ -127,6 +127,14 @@ describe("PostgresBrainEventStore", () => {
     )).rejects.toThrow();
   });
 
+  it("rejects an archive payload without a fingerprint property", async () => {
+    const { sourceFingerprint: _sourceFingerprint, ...missingFingerprint } = archive;
+    await expect(pool.query(
+      "INSERT INTO brain_creator_archives (id, creator_id, source_fingerprint, imported_at, payload) VALUES ($1, $2, $3, $4, $5)",
+      [archive.id, archive.creatorId, HASH, archive.importedAt, missingFingerprint]
+    )).rejects.toThrow();
+  });
+
   it("fails closed when a lookup row has mismatched payload and indexed fingerprints", async () => {
     const mismatched = { ...archive, sourceFingerprint: "b".repeat(64) };
     const poolWithCorruptRow = { query: vi.fn().mockResolvedValue({ rows: [{ source_fingerprint: HASH, payload: mismatched }] }) } as unknown as Pool;
