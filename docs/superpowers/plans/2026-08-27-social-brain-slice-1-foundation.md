@@ -2061,7 +2061,7 @@ git commit -m "feat(brain): expose read-only MCP inspection"
 
 Use the `skill-creator` skill for this task and validate the canonical folder with its bundled validator.
 
-- [ ] **Step 1: Create the canonical model-facing skill**
+- [x] **Step 1: Create the canonical model-facing skill**
 
 Create `skills/social-brain/SKILL.md`:
 
@@ -2099,7 +2099,7 @@ Use the Social Brain MCP tools as the source of truth for current opportunity st
 - Do not copy scoring weights, schemas, private strategy, or publishing logic into this skill. Those belong behind MCP tools.
 ```
 
-- [ ] **Step 2: Link the canonical skill into both current project discovery paths**
+- [x] **Step 2: Link the canonical skill into both current project discovery paths**
 
 Run:
 
@@ -2111,7 +2111,7 @@ ln -s ../../skills/social-brain .claude/skills/social-brain
 
 The symlinks keep one canonical instruction source. If either path already exists, stop and inspect it rather than overwriting it.
 
-- [ ] **Step 3: Validate the skill and links**
+- [x] **Step 3: Validate the skill and links**
 
 Run:
 
@@ -2123,11 +2123,11 @@ readlink .claude/skills/social-brain
 
 Expected: the validator reports success and each link resolves to `../../skills/social-brain`.
 
-- [ ] **Step 4: Perform a thinness review**
+- [x] **Step 4: Perform a thinness review**
 
 Read `skills/social-brain/SKILL.md` once. Confirm it contains no numeric ranking weights, model prompts, SQL, provider credentials, publishing permission, or duplicated domain schema. Its only stable knowledge should be workflow, response shape, safety boundaries, and MCP tool names.
 
-- [ ] **Step 5: Commit Task 9**
+- [x] **Step 5: Commit Task 9**
 
 ```bash
 git add skills/social-brain .agents/skills/social-brain .claude/skills/social-brain
