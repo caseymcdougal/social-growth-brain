@@ -6,4 +6,8 @@ const archive: CreatorArchive = { schemaVersion: 1, id: "00000000-0000-4000-8000
 describe("Casey context", () => {
   it("returns null when no archive exists", async () => expect(await loadLatestCaseyContext({ getLatestCreatorArchive: async () => null } as never)).toBeNull());
   it("maps every retrieval field unchanged and versions it by fingerprint", () => expect(buildCaseyContext(archive)).toEqual({ creatorId: "casey-mcdougal", version: archive.sourceFingerprint, archiveId: archive.id, importedAt: archive.importedAt, profile: archive.profile, ownedPosts: archive.posts, voiceProfile: archive.voiceProfile, voiceOverrides: archive.voiceOverrides, strategyMemory: archive.strategyMemory, creativeDirections: archive.creativeDirections }));
+  it("isolates and freezes the context snapshot", () => {
+    const context = buildCaseyContext(archive); archive.posts[0]!.text = "changed"; archive.voiceProfile!.vocabulary[0] = "changed";
+    expect(context.ownedPosts[0]!.text).toBe("hello"); expect(context.voiceProfile!.vocabulary[0]).toBe("build"); expect(() => { (context.ownedPosts[0] as { text: string }).text = "nope"; }).toThrow();
+  });
 });

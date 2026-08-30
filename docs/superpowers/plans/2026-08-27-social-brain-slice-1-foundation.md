@@ -1439,6 +1439,8 @@ Use the existing `openDatabase` and `createRepositories` helpers only to constru
 5. The reader still succeeds after dropping `analysis_runs`, `strategy_reports`, `post_analyses`, `generation_runs`, `generated_posts`, and `topic_exploration_runs`, proving it does not query those tables or any job directory.
 6. Capture source schema version, table names, row counts, main SQLite bytes, and directory file set before a successful read; every value remains unchanged afterwards.
 7. Two first imports started concurrently on an empty archive table produce exactly `imported` and `already-imported`, the same winner ID/fingerprint, and a guarded direct fingerprint row count of exactly one; a later sequential import is `already-imported`.
+8. Use a private `O_NOFOLLOW` snapshot captured before PostgreSQL configuration or migrations; reject symlinks, identity changes during capture, and active WAL sidecars with an actionable quiesce/checkpoint error. Verify main/WAL/SHM bytes and directory entries remain unchanged.
+9. Build all archive fields in one explicit read transaction over that private snapshot. Strictly reject non-string text/blob/null fields unless nullable by schema, non-safe/nonnegative-integer metrics, and invalid creative rows. Normalize through `creatorArchiveSchema`, sort retained posts by ID after deterministic last-row deduplication, then fingerprint only normalized payload fields.
 
 Run:
 
@@ -1669,7 +1671,7 @@ The explicit mappers copy only fields present in `creatorArchiveSchema`; raw row
 
 - [ ] **Step 4: Add an idempotent import service and explicit CLI**
 
-Create `src/brain/import/import-legacy.ts`:
+Create `src/brain/import/import-legacy.ts`. Keep capture/read candidate separate from persistence so the CLI can capture a secure candidate before loading runtime config, opening PostgreSQL, or running migrations; persist only that immutable candidate.
 
 ```ts
 import type { BrainEventStore } from "../storage/event-store";

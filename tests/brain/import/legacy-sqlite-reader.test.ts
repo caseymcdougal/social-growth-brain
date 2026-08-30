@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -51,6 +51,21 @@ describe("readLegacyCreatorArchive", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
     db.prepare("UPDATE post_snapshots SET likes_count = 'broken'").run(); db.close();
     expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("likes_count");
+  });
+  it("rejects fractional, negative, and malformed creator text", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.prepare("UPDATE post_snapshots SET views_count = -1").run(); db.close(); expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("views_count");
+    const second = fixture().sqlitePath; const db2 = openDatabase(second); db2.prepare("UPDATE post_snapshots SET likes_count = 1.5").run(); db2.close(); expect(() => readLegacyCreatorArchive({ sqlitePath: second })).toThrow("likes_count");
+  });
+  it("fails closed for symlink and active WAL sources without changing source files", () => {
+    const { sqlitePath } = fixture(); const link = `${sqlitePath}.link`; symlinkSync(sqlitePath, link); expect(() => readLegacyCreatorArchive({ sqlitePath: link })).toThrow("symlink");
+    const db = openDatabase(sqlitePath); db.pragma("journal_mode = WAL"); db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('wal', ?)").run("2026-08-07T00:00:00.000Z"); const before = readdirSync(join(sqlitePath, "..")).sort();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active WAL sidecars"); expect(readdirSync(join(sqlitePath, "..")).sort()).toEqual(before); db.close();
+  });
+  it("hashes normalized creative directions and stable retained-post order", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.prepare("UPDATE creative_direction SET text = '  write more examples  '").run(); db.close();
+    const first = readLegacyCreatorArchive({ sqlitePath, now: () => new Date("2026-08-08T00:00:00.000Z") }); const second = readLegacyCreatorArchive({ sqlitePath, now: () => new Date("2026-08-08T00:00:00.000Z") });
+    expect(first.creativeDirections).toEqual(["write more examples"]); expect(first.sourceFingerprint).toBe(second.sourceFingerprint); expect(first.posts.map((post) => post.xPostId)).toEqual([...first.posts.map((post) => post.xPostId)].sort());
   });
   it("treats blank handles as unattributable mixed creators", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
