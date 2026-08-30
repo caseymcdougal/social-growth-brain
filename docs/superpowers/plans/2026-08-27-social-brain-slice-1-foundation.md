@@ -1428,7 +1428,7 @@ git commit -m "feat(brain): add deterministic synthetic replay"
 - Create: `tests/brain/profile/casey-context.test.ts`
 - Create: `tests/brain/integration/import-legacy.test.ts`
 
-- [ ] **Step 1: Write failing isolation tests around a temporary legacy database**
+- [x] **Step 1: Write failing isolation tests around a temporary legacy database**
 
 Use the existing `openDatabase` and `createRepositories` helpers only to construct and close temporary SQLite fixtures. Test these cases:
 
@@ -1450,7 +1450,7 @@ npm run test:brain -- tests/brain/import/legacy-sqlite-reader.test.ts
 
 Expected: FAIL because the importer does not exist.
 
-- [ ] **Step 2: Add fingerprint lookup to the storage contract**
+- [x] **Step 2: Add fingerprint lookup to the storage contract**
 
 Add to `BrainEventStore`:
 
@@ -1462,7 +1462,7 @@ Implement it in `PostgresBrainEventStore` with a parameterized equality query an
 
 In the same adapter, change `appendCreatorArchive` to `INSERT ... ON CONFLICT (source_fingerprint) DO NOTHING`. This preserves append-only behavior while making concurrent import idempotent.
 
-- [ ] **Step 3: Implement a read-only, Casey-fixed SQLite reader**
+- [x] **Step 3: Implement a read-only, Casey-fixed SQLite reader**
 
 **Authoritative implementation flow:**
 
@@ -1493,7 +1493,7 @@ const sourceFingerprint = createHash("sha256")
 
 Return one final `creatorArchiveSchema.parse({ ...normalized, id: randomUUID(), sourceFingerprint })`. Never open or modify the user-owned database in place.
 
-- [ ] **Step 4: Add an idempotent import service and explicit CLI**
+- [x] **Step 4: Add an idempotent import service and explicit CLI**
 
 Keep immutable capture separate from persistence:
 
@@ -1514,7 +1514,7 @@ export async function persistLegacyCreatorArchive(store: BrainEventStore, candid
 
 The CLI requires `--sqlite /absolute/path/to/file.sqlite` and rejects missing, relative, nonexistent, symlink, or non-file paths. Its order is mandatory: `candidate = captureLegacyCreatorArchive(absolutePath)` **before** `loadRuntimeConfig`, pool creation, or migrations; then load configuration, open the pool, run migrations, call `persistLegacyCreatorArchive(store, candidate)`, print only status/archive ID/fingerprint/imported post count, and close the pool in `finally`.
 
-- [ ] **Step 5: Add the versioned Casey context module**
+- [x] **Step 5: Add the versioned Casey context module**
 
 Create `tests/brain/profile/casey-context.test.ts` first. Assert that no archive returns `null`, and a valid archive becomes a context whose version equals the immutable source fingerprint and whose fields remain unchanged.
 
@@ -1560,7 +1560,7 @@ export async function loadLatestCaseyContext(store: BrainEventStore): Promise<Ca
 
 This is retrieval-time memory. It does not train a model, update weights, or silently rewrite strategy.
 
-- [ ] **Step 6: Run importer, context, and integration tests**
+- [x] **Step 6: Run importer, context, and integration tests**
 
 ```bash
 npm run test:brain -- tests/brain/import/legacy-sqlite-reader.test.ts
@@ -1571,7 +1571,7 @@ npm run lint
 
 Expected: PASS. Inspect the fixture source after the test and confirm no new tables or rows were written to it.
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```bash
 git add src/brain/import src/brain/profile src/brain/storage/event-store.ts src/brain/storage/postgres-event-store.ts tests/brain/import tests/brain/profile tests/brain/integration/import-legacy.test.ts

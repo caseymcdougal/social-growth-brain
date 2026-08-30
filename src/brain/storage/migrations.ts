@@ -6,6 +6,10 @@ const migrations = [{
   version: 1,
   name: "brain_foundation",
   url: new URL("./migrations/0001_brain_foundation.sql", pathToFileURL(`${import.meta.dirname}/`))
+}, {
+  version: 2,
+  name: "creator_archive_fingerprint_binding",
+  url: new URL("./migrations/0002_creator_archive_fingerprint_binding.sql", pathToFileURL(`${import.meta.dirname}/`))
 }];
 
 export async function runMigrations(pool: Pool): Promise<void> {

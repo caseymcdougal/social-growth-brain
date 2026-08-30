@@ -9,6 +9,7 @@ import {
 import type { BrainEventStore, OpportunityQuery } from "./event-store";
 
 type PayloadRow = { payload: unknown };
+type CreatorArchiveRow = PayloadRow & { source_fingerprint: string };
 const opportunityQuerySchema = z.object({
   statuses: z.array(opportunityStatusSchema).optional(),
   limit: z.number().int().min(1).max(100).optional()
@@ -79,7 +80,16 @@ export class PostgresBrainEventStore implements BrainEventStore {
   async appendComplianceCheck(input: ComplianceCheck): Promise<void> { const value = complianceCheckSchema.parse(input); await this.insert("INSERT INTO brain_compliance_checks (id, retained_post_id, checked_at, payload) VALUES ($1, $2, $3, $4)", [value.id, value.retainedPostId, value.checkedAt, value]); }
   async listComplianceChecks(retainedPostId?: string): Promise<ComplianceCheck[]> { return retainedPostId === undefined ? this.many("SELECT payload FROM brain_compliance_checks ORDER BY checked_at ASC, id ASC", [], complianceCheckSchema) : this.many("SELECT payload FROM brain_compliance_checks WHERE retained_post_id = $1 ORDER BY checked_at ASC, id ASC", [retainedPostId], complianceCheckSchema); }
   async appendCreatorArchive(input: CreatorArchive): Promise<void> { const value = creatorArchiveSchema.parse(input); await this.insert("INSERT INTO brain_creator_archives (id, creator_id, source_fingerprint, imported_at, payload) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (source_fingerprint) DO NOTHING", [value.id, value.creatorId, value.sourceFingerprint, value.importedAt, value]); }
-  async getCreatorArchiveByFingerprint(sourceFingerprint: string): Promise<CreatorArchive | null> { return this.one("SELECT payload FROM brain_creator_archives WHERE source_fingerprint = $1", [sourceFingerprint], creatorArchiveSchema); }
+  async getCreatorArchiveByFingerprint(sourceFingerprint: string): Promise<CreatorArchive | null> {
+    const result = await this.pool.query<CreatorArchiveRow>("SELECT source_fingerprint, payload FROM brain_creator_archives WHERE source_fingerprint = $1", [sourceFingerprint]);
+    const row = result.rows[0];
+    if (!row) return null;
+    const archive = creatorArchiveSchema.parse(row.payload);
+    if (row.source_fingerprint !== sourceFingerprint || archive.sourceFingerprint !== row.source_fingerprint) {
+      throw new Error("Creator archive fingerprint binding mismatch");
+    }
+    return archive;
+  }
   async getLatestCreatorArchive(): Promise<CreatorArchive | null> { return this.one("SELECT payload FROM brain_creator_archives WHERE creator_id = $1 ORDER BY imported_at DESC, id DESC LIMIT 1", ["casey-mcdougal"], creatorArchiveSchema); }
   async healthCheck(): Promise<void> { await this.pool.query("SELECT 1"); }
 

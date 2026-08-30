@@ -120,6 +120,19 @@ describe("PostgresBrainEventStore", () => {
     expect(creatorArchiveSchema.parse(await store.getLatestCreatorArchive())).toEqual(archive);
   });
 
+  it("binds an archive payload fingerprint to its indexed fingerprint", async () => {
+    await expect(pool.query(
+      "INSERT INTO brain_creator_archives (id, creator_id, source_fingerprint, imported_at, payload) VALUES ($1, $2, $3, $4, $5)",
+      [archive.id, archive.creatorId, "b".repeat(64), archive.importedAt, archive]
+    )).rejects.toThrow();
+  });
+
+  it("fails closed when a lookup row has mismatched payload and indexed fingerprints", async () => {
+    const mismatched = { ...archive, sourceFingerprint: "b".repeat(64) };
+    const poolWithCorruptRow = { query: vi.fn().mockResolvedValue({ rows: [{ source_fingerprint: HASH, payload: mismatched }] }) } as unknown as Pool;
+    await expect(new PostgresBrainEventStore(poolWithCorruptRow).getCreatorArchiveByFingerprint(HASH)).rejects.toThrow("fingerprint");
+  });
+
   it("rejects duplicate opportunity revisions", async () => {
     await store.appendOpportunityRevision(opportunity(1));
     await expect(store.appendOpportunityRevision(opportunity(1))).rejects.toThrow();

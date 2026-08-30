@@ -60,12 +60,19 @@ describe("readLegacyCreatorArchive", () => {
   it("fails closed for symlink and active WAL sources without changing source files", () => {
     const { sqlitePath } = fixture(); const link = `${sqlitePath}.link`; fs.symlinkSync(sqlitePath, link); expect(() => readLegacyCreatorArchive({ sqlitePath: link })).toThrow("symlink");
     const db = openDatabase(sqlitePath); db.pragma("journal_mode = WAL"); db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('wal', ?)").run("2026-08-07T00:00:00.000Z"); const before = fs.readdirSync(join(sqlitePath, "..")).sort();
-    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active WAL sidecars"); expect(fs.readdirSync(join(sqlitePath, "..")).sort()).toEqual(before); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active SQLite sidecars"); expect(fs.readdirSync(join(sqlitePath, "..")).sort()).toEqual(before); db.close();
   });
-  it("hashes normalized creative directions and stable retained-post order", () => {
-    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.prepare("UPDATE creative_direction SET text = '  write more examples  '").run(); db.close();
-    const first = readLegacyCreatorArchive({ sqlitePath, now: () => new Date("2026-08-08T00:00:00.000Z") }); const second = readLegacyCreatorArchive({ sqlitePath, now: () => new Date("2026-08-08T00:00:00.000Z") });
-    expect(first.creativeDirections).toEqual(["write more examples"]); expect(first.sourceFingerprint).toBe(second.sourceFingerprint); expect(first.posts.map((post) => post.xPostId)).toEqual([...first.posts.map((post) => post.xPostId)].sort());
+  it("fingerprints equivalent normalized histories despite padding and stale duplicate rows", () => {
+    const clean = fixture().sqlitePath; const padded = fixture().sqlitePath;
+    for (const sqlitePath of [clean, padded]) {
+      const db = openDatabase(sqlitePath);
+      db.prepare("INSERT INTO post_snapshots (profile_snapshot_id, x_post_id, url, text, posted_at, captured_at, source, views_count, likes_count, reposts_count, replies_count, bookmarks_count) VALUES (2, '200', 'https://x.com/caseymcdougal/status/200', 'second', NULL, '2026-08-03T00:00:00.000Z', 'manual', 1, 2, 3, 4, 5)").run();
+      db.close();
+    }
+    const cleanDb = openDatabase(clean); cleanDb.prepare("DELETE FROM post_snapshots WHERE profile_snapshot_id = 1 AND x_post_id = '100'").run(); cleanDb.close();
+    const paddedDb = openDatabase(padded); paddedDb.prepare("UPDATE profile_snapshots SET handle = '  CaseyMcDougal  '").run(); paddedDb.prepare("UPDATE creative_direction SET text = '  write more examples  '").run(); paddedDb.close();
+    const fixedNow = () => new Date("2026-08-08T00:00:00.000Z"); const cleanArchive = readLegacyCreatorArchive({ sqlitePath: clean, now: fixedNow }); const paddedArchive = readLegacyCreatorArchive({ sqlitePath: padded, now: fixedNow });
+    expect(cleanArchive.posts.map((post) => post.xPostId)).toEqual(["100", "200"]); expect(paddedArchive.posts).toEqual(cleanArchive.posts); expect(paddedArchive.creativeDirections).toEqual(cleanArchive.creativeDirections); expect(paddedArchive.sourceFingerprint).toBe(cleanArchive.sourceFingerprint);
   });
   it("treats blank handles as unattributable mixed creators", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
@@ -107,17 +114,45 @@ describe("readLegacyCreatorArchive", () => {
     expect(sourceSnapshot(sqlitePath)).toEqual(before);
     expect(fs.readdirSync(tmpdir()).filter((name) => name.startsWith("social-brain-legacy-")).sort()).toEqual(privateBefore);
   });
-  it("rejects a WAL sidecar that appears after copying and cleans its private snapshot", () => {
-    const { sqlitePath } = fixture(); const before = sourceSnapshot(sqlitePath); const privateBefore = fs.readdirSync(tmpdir()).filter((name) => name.startsWith("social-brain-legacy-")).sort();
-    const originalFstat = fs.fstatSync; let fstatCalls = 0;
-    const spy = vi.spyOn(fs, "fstatSync").mockImplementation(((fd: number) => {
-      const stat = originalFstat(fd); fstatCalls += 1;
-      if (fstatCalls === 2) fs.writeFileSync(`${sqlitePath}-wal`, "test-only sidecar");
-      return stat;
-    }) as typeof fs.fstatSync);
-    try { expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active WAL sidecars"); }
-    finally { spy.mockRestore(); fs.rmSync(`${sqlitePath}-wal`, { force: true }); }
-    expect(sourceSnapshot(sqlitePath)).toEqual(before);
-    expect(fs.readdirSync(tmpdir()).filter((name) => name.startsWith("social-brain-legacy-")).sort()).toEqual(privateBefore);
+  it("rejects WAL and rollback-journal sidecars that appear after copying", () => {
+    for (const suffix of ["-wal", "-journal"]) {
+      const { sqlitePath } = fixture(); const before = sourceSnapshot(sqlitePath); const privateBefore = fs.readdirSync(tmpdir()).filter((name) => name.startsWith("social-brain-legacy-")).sort();
+      const originalFstat = fs.fstatSync; let fstatCalls = 0;
+      const spy = vi.spyOn(fs, "fstatSync").mockImplementation(((fd: number) => {
+        const stat = originalFstat(fd); fstatCalls += 1;
+        if (fstatCalls === 2) fs.writeFileSync(`${sqlitePath}${suffix}`, "test-only sidecar");
+        return stat;
+      }) as typeof fs.fstatSync);
+      try { expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active SQLite sidecars"); }
+      finally { spy.mockRestore(); fs.rmSync(`${sqlitePath}${suffix}`, { force: true }); }
+      expect(sourceSnapshot(sqlitePath)).toEqual(before);
+      expect(fs.readdirSync(tmpdir()).filter((name) => name.startsWith("social-brain-legacy-")).sort()).toEqual(privateBefore);
+    }
+  });
+  it("rejects an active rollback journal without importing uncommitted source pages", () => {
+    const { sqlitePath } = fixture(); const before = sourceSnapshot(sqlitePath); const writer = new Database(sqlitePath);
+    writer.pragma("journal_mode = DELETE"); writer.exec("BEGIN IMMEDIATE"); writer.prepare("UPDATE profile_snapshots SET display_name = 'uncommitted'").run();
+    expect(fs.existsSync(`${sqlitePath}-journal`)).toBe(true);
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active SQLite sidecars");
+    writer.exec("ROLLBACK"); writer.close();
+    expect(readLegacyCreatorArchive({ sqlitePath }).profile?.displayName).not.toBe("uncommitted"); expect(sourceSnapshot(sqlitePath)).toEqual(before);
+  });
+  it("rejects a hardlink alias to a live WAL source", () => {
+    const { sqlitePath } = fixture(); const alias = `${sqlitePath}.alias`; fs.linkSync(sqlitePath, alias); const writer = new Database(sqlitePath);
+    try { writer.pragma("journal_mode = WAL"); writer.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('live', ?)").run("2026-08-09T00:00:00.000Z"); expect(() => readLegacyCreatorArchive({ sqlitePath: alias })).toThrow("multiple hard links"); }
+    finally { writer.close(); fs.rmSync(alias, { force: true }); }
+  });
+  it("rejects BLOB ownership and corrupt recency fields before choosing candidates", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.prepare("UPDATE profile_snapshots SET handle = CAST('caseymcdougal' AS BLOB) WHERE id = 1").run(); db.close(); expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("handle");
+    const second = fixture().sqlitePath; const db2 = openDatabase(second); db2.prepare("UPDATE voice_profiles SET created_at = 'not-a-datetime'").run(); db2.close(); expect(() => readLegacyCreatorArchive({ sqlitePath: second })).toThrow("voice_profiles.created_at");
+    const third = fixture().sqlitePath; const db3 = openDatabase(third); db3.prepare("UPDATE strategy_memories SET created_at = 'not-a-datetime'").run(); db3.close(); expect(() => readLegacyCreatorArchive({ sqlitePath: third })).toThrow("strategy_memories.created_at");
+  });
+  it("rejects corrupt raw foreign keys and post recency before ownership filtering", () => {
+    const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath);
+    db.pragma("foreign_keys = OFF"); db.prepare("UPDATE post_snapshots SET profile_snapshot_id = CAST(2 AS BLOB) WHERE id = 1").run(); db.pragma("foreign_keys = ON"); db.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("post_snapshots.profile_snapshot_id");
+    const second = fixture().sqlitePath; const db2 = openDatabase(second); db2.prepare("UPDATE post_snapshots SET captured_at = 'not-a-datetime' WHERE id = 1").run(); db2.close();
+    expect(() => readLegacyCreatorArchive({ sqlitePath: second })).toThrow("post_snapshots.captured_at");
   });
 });
