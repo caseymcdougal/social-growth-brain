@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -61,6 +61,11 @@ describe("readLegacyCreatorArchive", () => {
     const { sqlitePath } = fixture(); const link = `${sqlitePath}.link`; symlinkSync(sqlitePath, link); expect(() => readLegacyCreatorArchive({ sqlitePath: link })).toThrow("symlink");
     const db = openDatabase(sqlitePath); db.pragma("journal_mode = WAL"); db.prepare("INSERT INTO creative_direction (text, updated_at) VALUES ('wal', ?)").run("2026-08-07T00:00:00.000Z"); const before = readdirSync(join(sqlitePath, "..")).sort();
     expect(() => readLegacyCreatorArchive({ sqlitePath })).toThrow("active WAL sidecars"); expect(readdirSync(join(sqlitePath, "..")).sort()).toEqual(before); db.close();
+  });
+  it("rejects path replacement and newly-created sidecars during private capture", () => {
+    const { sqlitePath } = fixture(); const replacement = `${sqlitePath}.replacement`; copyFileSync(sqlitePath, replacement);
+    expect(() => readLegacyCreatorArchive({ sqlitePath, onCapturedForTest: () => { rmSync(sqlitePath); copyFileSync(replacement, sqlitePath); } })).toThrow("changed while capturing");
+    const second = fixture().sqlitePath; expect(() => readLegacyCreatorArchive({ sqlitePath: second, onCapturedForTest: () => writeFileSync(`${second}-wal`, "sidecar") })).toThrow("active WAL sidecars");
   });
   it("hashes normalized creative directions and stable retained-post order", () => {
     const { sqlitePath } = fixture(); const db = openDatabase(sqlitePath); db.prepare("UPDATE creative_direction SET text = '  write more examples  '").run(); db.close();

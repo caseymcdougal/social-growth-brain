@@ -1498,7 +1498,7 @@ interface LegacyPostRow {
 
 function requiredLegacyNumber(value: unknown, field: string): number | null {
   if (value === null) return null;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
   throw new Error(`Invalid legacy numeric field: ${field}`);
 }
 
@@ -1536,9 +1536,15 @@ export interface ReadLegacyArchiveOptions {
 }
 
 export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): CreatorArchive {
-  const db = new Database(options.sqlitePath, { readonly: true, fileMustExist: true });
+  // Capture a private O_NOFOLLOW copy first. Compare initial lstat, opened-fd
+  // fstat, and final lstat dev+ino; check WAL/SHM absence both before and after
+  // copying. Reject any sidecar type or identity/stability change, then always
+  // close the fd and remove the private directory in finally.
+  const snapshot = capturePrivateSnapshot(options.sqlitePath);
+  const db = new Database(snapshot.path, { readonly: true, fileMustExist: true });
   try {
     db.pragma("query_only = ON");
+    db.exec("BEGIN"); // all schema/data reads and canonical construction share one snapshot
     const requiredTables = [
       "profile_snapshots",
       "post_snapshots",
@@ -1641,7 +1647,10 @@ export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): Cre
         : [],
       omittedFields
     };
-    const sourceFingerprint = createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+    // Parse through creatorArchiveSchema first (including trim normalization),
+    // then sort last-row-wins deduplicated posts by xPostId and hash only that
+    // normalized canonical payload, never IDs or import timestamps.
+    const sourceFingerprint = createHash("sha256").update(JSON.stringify(normalizedCanonical)).digest("hex");
     const importedAt = (options.now ?? (() => new Date()))().toISOString();
 
     return creatorArchiveSchema.parse({
@@ -1662,7 +1671,9 @@ export function readLegacyCreatorArchive(options: ReadLegacyArchiveOptions): Cre
       importReport: { importedPosts: canonical.posts.length, omittedFields }
     });
   } finally {
+    try { db.exec("ROLLBACK"); } catch {}
     db.close();
+    snapshot.cleanup();
   }
 }
 ```
