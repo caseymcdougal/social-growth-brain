@@ -61,4 +61,18 @@ describe("BrainQueryService", () => {
     expect(JSON.stringify(health)).not.toContain("postgresql:");
     expect(JSON.stringify(health)).not.toContain("placeholder");
   });
+
+  it("does not expose a production approval reference in health output", async () => {
+    const approvalReference = "x-approval-private-reference";
+    const productionService = new BrainQueryService(store(), {
+      mode: "production",
+      databaseUrl: "postgresql://social_brain:placeholder@db.example.invalid/social_brain?sslmode=verify-full",
+      xApprovalReference: approvalReference,
+      dailySpendLimitUsd: 10,
+      monthlySpendLimitUsd: 100
+    });
+    const health = await productionService.getSystemHealth();
+    expect(health.approvalConfigured).toBe(true);
+    expect(JSON.stringify(health)).not.toContain(approvalReference);
+  });
 });

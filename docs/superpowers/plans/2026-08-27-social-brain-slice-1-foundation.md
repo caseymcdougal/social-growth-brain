@@ -1682,7 +1682,10 @@ git commit -m "feat(brain): add compliance retention policy"
 - Create: `src/brain/dev/verify-slice-1.ts`
 - Create: `tests/brain/query/brain-query-service.test.ts`
 - Create: `tests/brain/interfaces/mcp-server.test.ts`
+- Create: `tests/brain/interfaces/mcp-stdio.test.ts`
+- Create: `tests/brain/dev/verify-slice-1.test.ts`
 - Create: `tests/brain/integration/mcp-seeded-inspection.test.ts`
+- Create: `tests/brain/integration/mcp-stdio-launcher.test.ts`
 
 - [x] **Step 1: Write failing query-service tests**
 
@@ -1961,24 +1964,36 @@ import { createPostgresPool } from "../../storage/postgres";
 import { PostgresBrainEventStore } from "../../storage/postgres-event-store";
 import { createReadOnlyMcpServer } from "./create-server";
 
-const config = loadRuntimeConfig();
-const pool = createPostgresPool(config.databaseUrl);
-
-try {
-  await runMigrations(pool);
-  const store = new PostgresBrainEventStore(pool);
-  const server = createReadOnlyMcpServer(new BrainQueryService(store, config));
-  await server.connect(new StdioServerTransport());
-  console.error("Social Brain read-only MCP server running on stdio");
-} catch (error) {
-  await pool.end();
-  throw error;
+export async function runReadOnlyStdioServer({ stdin, transport, server, pool, migrate, logError }) {
+  let inputError = null;
+  const shutdown = new Promise((resolveShutdown) => {
+    stdin.once("end", resolveShutdown);
+    stdin.once("error", (error) => {
+      inputError = error;
+      logError("Social Brain MCP stdin error", error);
+      resolveShutdown();
+    });
+  });
+  try {
+    await migrate(pool);
+    await server.connect(transport);
+    await shutdown;
+    return inputError === null ? "closed" : "error";
+  } finally {
+    try {
+      await server.close(); // closes the owned stdio transport
+    } finally {
+      await pool.end();
+    }
+  }
 }
 ```
 
 Never write diagnostics to stdout because stdout is the MCP protocol stream.
 
 The composition root must also treat stdin EOF and stdin errors as lifecycle events: close the MCP server/transport and PostgreSQL pool exactly once, emit any error diagnostic only to stderr, and allow the process to exit naturally.
+
+Launch this protocol endpoint with `npm --silent run brain:mcp`; plain `npm run` writes npm banners to stdout and corrupts the MCP stream.
 
 - [x] **Step 6: Prove seeded inspection against real PostgreSQL**
 
@@ -2133,7 +2148,7 @@ Create `docs/social-brain/slice-1-runbook.md` with these exact sections:
 1. `Policy boundary`: synthetic and Casey-owned data only; no live X, models on X content, Telegram, or publishing.
 2. `Local startup`: use the safe built-in synthetic database URL or export the matching `.env.example` override, then start PostgreSQL, migrate, seed, and verify.
 3. `Legacy import`: require an absolute SQLite path, explain Casey-only filtering and omitted global fields.
-4. `Agent connection`: run `npm run brain:mcp`; configure the client to launch that command from the repository root.
+4. `Agent connection`: run `npm --silent run brain:mcp`; configure the client to launch that command from the repository root. The silent flag is required because stdout is the MCP protocol stream.
 5. `Failure recovery`: database unavailable means no state transition; duplicate seeds are safe; production parsing fails without approval and budgets.
 
 Include command blocks using only the scripts defined in Task 1. Do not include real credentials or suggest switching to production mode.
