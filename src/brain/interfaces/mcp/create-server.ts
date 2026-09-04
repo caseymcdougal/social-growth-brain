@@ -1,13 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { complianceCheckSchema, decisionEventSchema, draftVariantSchema, opportunitySchema, opportunityStatusSchema, outcomeSnapshotSchema, signalEvidenceSchema, uuidSchema } from "../../domain";
+import { complianceCheckSchema, creatorArchiveSchema, creatorArchiveSourceSchema, decisionEventSchema, draftVariantSchema, opportunitySchema, opportunityStatusSchema, outcomeSnapshotSchema, signalEvidenceSchema, uuidSchema } from "../../domain";
 import type { BrainQueryService } from "../../query/brain-query-service";
 
 const opportunityListOutputSchema = z.object({ opportunities: z.array(opportunitySchema) });
 const inspectionOutputSchema = z.object({ opportunity: opportunitySchema, revisions: z.array(opportunitySchema), evidence: z.array(signalEvidenceSchema), drafts: z.array(draftVariantSchema), decisions: z.array(decisionEventSchema), outcomes: z.array(outcomeSnapshotSchema), compliance: z.array(complianceCheckSchema) });
 const explanationOutputSchema = z.object({ opportunity: opportunitySchema, evidence: z.array(signalEvidenceSchema), drafts: z.array(draftVariantSchema) });
 const proofOutputSchema = z.object({ state: z.literal("not_started"), requiredConsecutiveDays: z.literal(7), requiredViews: z.literal(1000), maturityHours: z.literal(48), reason: z.string() });
-const healthOutputSchema = z.object({ mode: z.enum(["synthetic", "production"]), storage: z.enum(["healthy", "unavailable"]), liveAdaptersInstalled: z.boolean(), approvalConfigured: z.boolean(), latestComplianceCheckedAt: z.string().datetime({ offset: true }).nullable(), capabilities: z.array(z.object({ capability: z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"]), allowed: z.boolean(), reason: z.string() })) });
+const archiveOutputSchema = z.object({ available: z.boolean(), archive: creatorArchiveSchema.nullable() }).strict();
+const healthOutputSchema = z.object({ mode: z.enum(["synthetic", "production"]), storage: z.enum(["healthy", "unavailable"]), liveAdaptersInstalled: z.boolean(), approvalConfigured: z.boolean(), latestComplianceCheckedAt: z.string().datetime({ offset: true }).nullable(), creatorArchive: z.object({ available: z.boolean(), source: creatorArchiveSourceSchema.nullable(), importedAt: z.string().datetime({ offset: true }).nullable() }).strict(), capabilities: z.array(z.object({ capability: z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"]), allowed: z.boolean(), reason: z.string() })) });
 
 function structuredResult<T extends Record<string, unknown>>(schema: z.ZodType<T>, value: unknown) {
   const parsed = schema.parse(value);
@@ -20,6 +21,10 @@ export function createReadOnlyMcpServer(queryService: BrainQueryService): McpSer
   server.registerTool("inspect_opportunity", { description: "Inspect one Opportunity and all stored evidence and history. Slice 1 is read-only.", inputSchema: { id: uuidSchema }, outputSchema: inspectionOutputSchema.shape }, async ({ id }) => structuredResult(inspectionOutputSchema, await queryService.inspectOpportunity(id)));
   server.registerTool("explain_prediction", { description: "Explain one immutable prediction revision from its evidence and drafts. Slice 1 is read-only.", inputSchema: { id: uuidSchema, revision: z.number().int().positive().optional() }, outputSchema: explanationOutputSchema.shape }, async ({ id, revision }) => structuredResult(explanationOutputSchema, await queryService.explainPrediction(id, revision)));
   server.registerTool("get_proof_status", { description: "Return the phase-one proof state. Slice 1 cannot start live proof.", inputSchema: {}, outputSchema: proofOutputSchema.shape }, async () => structuredResult(proofOutputSchema, queryService.getProofStatus()));
+  server.registerTool("get_creator_archive", { description: "Return the locally imported, read-only owned-post archive when available.", inputSchema: {}, outputSchema: archiveOutputSchema.shape }, async () => {
+    const archive = await queryService.getCreatorArchive();
+    return structuredResult(archiveOutputSchema, { available: archive !== null, archive });
+  });
   server.registerTool("get_system_health", { description: "Return storage and policy-gate health without secrets. Slice 1 is read-only.", inputSchema: {}, outputSchema: healthOutputSchema.shape }, async () => structuredResult(healthOutputSchema, await queryService.getSystemHealth()));
   return server;
 }

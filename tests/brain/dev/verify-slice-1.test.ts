@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { validateSlice1Verification } from "../../../src/brain/dev/verify-slice-1";
 
 const valid = {
-  tools: ["explain_prediction", "get_proof_status", "get_system_health", "inspect_opportunity", "list_opportunities"],
+  tools: ["explain_prediction", "get_creator_archive", "get_proof_status", "get_system_health", "inspect_opportunity", "list_opportunities"],
   inspection: { opportunity: { id: "20000000-0000-4000-8000-000000000001", revision: 1 }, evidence: [{}, {}, {}] },
-  health: { mode: "synthetic", storage: "healthy", liveAdaptersInstalled: false, approvalConfigured: false, latestComplianceCheckedAt: "2026-08-27T14:07:00.000Z", capabilities: [
+  health: { mode: "synthetic", storage: "healthy", liveAdaptersInstalled: false, approvalConfigured: false, latestComplianceCheckedAt: "2026-08-27T14:07:00.000Z", creatorArchive: { available: false, source: null, importedAt: null }, capabilities: [
     { capability: "live-x-read", allowed: false, reason: "live capabilities are disabled in synthetic mode" },
     { capability: "live-ai-judgment", allowed: false, reason: "live capabilities are disabled in synthetic mode" },
     { capability: "live-ai-generation", allowed: false, reason: "live capabilities are disabled in synthetic mode" },

@@ -19,7 +19,10 @@
     "brain:migrate": "tsx src/brain/storage/run-migrations.ts",
     "brain:seed": "tsx src/brain/dev/seed-synthetic.ts",
     "brain:import:legacy": "tsx src/brain/import/cli.ts",
+    "brain:import:x-owned": "tsx src/brain/import/x-owned-posts-cli.ts",
     "brain:mcp": "tsx src/brain/interfaces/mcp/stdio.ts",
+    "brain:mcp:local": "tsx src/brain/interfaces/mcp/local-stdio.ts",
+    "brain:mcp:synthetic": "tsx src/brain/interfaces/mcp/synthetic-stdio.ts",
     "brain:verify:slice1": "tsx src/brain/dev/verify-slice-1.ts",
     "test:brain": "vitest run tests/brain --exclude 'tests/brain/integration/**'",
     "test:brain:integration": "vitest run --no-file-parallelism tests/brain/integration"

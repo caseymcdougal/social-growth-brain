@@ -75,4 +75,18 @@ describe("BrainQueryService", () => {
     expect(health.approvalConfigured).toBe(true);
     expect(JSON.stringify(health)).not.toContain(approvalReference);
   });
+
+  it("makes an archive lookup failure visible without treating it as an absent archive", async () => {
+    const unavailableStore = {
+      ...store(),
+      getLatestCreatorArchive: async () => { throw new Error("archive lookup unavailable"); }
+    };
+    const unavailableService = new BrainQueryService(unavailableStore, { mode: "synthetic", databaseUrl: "postgresql://social_brain:placeholder@127.0.0.1/social_brain_test" });
+
+    await expect(unavailableService.getCreatorArchive()).rejects.toThrow("archive lookup unavailable");
+    await expect(unavailableService.getSystemHealth()).resolves.toMatchObject({
+      storage: "unavailable",
+      creatorArchive: { available: false, source: null, importedAt: null }
+    });
+  });
 });

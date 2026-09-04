@@ -139,6 +139,21 @@ function validCreatorArchive() {
   };
 }
 
+function creatorArchiveWithPostCount(count: number, source: "legacy-sqlite" | "x-api-owned-posts") {
+  const archive = validCreatorArchive();
+  const posts = Array.from({ length: count }, (_, index) => {
+    const xPostId = `900000000000000${String(index).padStart(3, "0")}`;
+    return { ...archive.posts[0], xPostId, url: `https://x.com/caseymcdougal/status/${xPostId}` };
+  });
+  return {
+    ...archive,
+    source,
+    consentBasis: source === "legacy-sqlite" ? "casey-requested-import" : "casey-approved-x-owned-post-import",
+    posts,
+    importReport: { importedPosts: count, omittedFields: [] }
+  };
+}
+
 function validOpportunity(): Opportunity {
   const opportunityId = randomUUID();
   return {
@@ -340,6 +355,12 @@ describe("Social Brain domain contracts", () => {
         importReport: { importedPosts: 0, omittedFields: [] }
       })
     ).toThrow();
+  });
+
+  it("limits owned X archive imports to 25 posts without limiting legacy archives", () => {
+    expect(creatorArchiveSchema.parse(creatorArchiveWithPostCount(25, "x-api-owned-posts")).posts).toHaveLength(25);
+    expect(() => creatorArchiveSchema.parse(creatorArchiveWithPostCount(26, "x-api-owned-posts"))).toThrow(/at most 25/);
+    expect(creatorArchiveSchema.parse(creatorArchiveWithPostCount(26, "legacy-sqlite")).posts).toHaveLength(26);
   });
 
   it.each([

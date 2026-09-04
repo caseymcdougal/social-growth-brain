@@ -1,5 +1,5 @@
 import type { RuntimeConfig } from "../config/runtime-config";
-import type { OpportunityStatus } from "../domain";
+import { creatorArchiveSchema, type OpportunityStatus } from "../domain";
 import { createPolicyGate } from "../policy/policy-gate";
 import type { BrainEventStore } from "../storage/event-store";
 
@@ -51,13 +51,31 @@ export class BrainQueryService {
     };
   }
 
+  async getCreatorArchive() {
+    const archive = await this.store.getLatestCreatorArchive();
+    return archive === null ? null : creatorArchiveSchema.parse(archive);
+  }
+
   async getSystemHealth() {
     let storage: "healthy" | "unavailable" = "healthy";
     let latestComplianceCheckedAt: string | null = null;
+    let creatorArchive: { available: boolean; source: "legacy-sqlite" | "x-api-owned-posts" | null; importedAt: string | null } = {
+      available: false,
+      source: null,
+      importedAt: null
+    };
     try {
       await this.store.healthCheck();
       const compliance = await this.store.listComplianceChecks();
       latestComplianceCheckedAt = compliance.at(-1)?.checkedAt ?? null;
+      const archive = await this.getCreatorArchive();
+      if (archive) {
+        creatorArchive = {
+          available: true,
+          source: archive.source,
+          importedAt: archive.importedAt
+        };
+      }
     } catch {
       storage = "unavailable";
     }
@@ -67,6 +85,7 @@ export class BrainQueryService {
       liveAdaptersInstalled: false,
       approvalConfigured: this.config.mode === "production",
       latestComplianceCheckedAt,
+      creatorArchive,
       capabilities: this.policyGate.list().map(({ capability, allowed, reason }) => ({ capability, allowed, reason }))
     };
   }

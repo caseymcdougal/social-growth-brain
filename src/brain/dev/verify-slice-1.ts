@@ -9,7 +9,7 @@ import { runMigrations } from "../storage/migrations";
 import { PostgresBrainEventStore } from "../storage/postgres-event-store";
 import { createPostgresPool } from "../storage/postgres";
 
-const expectedTools = ["explain_prediction", "get_proof_status", "get_system_health", "inspect_opportunity", "list_opportunities"];
+const expectedTools = ["explain_prediction", "get_creator_archive", "get_proof_status", "get_system_health", "inspect_opportunity", "list_opportunities"];
 const expectedOpportunityId = "20000000-0000-4000-8000-000000000001";
 const expectedEvidenceCount = 3;
 const expectedCapabilities = ["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"];
@@ -18,14 +18,14 @@ const expectedLatestComplianceCheckedAt = "2026-08-27T14:07:00.000Z";
 type VerificationInput = {
   tools: string[];
   inspection: { opportunity: { id: string; revision: number }; evidence: unknown[] } | undefined;
-  health: { mode: string; storage: string; liveAdaptersInstalled: boolean; approvalConfigured: boolean; latestComplianceCheckedAt: string | null; capabilities: { capability: string; allowed: boolean; reason: string }[] } | undefined;
+  health: { mode: string; storage: string; liveAdaptersInstalled: boolean; approvalConfigured: boolean; latestComplianceCheckedAt: string | null; creatorArchive: { available: boolean; source: string | null; importedAt: string | null }; capabilities: { capability: string; allowed: boolean; reason: string }[] } | undefined;
 };
 
 export function validateSlice1Verification(input: VerificationInput): asserts input is VerificationInput & { inspection: NonNullable<VerificationInput["inspection"]>; health: NonNullable<VerificationInput["health"]> } {
   const { tools, inspection, health } = input;
   if (JSON.stringify(tools) !== JSON.stringify(expectedTools)) throw new Error("Unexpected MCP tool registry");
   if (!inspection || inspection.opportunity.id !== expectedOpportunityId || inspection.opportunity.revision !== 1 || inspection.evidence.length !== expectedEvidenceCount) throw new Error("Seeded MCP inspection invariants failed");
-  if (!health || health.mode !== "synthetic" || health.storage !== "healthy" || health.liveAdaptersInstalled || health.approvalConfigured || health.latestComplianceCheckedAt !== expectedLatestComplianceCheckedAt) throw new Error("Unexpected Slice 1 system health");
+  if (!health || health.mode !== "synthetic" || health.storage !== "healthy" || health.liveAdaptersInstalled || health.approvalConfigured || health.latestComplianceCheckedAt !== expectedLatestComplianceCheckedAt || health.creatorArchive.available || health.creatorArchive.source !== null || health.creatorArchive.importedAt !== null) throw new Error("Unexpected Slice 1 system health");
   if (health.capabilities.length !== expectedCapabilities.length || health.capabilities.some(({ capability, allowed, reason }, index) => capability !== expectedCapabilities[index] || allowed || reason !== "live capabilities are disabled in synthetic mode")) throw new Error("Live capability policy is not fail-closed");
 }
 

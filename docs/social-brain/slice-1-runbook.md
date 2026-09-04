@@ -25,11 +25,22 @@ npm run brain:import:legacy -- --sqlite /absolute/path/to/file.sqlite
 
 ## Agent connection
 
-Launch MCP from the repository root and configure the client to launch the same command. The silent flag is required because stdout is the MCP protocol stream.
+Launch the local read-only MCP from the repository root and configure the client to launch the same command. It always serves the three synthetic scenarios and optionally exposes a valid private owned-post archive. The silent flag is required because stdout is the MCP protocol stream.
 
 ```bash
-npm --silent run brain:mcp
+npm --silent run brain:mcp:local
 ```
+
+## Owned X history import
+
+This is a one-time, read-only import of up to 25 of Casey's own original X posts. It is not a live feed, a scheduled refresh, AI processing, or a publishing integration.
+
+1. In the X Developer Portal, configure the exact OAuth callback `http://127.0.0.1:8787/callback` and obtain the public OAuth client ID. Keep it outside Git by adding it to the ignored `.env` file as `SOCIAL_BRAIN_X_OAUTH_CLIENT_ID=...`.
+2. Run `npm run brain:import:x-owned`. The command displays a fixed $0.05 request envelope before it opens an authorization URL.
+3. Casey manually reviews and approves only `tweet.read` and `users.read` on the X consent screen. The access token stays in process memory and is never saved.
+4. The command makes one authenticated-profile request and one 25-post page request, then writes the private mode-`0600` archive at `data/social-brain/casey-owned-post-history.json`.
+
+The X Developer Console spend limit is the final cost control. After import, the local plugin can only inspect the archive with `get_creator_archive`; it still cannot refresh X data, use AI on the archive, or publish.
 
 ## Failure recovery
 
