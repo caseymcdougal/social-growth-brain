@@ -86,7 +86,7 @@ const BASELINE_OUTPUT_JSON_SCHEMA = {
       additionalProperties: false,
       required: ["consideredPostIds"],
       properties: {
-        consideredPostIds: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", pattern: "^\\d+$" } }
+        consideredPostIds: { type: "array", minItems: 1, items: { type: "string", pattern: "^\\d+$" } }
       }
     },
     claims: {
@@ -102,7 +102,7 @@ const BASELINE_OUTPUT_JSON_SCHEMA = {
             enum: ["voice", "positioning", "audience", "strongest-lane", "weak-lane", "proof-point", "experiment", "duplication"]
           },
           claim: requiredTextSchema,
-          postIds: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", pattern: "^\\d+$" } },
+          postIds: { type: "array", minItems: 1, items: { type: "string", pattern: "^\\d+$" } },
           evidenceKind: { type: "string", enum: ["measured", "inferred"] },
           confidence: { type: "number", minimum: 0, maximum: 1 },
           uncertainty: requiredTextSchema
@@ -184,6 +184,14 @@ function baselineEnvironment(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(
     allowedKeys.flatMap((key) => source[key] === undefined ? [] : [[key, source[key]]])
   );
+}
+
+function hasChatGptAuthStatus(output: { stdout: string; stderr: string }): boolean {
+  const statusLines = `${output.stdout}\n${output.stderr}`
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("Logged in using "));
+  return statusLines.length === 1 && statusLines[0] === CHATGPT_AUTH_STATUS;
 }
 
 function modelInput(archive: CreatorArchive) {
@@ -272,7 +280,7 @@ export async function deriveCreatorBaseline(input: {
       timeoutMs: PREFLIGHT_TIMEOUT_MS
     }, "Codex baseline authentication preflight failed");
 
-    if (preflight.stdout.trim() !== CHATGPT_AUTH_STATUS) {
+    if (!hasChatGptAuthStatus(preflight)) {
       throw new Error("ChatGPT authentication preflight failed");
     }
 

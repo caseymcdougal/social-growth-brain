@@ -181,6 +181,7 @@ describe("Codex creator baseline runner", () => {
     expect(JSON.stringify(inputSnapshot)).not.toContain("private override");
     expect(JSON.stringify(inputSnapshot)).not.toContain("private direction");
     expect(schemaSnapshot).toMatchObject({ type: "object", additionalProperties: false });
+    expect(JSON.stringify(schemaSnapshot)).not.toContain('"uniqueItems"');
     expect(fileModes).toEqual([0o600, 0o600, 0o600]);
     expect(result).toMatchObject({
       id: "20000000-0000-4000-8000-000000000001",
@@ -208,6 +209,31 @@ describe("Codex creator baseline runner", () => {
       }
     })).rejects.toThrow("ChatGPT authentication preflight failed");
     expect(calls).toBe(1);
+    expect(fs.readdirSync(root)).toEqual([]);
+  });
+
+  it("accepts the exact ChatGPT auth status when Codex writes it to stderr", async () => {
+    const root = tempRoot();
+    let calls = 0;
+
+    const result = await deriveCreatorBaseline({
+      archive: archive(),
+      tempRoot: root,
+      runProcess: async (request) => {
+        calls += 1;
+        if (request.args[0] === "login") {
+          return {
+            stdout: "",
+            stderr: "WARNING: PATH alias setup was skipped\nLogged in using ChatGPT\n"
+          };
+        }
+        fs.writeFileSync(outputPath(request), JSON.stringify(modelOutput()));
+        return { stdout: "", stderr: "" };
+      }
+    });
+
+    expect(calls).toBe(2);
+    expect(result.voiceProfile).toEqual(modelOutput().voiceProfile);
     expect(fs.readdirSync(root)).toEqual([]);
   });
 
