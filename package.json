@@ -20,6 +20,8 @@
     "brain:seed": "tsx src/brain/dev/seed-synthetic.ts",
     "brain:import:legacy": "tsx src/brain/import/cli.ts",
     "brain:import:x-owned": "tsx src/brain/import/x-owned-posts-cli.ts",
+    "brain:baseline:propose": "tsx src/brain/baseline/propose-cli.ts",
+    "brain:baseline:accept": "tsx src/brain/baseline/accept-cli.ts",
     "brain:mcp": "tsx src/brain/interfaces/mcp/stdio.ts",
     "brain:mcp:local": "tsx src/brain/interfaces/mcp/local-stdio.ts",
     "brain:mcp:synthetic": "tsx src/brain/interfaces/mcp/synthetic-stdio.ts",
