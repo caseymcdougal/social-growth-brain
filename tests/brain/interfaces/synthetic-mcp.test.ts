@@ -21,6 +21,7 @@ describe("synthetic fixture MCP server", () => {
       expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
         "explain_prediction",
         "get_creator_archive",
+        "get_creator_baseline",
         "get_proof_status",
         "get_system_health",
         "inspect_opportunity",
@@ -43,6 +44,15 @@ describe("synthetic fixture MCP server", () => {
         archive: unknown;
       };
       expect(archive).toEqual({ available: false, archive: null });
+
+      expect((await client.callTool({ name: "get_creator_baseline", arguments: {} })).structuredContent).toEqual({
+        proposalAvailable: false,
+        acceptedAvailable: false,
+        proposalMatchesCurrentArchive: false,
+        acceptedMatchesCurrentArchive: false,
+        proposal: null,
+        accepted: null
+      });
 
       const listed = (await client.callTool({ name: "list_opportunities", arguments: {} })).structuredContent as {
         opportunities: Array<{ id: string; actionType: string }>;

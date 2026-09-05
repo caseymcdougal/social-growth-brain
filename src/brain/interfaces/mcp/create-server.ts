@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { complianceCheckSchema, creatorArchiveSchema, creatorArchiveSourceSchema, decisionEventSchema, draftVariantSchema, opportunitySchema, opportunityStatusSchema, outcomeSnapshotSchema, signalEvidenceSchema, uuidSchema } from "../../domain";
+import { acceptedCreatorBaselineSchema, complianceCheckSchema, creatorArchiveSchema, creatorArchiveSourceSchema, creatorBaselineProposalSchema, decisionEventSchema, draftVariantSchema, opportunitySchema, opportunityStatusSchema, outcomeSnapshotSchema, signalEvidenceSchema, uuidSchema } from "../../domain";
 import type { BrainQueryService } from "../../query/brain-query-service";
 
 const opportunityListOutputSchema = z.object({ opportunities: z.array(opportunitySchema) });
@@ -8,6 +8,7 @@ const inspectionOutputSchema = z.object({ opportunity: opportunitySchema, revisi
 const explanationOutputSchema = z.object({ opportunity: opportunitySchema, evidence: z.array(signalEvidenceSchema), drafts: z.array(draftVariantSchema) });
 const proofOutputSchema = z.object({ state: z.literal("not_started"), requiredConsecutiveDays: z.literal(7), requiredViews: z.literal(1000), maturityHours: z.literal(48), reason: z.string() });
 const archiveOutputSchema = z.object({ available: z.boolean(), archive: creatorArchiveSchema.nullable() }).strict();
+const baselineOutputSchema = z.object({ proposalAvailable: z.boolean(), acceptedAvailable: z.boolean(), proposalMatchesCurrentArchive: z.boolean(), acceptedMatchesCurrentArchive: z.boolean(), proposal: creatorBaselineProposalSchema.nullable(), accepted: acceptedCreatorBaselineSchema.nullable() }).strict();
 const healthOutputSchema = z.object({ mode: z.enum(["synthetic", "production"]), storage: z.enum(["healthy", "unavailable"]), liveAdaptersInstalled: z.boolean(), approvalConfigured: z.boolean(), latestComplianceCheckedAt: z.string().datetime({ offset: true }).nullable(), creatorArchive: z.object({ available: z.boolean(), source: creatorArchiveSourceSchema.nullable(), importedAt: z.string().datetime({ offset: true }).nullable() }).strict(), capabilities: z.array(z.object({ capability: z.enum(["live-x-read", "live-ai-judgment", "live-ai-generation", "x-write"]), allowed: z.boolean(), reason: z.string() })) });
 
 function structuredResult<T extends Record<string, unknown>>(schema: z.ZodType<T>, value: unknown) {
@@ -25,6 +26,7 @@ export function createReadOnlyMcpServer(queryService: BrainQueryService): McpSer
     const archive = await queryService.getCreatorArchive();
     return structuredResult(archiveOutputSchema, { available: archive !== null, archive });
   });
+  server.registerTool("get_creator_baseline", { description: "Inspect local proposal and accepted creator-baseline state. This read-only tool never generates or accepts anything.", inputSchema: {}, outputSchema: baselineOutputSchema.shape }, async () => structuredResult(baselineOutputSchema, queryService.getCreatorBaseline()));
   server.registerTool("get_system_health", { description: "Return storage and policy-gate health without secrets. Slice 1 is read-only.", inputSchema: {}, outputSchema: healthOutputSchema.shape }, async () => structuredResult(healthOutputSchema, await queryService.getSystemHealth()));
   return server;
 }

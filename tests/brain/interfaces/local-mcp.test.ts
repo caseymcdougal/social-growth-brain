@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
 import packageJson from "../../../package.json";
-import type { CreatorArchive } from "../../../src/brain/domain";
+import { acceptCreatorBaseline, buildCreatorBaselineProposal, type CreatorArchive, type CreatorBaselineModelOutput } from "../../../src/brain/domain";
+import { writeLocalAcceptedBaseline, writeLocalBaselineProposal } from "../../../src/brain/baseline/local-baseline-store";
 import { writeLocalCreatorArchive } from "../../../src/brain/import/local-creator-archive";
 import { createLocalMcpServer } from "../../../src/brain/interfaces/mcp/local-server";
 
@@ -60,6 +61,37 @@ function archivePath(): string {
   return join(directory, "archive.json");
 }
 
+function baselinePaths() {
+  const path = archivePath();
+  return {
+    archivePath: path,
+    proposalPath: join(dirname(path), "proposal.json"),
+    acceptedPath: join(dirname(path), "accepted.json")
+  };
+}
+
+function baselineModelOutput(postIds: string[]): CreatorBaselineModelOutput {
+  return {
+    voiceProfile: { summary: "direct", casing_and_punctuation: ["sentence case"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build it."] },
+    strategyMemory: { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "artifacts work", status: "active", evidence: "future posts" }] },
+    duplicationGuard: { consideredPostIds: postIds },
+    claims: [
+      { area: "voice", claim: "direct", postIds: [postIds[0]!], evidenceKind: "measured", confidence: 0.9, uncertainty: "small sample" },
+      { area: "positioning", claim: "builder", postIds: [postIds[0]!], evidenceKind: "inferred", confidence: 0.7, uncertainty: "inferred" }
+    ],
+    largestUncertainty: "small archive"
+  };
+}
+
+function baselineProposal(inputArchive: CreatorArchive) {
+  return buildCreatorBaselineProposal({
+    archive: inputArchive,
+    modelOutput: baselineModelOutput(inputArchive.posts.map(({ xPostId }) => xPostId)),
+    id: "30000000-0000-4000-8000-000000000001",
+    now: () => new Date("2026-09-04T21:00:00.000Z")
+  });
+}
+
 async function withClient(server: Awaited<ReturnType<typeof createLocalMcpServer>>, callback: (client: Client) => Promise<void>) {
   const client = new Client({ name: "social-brain-local-mcp-test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -88,6 +120,7 @@ describe("local archive MCP server", () => {
       expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
         "explain_prediction",
         "get_creator_archive",
+        "get_creator_baseline",
         "get_proof_status",
         "get_system_health",
         "inspect_opportunity",
@@ -116,6 +149,72 @@ describe("local archive MCP server", () => {
         { id: "20000000-0000-4000-8000-000000000003", actionType: "original" }
       ]);
     });
+  });
+
+  it("serves proposal and accepted baseline state without mutating either record", async () => {
+    const paths = baselinePaths();
+    const expectedArchive = writeLocalCreatorArchive(paths.archivePath, archive());
+    const expectedProposal = writeLocalBaselineProposal(paths.proposalPath, baselineProposal(expectedArchive));
+    const expectedAccepted = writeLocalAcceptedBaseline(paths.acceptedPath, acceptCreatorBaseline({
+      archive: expectedArchive,
+      proposal: expectedProposal,
+      proposalId: expectedProposal.id,
+      sourceFingerprint: expectedProposal.sourceArchiveFingerprint,
+      now: () => new Date("2026-09-04T22:00:00.000Z")
+    }));
+    const beforeProposal = fs.readFileSync(paths.proposalPath);
+    const beforeAccepted = fs.readFileSync(paths.acceptedPath);
+
+    await withClient(await createLocalMcpServer({ archivePath: paths.archivePath, proposalPath: paths.proposalPath, acceptedBaselinePath: paths.acceptedPath }), async (client) => {
+      expect((await client.callTool({ name: "get_creator_baseline", arguments: {} })).structuredContent).toEqual({
+        proposalAvailable: true,
+        acceptedAvailable: true,
+        proposalMatchesCurrentArchive: true,
+        acceptedMatchesCurrentArchive: true,
+        proposal: expectedProposal,
+        accepted: expectedAccepted
+      });
+    });
+
+    expect(fs.readFileSync(paths.proposalPath)).toEqual(beforeProposal);
+    expect(fs.readFileSync(paths.acceptedPath)).toEqual(beforeAccepted);
+  });
+
+  it("reports absent and stale optional baseline files explicitly", async () => {
+    const absentPaths = baselinePaths();
+    writeLocalCreatorArchive(absentPaths.archivePath, archive());
+    await withClient(await createLocalMcpServer({ archivePath: absentPaths.archivePath, proposalPath: absentPaths.proposalPath, acceptedBaselinePath: absentPaths.acceptedPath }), async (client) => {
+      expect((await client.callTool({ name: "get_creator_baseline", arguments: {} })).structuredContent).toEqual({
+        proposalAvailable: false,
+        acceptedAvailable: false,
+        proposalMatchesCurrentArchive: false,
+        acceptedMatchesCurrentArchive: false,
+        proposal: null,
+        accepted: null
+      });
+    });
+
+    const stalePaths = baselinePaths();
+    writeLocalCreatorArchive(stalePaths.archivePath, archive());
+    const staleArchive = archive();
+    staleArchive.sourceFingerprint = "b".repeat(64);
+    const staleProposal = writeLocalBaselineProposal(stalePaths.proposalPath, baselineProposal(staleArchive));
+    writeLocalAcceptedBaseline(stalePaths.acceptedPath, acceptCreatorBaseline({ archive: staleArchive, proposal: staleProposal, proposalId: staleProposal.id, sourceFingerprint: staleProposal.sourceArchiveFingerprint }));
+    await withClient(await createLocalMcpServer({ archivePath: stalePaths.archivePath, proposalPath: stalePaths.proposalPath, acceptedBaselinePath: stalePaths.acceptedPath }), async (client) => {
+      expect((await client.callTool({ name: "get_creator_baseline", arguments: {} })).structuredContent).toMatchObject({
+        proposalAvailable: true,
+        acceptedAvailable: true,
+        proposalMatchesCurrentArchive: false,
+        acceptedMatchesCurrentArchive: false
+      });
+    });
+  });
+
+  it("fails startup when an optional baseline file is invalid", async () => {
+    const paths = baselinePaths();
+    writeLocalCreatorArchive(paths.archivePath, archive());
+    fs.writeFileSync(paths.proposalPath, "not JSON");
+    await expect(createLocalMcpServer({ archivePath: paths.archivePath, proposalPath: paths.proposalPath, acceptedBaselinePath: paths.acceptedPath })).rejects.toThrow();
   });
 
   it("starts without an absent archive and reports it unavailable", async () => {

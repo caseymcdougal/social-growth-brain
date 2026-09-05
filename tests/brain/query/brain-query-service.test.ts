@@ -3,6 +3,7 @@ import fixture from "../../../src/brain/replay/fixtures/synthetic-replay.json";
 import { replayFixtureSchema } from "../../../src/brain/replay/replay-schema";
 import type { BrainEventStore } from "../../../src/brain/storage/event-store";
 import { BrainQueryService } from "../../../src/brain/query/brain-query-service";
+import { acceptedCreatorBaselineSchema, creatorBaselineProposalSchema } from "../../../src/brain/domain";
 
 const replay = replayFixtureSchema.parse(fixture);
 const opportunity = replay.events.find((event) => event.kind === "opportunity_revision")!.payload;
@@ -13,6 +14,8 @@ const compliance = replay.events.filter((event) => event.kind === "compliance_ch
 const olderRevision = { ...opportunity, revision: 1, revisedAt: "2026-08-27T14:00:00.000Z" };
 const currentRevision = { ...opportunity, revision: 2, status: "approved" as const, revisedAt: "2026-08-27T14:10:00.000Z" };
 const outcomes = [{ schemaVersion: 1 as const, id: "80000000-0000-4000-8000-000000000001", opportunityId: opportunity.id, publishedPostId: opportunity.targetPostId!, publishedAt: "2026-08-27T14:05:00.000Z", observedAt: "2026-08-27T14:10:00.000Z", observationAgeMinutes: 5, publicMetrics: { views: 1, likes: 0, replies: 0, reposts: 0, bookmarks: 0 }, privateMetrics: null, source: "synthetic" as const, collectionStatus: "complete" as const }];
+const baselineProposal = creatorBaselineProposalSchema.parse({ schemaVersion: 1, id: "30000000-0000-4000-8000-000000000001", creatorId: "casey-mcdougal", createdAt: "2026-09-04T21:00:00.000Z", sourceArchiveFingerprint: "a".repeat(64), provenance: { interface: "codex-cli", model: "codex-cli-chatgpt-default", promptTemplateVersion: "owned-x-baseline-v1" }, voiceProfile: { summary: "direct", casing_and_punctuation: ["sentence case"], sentence_rhythm: ["short"], vocabulary: ["build"], hook_moves: ["claim"], banned_moves: ["hype"], style_excerpts: ["Build it."] }, strategyMemory: { positioning: "builder", audience_segments: ["builders"], strongest_lanes: ["product"], weak_lanes: ["news"], voice_rules: ["plain"], proof_points: ["shipped"], active_experiments: [{ hypothesis: "artifacts work", status: "active", evidence: "future posts" }] }, duplicationGuard: { consideredPostIds: ["100"] }, claims: [{ area: "voice", claim: "direct", postIds: ["100"], evidenceKind: "measured", confidence: 0.9, uncertainty: "small sample" }, { area: "positioning", claim: "builder", postIds: ["100"], evidenceKind: "inferred", confidence: 0.7, uncertainty: "inferred" }], largestUncertainty: "small archive" });
+const acceptedBaseline = acceptedCreatorBaselineSchema.parse({ schemaVersion: 1, proposal: baselineProposal, acceptedAt: "2026-09-04T22:00:00.000Z", acceptedBy: "casey-mcdougal", acceptedProposalId: baselineProposal.id, acceptedSourceArchiveFingerprint: baselineProposal.sourceArchiveFingerprint });
 
 function store(): BrainEventStore {
   return {
@@ -74,6 +77,60 @@ describe("BrainQueryService", () => {
     const health = await productionService.getSystemHealth();
     expect(health.approvalConfigured).toBe(true);
     expect(JSON.stringify(health)).not.toContain(approvalReference);
+  });
+
+  it("returns a cloned creator baseline snapshot with current-archive match state", () => {
+    const input = {
+      currentArchiveFingerprint: "a".repeat(64),
+      proposal: structuredClone(baselineProposal),
+      accepted: structuredClone(acceptedBaseline)
+    };
+    const baselineService = new BrainQueryService(
+      store(),
+      { mode: "synthetic", databaseUrl: "postgresql://social_brain:placeholder@127.0.0.1/social_brain_test" },
+      input
+    );
+
+    expect(baselineService.getCreatorBaseline()).toEqual({
+      proposalAvailable: true,
+      acceptedAvailable: true,
+      proposalMatchesCurrentArchive: true,
+      acceptedMatchesCurrentArchive: true,
+      proposal: baselineProposal,
+      accepted: acceptedBaseline
+    });
+
+    input.proposal.voiceProfile.summary = "mutated";
+    input.accepted.proposal.voiceProfile.summary = "mutated";
+    expect(baselineService.getCreatorBaseline().proposal?.voiceProfile.summary).toBe("direct");
+    expect(baselineService.getCreatorBaseline().accepted?.proposal.voiceProfile.summary).toBe("direct");
+    const returned = baselineService.getCreatorBaseline();
+    returned.proposal!.voiceProfile.summary = "returned mutation";
+    expect(baselineService.getCreatorBaseline().proposal?.voiceProfile.summary).toBe("direct");
+  });
+
+  it("reports absent and stale creator baseline records without hiding them", () => {
+    const absent = service.getCreatorBaseline();
+    expect(absent).toEqual({
+      proposalAvailable: false,
+      acceptedAvailable: false,
+      proposalMatchesCurrentArchive: false,
+      acceptedMatchesCurrentArchive: false,
+      proposal: null,
+      accepted: null
+    });
+
+    const stale = new BrainQueryService(
+      store(),
+      { mode: "synthetic", databaseUrl: "postgresql://social_brain:placeholder@127.0.0.1/social_brain_test" },
+      { currentArchiveFingerprint: "b".repeat(64), proposal: baselineProposal, accepted: acceptedBaseline }
+    ).getCreatorBaseline();
+    expect(stale).toMatchObject({
+      proposalAvailable: true,
+      acceptedAvailable: true,
+      proposalMatchesCurrentArchive: false,
+      acceptedMatchesCurrentArchive: false
+    });
   });
 
   it("makes an archive lookup failure visible without treating it as an absent archive", async () => {

@@ -5,7 +5,7 @@ import { createLocalMcpServer } from "./local-server";
 import { runReadOnlyStdioServer } from "./stdio";
 
 export async function createSyntheticMcpServer() {
-  return createLocalMcpServer({ archivePath: null });
+  return createLocalMcpServer({ archivePath: null, proposalPath: null, acceptedBaselinePath: null });
 }
 
 async function main(): Promise<void> {

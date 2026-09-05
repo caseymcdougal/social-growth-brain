@@ -1,13 +1,52 @@
 import type { RuntimeConfig } from "../config/runtime-config";
-import { creatorArchiveSchema, type OpportunityStatus } from "../domain";
+import {
+  acceptedCreatorBaselineSchema,
+  creatorArchiveSchema,
+  creatorBaselineProposalSchema,
+  type AcceptedCreatorBaseline,
+  type CreatorBaselineProposal,
+  type OpportunityStatus
+} from "../domain";
 import { createPolicyGate } from "../policy/policy-gate";
 import type { BrainEventStore } from "../storage/event-store";
 
+export interface CreatorBaselineSnapshot {
+  currentArchiveFingerprint: string | null;
+  proposal: CreatorBaselineProposal | null;
+  accepted: AcceptedCreatorBaseline | null;
+}
+
+const EMPTY_BASELINE_SNAPSHOT: CreatorBaselineSnapshot = {
+  currentArchiveFingerprint: null,
+  proposal: null,
+  accepted: null
+};
+
 export class BrainQueryService {
   private readonly policyGate;
+  private readonly baselineSnapshot: CreatorBaselineSnapshot;
 
-  constructor(private readonly store: BrainEventStore, private readonly config: RuntimeConfig) {
+  constructor(
+    private readonly store: BrainEventStore,
+    private readonly config: RuntimeConfig,
+    baselineSnapshot: CreatorBaselineSnapshot = EMPTY_BASELINE_SNAPSHOT
+  ) {
     this.policyGate = createPolicyGate(config);
+    if (
+      baselineSnapshot.currentArchiveFingerprint !== null &&
+      !/^[a-f0-9]{64}$/.test(baselineSnapshot.currentArchiveFingerprint)
+    ) {
+      throw new Error("Current archive fingerprint must be null or a lowercase SHA-256 value");
+    }
+    this.baselineSnapshot = {
+      currentArchiveFingerprint: baselineSnapshot.currentArchiveFingerprint,
+      proposal: baselineSnapshot.proposal === null
+        ? null
+        : creatorBaselineProposalSchema.parse(baselineSnapshot.proposal),
+      accepted: baselineSnapshot.accepted === null
+        ? null
+        : acceptedCreatorBaselineSchema.parse(baselineSnapshot.accepted)
+    };
   }
 
   async listOpportunities(input: { statuses?: OpportunityStatus[]; limit?: number } = {}) {
@@ -48,6 +87,22 @@ export class BrainQueryService {
       requiredViews: 1000,
       maturityHours: 48,
       reason: "Slice 1 is synthetic-only; live proof begins after later slice gates pass"
+    };
+  }
+
+  getCreatorBaseline() {
+    const { currentArchiveFingerprint, proposal, accepted } = this.baselineSnapshot;
+    return {
+      proposalAvailable: proposal !== null,
+      acceptedAvailable: accepted !== null,
+      proposalMatchesCurrentArchive: proposal !== null &&
+        currentArchiveFingerprint !== null &&
+        proposal.sourceArchiveFingerprint === currentArchiveFingerprint,
+      acceptedMatchesCurrentArchive: accepted !== null &&
+        currentArchiveFingerprint !== null &&
+        accepted.acceptedSourceArchiveFingerprint === currentArchiveFingerprint,
+      proposal: proposal === null ? null : structuredClone(proposal),
+      accepted: accepted === null ? null : structuredClone(accepted)
     };
   }
 
